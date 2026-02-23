@@ -26,6 +26,8 @@
 - `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth). Production currently uses https://pay.openfacilitator.io (Dexter was down 2026-02-23)
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.10
+- `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
+- `BASESCAN_API_KEY` — Basescan API key for deployer reputation checks (optional, degrades gracefully)
 
 ## Gotchas
 - No web3.py — we use raw JSON-RPC via requests
@@ -35,4 +37,6 @@
 - Network must be CAIP-2 format: `eip155:84532` (sepolia), `eip155:8453` (mainnet)
 - `create_app(enable_x402=False)` to skip payment middleware in tests
 - All scores 0-100, higher = riskier
+- 8 detectors: 7 bytecode pattern detectors + 1 deployer reputation detector (Basescan)
 - Proxy detection covers EIP-1967, EIP-1822, and OpenZeppelin (pre-1967) slots
+- Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it

@@ -19,6 +19,8 @@ class Config:
     facilitator_url: str
     network: str
     price: str
+    erc8004_agent_id: int | None = None
+    basescan_api_key: str = ""
 
 
 def load_config() -> Config:
@@ -32,6 +34,9 @@ def load_config() -> Config:
     if not wallet:
         raise ConfigError("WALLET_ADDRESS environment variable is required")
 
+    raw_agent_id = os.environ.get("ERC8004_AGENT_ID", "")
+    erc8004_agent_id: int | None = int(raw_agent_id) if raw_agent_id else None
+
     return Config(
         wallet_address=wallet,
         base_rpc_url=os.environ.get("BASE_RPC_URL", "https://mainnet.base.org"),
@@ -41,4 +46,6 @@ def load_config() -> Config:
         ),
         network=os.environ.get("NETWORK", "eip155:8453"),
         price=os.environ.get("PRICE", "$0.10"),
+        erc8004_agent_id=erc8004_agent_id,
+        basescan_api_key=os.environ.get("BASESCAN_API_KEY", ""),
     )

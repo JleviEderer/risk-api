@@ -91,3 +91,16 @@ def test_suspicious_selectors_scored():
     findings = run_all_detectors(instructions)
     result = compute_score(findings, instructions, bytecode)
     assert result.category_scores.get("suspicious_selector", 0) == 5
+
+
+def test_deployer_reputation_category_cap():
+    # Multiple deployer_reputation findings should cap at 10
+    findings = [
+        Finding("deployer_reputation", Severity.INFO, "young", "desc", 5),
+        Finding("deployer_reputation", Severity.INFO, "low tx", "desc", 5),
+        Finding("deployer_reputation", Severity.INFO, "extra", "desc", 5),
+    ]
+    bytecode = "00" * 200
+    instructions = disassemble(bytecode)
+    result = compute_score(findings, instructions, bytecode)
+    assert result.category_scores["deployer_reputation"] == 10

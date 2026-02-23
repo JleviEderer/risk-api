@@ -29,6 +29,7 @@ CATEGORY_CAPS: dict[str, int] = {
     "reentrancy": 10,
     "suspicious_selector": 15,
     "tiny_bytecode": 10,
+    "deployer_reputation": 10,
 }
 
 SUSPICIOUS_SELECTOR_POINTS = 5

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from risk_api.analysis.disassembler import disassemble
 from risk_api.analysis.patterns import Finding, run_all_detectors
+from risk_api.analysis.reputation import detect_deployer_reputation
 from risk_api.analysis.scoring import RiskLevel, ScoreResult, compute_score
 from risk_api.chain.rpc import get_code
 
@@ -20,7 +21,9 @@ class AnalysisResult:
     bytecode_size: int
 
 
-def analyze_contract(address: str, rpc_url: str) -> AnalysisResult:
+def analyze_contract(
+    address: str, rpc_url: str, basescan_api_key: str = ""
+) -> AnalysisResult:
     """Full analysis pipeline: fetch bytecode → disassemble → detect → score.
 
     Raises RPCError if bytecode fetch fails.
@@ -33,6 +36,7 @@ def analyze_contract(address: str, rpc_url: str) -> AnalysisResult:
 
     instructions = disassemble(bytecode_hex)
     findings = run_all_detectors(instructions)
+    findings.extend(detect_deployer_reputation(address, basescan_api_key))
     score_result: ScoreResult = compute_score(findings, instructions, bytecode_hex)
 
     return AnalysisResult(

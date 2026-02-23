@@ -12,6 +12,8 @@ def test_config():
         facilitator_url="https://x402.org/facilitator",
         network="eip155:84532",
         price="$0.10",
+        erc8004_agent_id=None,
+        basescan_api_key="",
     )
 
 

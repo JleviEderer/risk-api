@@ -166,6 +166,8 @@ def create_app(
 
     app = Flask(__name__)
     app.config["RISK_API_CONFIG"] = config
+    if config.erc8004_agent_id is not None:
+        app.config["ERC8004_AGENT_ID"] = config.erc8004_agent_id
 
     if enable_x402:
         _setup_x402_middleware(app, config)
@@ -227,7 +229,9 @@ def create_app(
             )
 
         try:
-            result = analyze_contract(address, config.base_rpc_url)
+            result = analyze_contract(
+                address, config.base_rpc_url, config.basescan_api_key
+            )
         except RPCError as e:
             return jsonify({"error": f"RPC error: {e}"}), 502
 
