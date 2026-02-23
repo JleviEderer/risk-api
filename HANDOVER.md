@@ -1,85 +1,86 @@
 # Handover — risk-api
 
-**Session date:** 2026-02-23
+**Session date:** 2026-02-23 (afternoon)
 **Repo:** https://github.com/JleviEderer/risk-api (private)
-**Latest commit:** `a62f5af` on `master` — deployment + Dexter facilitator switch
+**Latest commit:** `2ea189a` on `master`
 **Live at:** https://risk-api.life.conway.tech
 
 ---
 
 ## What We Did This Session
 
-Two tracks: **deployment/ops** (first half) and **strategic analysis** (second half).
+Three main tasks plus a deployment, all completed:
 
-### Track 1: Deployment & Paywall Activation
+### 1. Price Update ($0.01 → $0.10)
 
-Picked up from previous session where the API was built locally but not deployed.
+Updated the default price across all files:
+- `src/risk_api/config.py` — default `$0.10`
+- `.env.example`, `.env.production` — `PRICE=$0.10`
+- `tests/conftest.py` — test fixture price
+- `CLAUDE.md` — docs
 
-1. **Deployed to Conway sandbox** (`76cfc42df7955d2a7de0ec7e2473f686`, us-east, 1GB RAM)
-   - Created venv at `/root/risk-api-venv/`, installed all deps
-   - Wrote all source files via `sandbox_write_file`
-   - Started gunicorn with explicit env vars (dotenv doesn't work with gunicorn)
+### 2. ERC-8004 Registration (Agent #19074)
 
-2. **Switched facilitator from Coinbase to Dexter**
-   - Coinbase facilitator (`api.cdp.coinbase.com`) returned 401 — requires CDP API key
-   - Dexter (`https://x402.dexter.cash`) — free, no auth, 20K settlements/day
-   - Updated startup script, restarted gunicorn, verified paywall works
+Registered the risk-api as an on-chain agent identity on Base mainnet.
 
-3. **Verified live endpoints:**
-   - `/health` → 200 `{"status":"ok"}` (no paywall)
-   - `/analyze?address=0x...` → 402 with `Payment-Required` header containing base64 JSON payment details
-   - Payment details confirmed: USDC on Base, $0.01 (will be updated to $0.10), pay to wallet `0x1358...`
+- **Added `/agent-metadata.json` endpoint** to Flask app — serves ERC-8004 metadata, NOT behind x402 paywall
+- **Created `scripts/register_erc8004.py`** — signs and sends `register(string agentURI)` to the ERC-8004 registry contract using the agent wallet private key from `~/.automaton/wallet.json`
+- **Executed registration** — agent #19074 on Base mainnet
+  - TX: `9716a87ca45b10482efb42e0ebe53793c8cd14fa2987bc083aedd5606cb5e47d`
+  - View: https://8004scan.io/agents/base/19074
+  - Gas cost: 0.0000045710942064 ETH
+- **Added 3 tests** for the metadata endpoint (basic, with agent_id, not behind paywall)
+- **Metadata uses data: URI** (base64 encoded JSON) — could be upgraded to hosted URL via `setAgentURI(agentId, newURI)` later
 
-4. **Updated local config defaults** — `config.py`, `.env.example`, `.env.production`, `CLAUDE.md` all now default to Dexter
-5. **Added Docker setup** — Dockerfile, docker-compose.yml, .dockerignore, deploy.sh
-6. **Added gunicorn** to pyproject.toml dependencies
-7. **All 64 tests pass** locally after changes
-8. **Committed and pushed** as `a62f5af`
+### 3. x402.jobs Marketplace Listing
 
-### Track 2: Strategic Analysis
+Listed the API on the x402.jobs discovery marketplace.
 
-Deep discussion about competitive positioning, pricing, and build priorities. Key outcomes:
+- **Created `scripts/register_x402jobs.py`** — POSTs resource to x402.jobs API
+- **API key:** `kbaB-cpuBZaxvcEtrnC5tK2RVaFMsrXuarZDT0o0Duc` (user's account)
+- **Resource ID:** `43ef12aa-6f26-4f48-9bba-b07d8fea87c9`
+- **Live at:** https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base
 
-1. **GoPlus competitive analysis** — 717M calls/month, free API, 30+ chains. They check more things than us BUT can't serve autonomous agents (requires signup + API key). Our x402-native access is a categorical advantage, not just convenience.
+### 4. Conway Sandbox Deployment
 
-2. **Moat thesis** — The moat is x402 frictionlessness, not analysis depth. GoPlus can't easily add x402 (would cannibalize free tier). Moat is time-bounded (6-18 months). Ship fast, be first.
+Deployed all code changes to the live server.
 
-3. **Pricing decision** — Single tier at $0.10/call. No free tier (removes differentiator). No tiered pricing (over-engineering for zero users). Can adjust down based on data.
-
-4. **Build priorities** — Discovery first (ERC-8004 + x402.jobs), then deployer reputation + expanded selectors, then iterate from live feedback. Don't build honeypot simulation or cross-contract analysis until users ask.
-
-5. **Updated docs:**
-   - `docs/BizPlanning.md` — comprehensive rewrite with GoPlus analysis, moat thesis, pricing, build priorities (sections 6-13 are new)
-   - `docs/DECISIONS.md` — added ADR-005 (pricing) and ADR-006 (ship fast, iterate)
-   - `MEMORY.md` — added Strategic Insights section
+- **Uploaded updated files** via Conway API (`POST /v1/sandboxes/{id}/files/upload/json`)
+- **Critical gotcha discovered:** gunicorn loads from `site-packages`, NOT from `/root/risk-api/src/`. Must upload to BOTH `/root/risk-api/src/risk_api/` AND `/root/risk-api-venv/lib/python3.10/site-packages/risk_api/`
+- **Switched facilitator:** Dexter (`x402.dexter.cash`) was down with 522 timeout. Switched to **OpenFacilitator** (`pay.openfacilitator.io`) — free, no auth, supports Base mainnet v2 exact
+- **Verified all endpoints live:**
+  - `/health` → 200
+  - `/agent-metadata.json` → 200 with ERC-8004 metadata
+  - `/analyze` → 402 with $0.10 price (confirmed `amount: 100000` in payment header)
 
 ---
 
 ## What Worked
 
-- Conway sandbox deployment via `sandbox_exec` + `sandbox_write_file` — reliable once you use simple commands (compound commands over SSH are flaky)
-- Dexter facilitator — zero-friction setup, just works
-- x402 middleware gracefully handles facilitator failures (try/except on `initialize()`)
-- The strategy discussion surfaced critical insights that changed the build plan
+- **Conway API for deployment** — `POST /files/upload/json` and `POST /exec` work reliably. API key at `~/.conway/config.json`: `cnwy_k_LKnBkOgIX3FH817Zr7sB_y3KuraHR1fM`
+- **OpenFacilitator as drop-in replacement** — one env var change, same x402 protocol, instant switch
+- **ERC-8004 registration via Python** — `web3` and `eth_account` are transitive deps from x402, no new deps needed
+- **x402.jobs API** — straightforward REST, worked after fixing field name casing
 
 ## What Didn't Work / Gotchas
 
-- **Coinbase facilitator needs CDP API key** — returns 401 without it. Not documented clearly. Use Dexter instead.
-- **Conway sandbox SSH flaky with compound commands** — `cmd1 && cmd2` often fails with exit 255. Write scripts via `sandbox_write_file` and execute them instead.
-- **gunicorn doesn't auto-load .env** — must pass env vars explicitly on command line or in startup script
-- **Taskmaster skill is annoying for discussion sessions** — designed for action tasks, kept blocking every response during strategy analysis. Disabled it mid-session. Re-enable for building sessions.
+- **Conway SSH compound commands fail** — `cmd1 && cmd2` returns exit 255. Use separate `exec` calls for each command.
+- **Gunicorn loads from site-packages** — uploading to source dir does nothing. Previous deploy installed via pip, so gunicorn uses the installed copy. Upload to BOTH paths or re-run `pip install -e .`
+- **Dexter facilitator down** — 522 Connection Timed Out on 2026-02-23. x402 middleware gracefully disables itself (by design), but the API serves without a paywall. Always check logs after restart.
+- **x402.jobs field names are camelCase** — `resourceUrl` not `resource_url`. Also requires `network` and `payTo` fields not prominently documented.
+- **`python3` doesn't exist on Windows MINGW** — use `python`
+- **User's ETH transfer appeared as exchange internal ID** — not an on-chain tx hash. Had to wait ~3 min for exchange to broadcast.
 
 ---
 
 ## Key Decisions Made
 
-| Decision | Why | ADR |
-|----------|-----|-----|
-| Dexter facilitator (not Coinbase) | Free, no auth, 20K/day. Coinbase needs CDP key. | — |
-| Single tier $0.10/call | Simple, good margins, adjustable. No free tier. | ADR-005 |
-| Ship fast, iterate from data | Zero users = zero feedback. Discovery > features. | ADR-006 |
-| Don't match GoPlus features | Different market (agents vs humans). x402 access is the moat. | — |
-| No LLM in scoring pipeline | Speed + reliability + margins favor deterministic | — |
+| Decision | Why |
+|----------|-----|
+| OpenFacilitator over Dexter (for now) | Dexter is down. Facilitators are commoditized — swap with one env var. |
+| data: URI for ERC-8004 (not hosted URL) | Simpler, no dependency on live server for registry metadata. Can upgrade via `setAgentURI` later. |
+| `/agent-metadata.json` not behind paywall | Discovery endpoint — agents need to read it for free to decide whether to pay for `/analyze` |
+| `type: ignore[arg-type]` for web3 TxParams | web3's TypedDict is overly strict, rejects plain dicts. Known SDK issue. |
 
 ---
 
@@ -88,34 +89,41 @@ Deep discussion about competitive positioning, pricing, and build priorities. Ke
 ### Live API
 - **URL:** https://risk-api.life.conway.tech
 - **Sandbox:** `76cfc42df7955d2a7de0ec7e2473f686` (us-east, 1GB)
-- **Startup script:** `/root/start-risk-api.sh` (env vars + gunicorn)
-- **Restart:** `kill $(pgrep -f gunicorn) && nohup /root/start-risk-api.sh > /root/gunicorn.log 2>&1 &`
-- **Price:** Currently $0.01 (needs update to $0.10)
-- **Facilitator:** Dexter (`https://x402.dexter.cash`)
-- **Paywall:** Active on `/analyze`, open on `/health`
+- **Conway API:** `https://api.conway.tech`, auth key in `~/.conway/config.json`
+- **Startup script:** `/root/start-risk-api.sh`
+- **Restart:** `pkill -f gunicorn` (via Conway exec), then `nohup /root/start-risk-api.sh > /root/gunicorn.log 2>&1 &` (separate exec calls — don't chain!)
+- **Price:** $0.10/call
+- **Facilitator:** OpenFacilitator (`https://pay.openfacilitator.io`)
+- **Paywall:** Active on `/analyze`, open on `/health` and `/agent-metadata.json`
+- **Endpoints:**
+  - `GET /health` → `{"status":"ok"}` (free)
+  - `GET /agent-metadata.json` → ERC-8004 metadata (free)
+  - `GET /analyze?address=0x...` → risk score (402 paywall, $0.10 USDC on Base)
+
+### Registrations
+- **ERC-8004:** Agent #19074 on Base mainnet (https://8004scan.io/agents/base/19074)
+- **x402.jobs:** https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base
 
 ### Local Dev
-- **64 tests pass**, 91% coverage, 0 pyright errors
-- Default facilitator: Dexter (updated in config.py, .env.example, .env.production)
-- Git: clean working tree, `a62f5af` pushed to origin/master
-
-### Taskmaster
-- **Currently disabled** — Stop hook removed from `~/.claude/settings.json`
-- Re-enable by adding the Stop hook back (see napkin.md for config)
+- **67 tests pass**, 0 pyright errors
+- Git: clean working tree, `2ea189a` pushed to origin/master
+- Taskmaster: enabled (Stop hook in `~/.claude/settings.json`)
 
 ---
 
 ## Next Steps (Priority Order)
 
-### Immediate
-1. **Update price to $0.10** — Change `PRICE` in `/root/start-risk-api.sh` on sandbox, restart gunicorn
-2. **Register on ERC-8004** — Permissionless contract at `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` on Base mainnet. Need to call it from wallet `0x1358...`. This makes us discoverable to agents.
-3. **List on x402.jobs** — Additional discovery channel for agent-to-agent services.
+### All "Immediate" items from last session are DONE
 
 ### Phase 2 (while waiting for traffic)
-4. **Deployer wallet reputation** — Add Basescan API call (free tier, 5/sec). Deployer age + contract count. High signal, fast win.
-5. **Expand selector database** — Research common scam signatures, grow from 15 to 50-100. Our bytecode approach works on unverified contracts (most scams).
-6. **Storage state reads** — `eth_getStorageAt` for paused state, owner address.
+1. **Deployer wallet reputation** — Add Basescan API call (free tier, 5/sec). Deployer age + contract count. High signal, fast win.
+2. **Expand selector database** — Research common scam signatures, grow from 15 to 50-100. Our bytecode approach works on unverified contracts (most scams).
+3. **Storage state reads** — `eth_getStorageAt` for paused state, owner address.
+
+### Phase 2.5 (ops improvements)
+4. **Update ERC-8004 agentURI** — Currently a data: URI. After confirming `/agent-metadata.json` is stable, call `setAgentURI(19074, "https://risk-api.life.conway.tech/agent-metadata.json")` to point to the hosted endpoint.
+5. **Set `ERC8004_AGENT_ID=19074`** in production env — enables the `registrations` field in the metadata response.
+6. **Monitor Dexter** — If it comes back stable, consider switching back (higher volume facilitator). Or stay on OpenFacilitator — both are fine.
 
 ### Phase 3 (after seeing real traffic)
 7. Build whatever users actually ask for — we don't know yet what matters most.
@@ -124,38 +132,39 @@ Deep discussion about competitive positioning, pricing, and build priorities. Ke
 
 ## Important Files Modified/Created This Session
 
-### risk-api/ (committed as `a62f5af`)
+### risk-api/ (commits `7c6eed8` and `2ea189a`)
 | File | Change |
 |------|--------|
-| `src/risk_api/config.py` | Default facilitator → Dexter, network → mainnet |
-| `pyproject.toml` | Added gunicorn dependency |
-| `Dockerfile` | New — containerized deployment |
-| `docker-compose.yml` | New — one-command Docker deploy |
-| `.dockerignore` | New |
-| `.env.production` | New — mainnet config template (Dexter) |
-| `scripts/deploy.sh` | New — VPS deploy script |
-| `.env.example` | Updated defaults (Dexter, mainnet) |
-| `CLAUDE.md` | Updated stack, commands, env var defaults |
-| `.claude/napkin.md` | Added Dexter notes, Conway sandbox gotchas |
-
-### docs/ (in web4/, NOT in risk-api — not committed yet)
-| File | Change |
-|------|--------|
-| `docs/BizPlanning.md` | Major rewrite — sections 6-13 new (GoPlus analysis, moat, pricing, priorities) |
-| `docs/DECISIONS.md` | Added ADR-005 (pricing) and ADR-006 (ship fast) |
+| `src/risk_api/app.py` | Added `/agent-metadata.json` endpoint (ERC-8004 metadata) |
+| `src/risk_api/config.py` | Default price $0.01 → $0.10 |
+| `tests/test_app.py` | +3 tests for metadata endpoint (67 total) |
+| `tests/conftest.py` | Test fixture price $0.01 → $0.10 |
+| `.env.example` | Price → $0.10 |
+| `.env.production` | Price → $0.10 |
+| `CLAUDE.md` | Price docs, OpenFacilitator note |
+| `.claude/napkin.md` | ERC-8004 notes, x402.jobs notes, deploy corrections |
+| `scripts/register_erc8004.py` | **New** — on-chain ERC-8004 registration script |
+| `scripts/register_x402jobs.py` | **New** — x402.jobs marketplace listing script |
 
 ### Memory/Config
 | File | Change |
 |------|--------|
-| `~/.claude/projects/.../MEMORY.md` | Added Strategic Insights section, updated price/status |
-| `~/.claude/settings.json` | Taskmaster Stop hook removed (disabled) |
+| `~/.claude/projects/.../MEMORY.md` | Updated facilitator, test count, added registrations, Conway API details |
+| `~/.claude/settings.json` | Taskmaster Stop hook re-enabled |
+
+### Conway Sandbox (live)
+| File | Change |
+|------|--------|
+| `/root/start-risk-api.sh` | Price → $0.10, facilitator → OpenFacilitator |
+| `/root/risk-api-venv/lib/python3.10/site-packages/risk_api/app.py` | Added `/agent-metadata.json` endpoint |
+| `/root/risk-api-venv/lib/python3.10/site-packages/risk_api/config.py` | Default price $0.10 |
 
 ---
 
 ## Commands
 
 ```bash
-cd C:/Users/justi/dev/web4/risk-api
+cd C:/Users/justi/dev/risk-api
 
 # Install
 pip install -e ".[dev]"
@@ -164,18 +173,24 @@ pip install -e ".[dev]"
 pytest tests/ -v --cov=src/risk_api
 
 # Type check
-pyright src/risk_api/
+pyright src/ tests/
 
 # Run locally (dev)
 WALLET_ADDRESS=0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891 flask --app risk_api.app:create_app run
 
-# Run locally (prod)
-gunicorn "risk_api.app:create_app()" --bind 0.0.0.0:8000 --workers 2
-
-# Docker
-docker compose up -d --build
-
 # Verify live
 curl https://risk-api.life.conway.tech/health
+curl https://risk-api.life.conway.tech/agent-metadata.json
 curl -sD - https://risk-api.life.conway.tech/analyze?address=0x4200000000000000000000000000000000000006
+
+# Conway sandbox deploy (via Python)
+python -c "
+import httpx
+API = 'https://api.conway.tech/v1/sandboxes/76cfc42df7955d2a7de0ec7e2473f686'
+HEADERS = {'Authorization': 'cnwy_k_LKnBkOgIX3FH817Zr7sB_y3KuraHR1fM', 'Content-Type': 'application/json'}
+# Upload file:
+httpx.post(f'{API}/files/upload/json', headers=HEADERS, json={'path': '/root/...', 'content': '...'})
+# Execute command:
+httpx.post(f'{API}/exec', headers=HEADERS, json={'command': '...'})
+"
 ```
