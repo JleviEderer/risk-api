@@ -1,13 +1,16 @@
 # risk-api — Smart Contract Risk Scoring API
 
 ## Stack
-- Python 3.10+, Flask, x402[flask,evm] v2.2.0, httpx
+- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx
 - requests (Base RPC), python-dotenv
 - pytest + responses (testing), pyright (type checking)
+- Docker + docker-compose (production deployment)
 
 ## Commands
 - Install: `pip install -e ".[dev]"`
-- Run: `flask --app risk_api.app:create_app run`
+- Run (dev): `flask --app risk_api.app:create_app run`
+- Run (prod): `gunicorn "risk_api.app:create_app()" --bind 0.0.0.0:8000 --workers 2`
+- Docker: `docker compose up -d --build`
 - Test: `pytest tests/ -v`
 - Coverage: `pytest tests/ -v --cov=src/risk_api`
 
@@ -20,8 +23,8 @@
 ## Key Env Vars
 - `WALLET_ADDRESS` — payment destination (required)
 - `BASE_RPC_URL` — defaults to https://mainnet.base.org
-- `FACILITATOR_URL` — defaults to https://x402.org/facilitator
-- `NETWORK` — defaults to eip155:84532 (Base Sepolia, CAIP-2 format)
+- `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth)
+- `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.01
 
 ## Gotchas

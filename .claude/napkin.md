@@ -15,7 +15,7 @@
 ## User Preferences
 - Prefers new private GitHub repos for new projects (not monorepo)
 - Conventional commits: `feat|fix|chore|docs(scope): description`
-- Taskmaster skill was disabled — user removed the Stop hook
+- Taskmaster skill re-enabled (2026-02-22) — Stop hook restored in ~/.claude/settings.json
 
 ## Patterns That Work
 - Build pipeline modules bottom-up with tests at each step (opcodes -> disassembler -> selectors -> patterns -> scoring -> engine -> app)
@@ -33,10 +33,15 @@
 ## Domain Notes
 - x402 SDK undeclared dependency: needs `httpx` at runtime, not listed in `x402[flask,evm]` extras
 - x402.org facilitator supports: `eip155:84532` (v2 exact), `base-sepolia` (v1 exact)
-- Coinbase mainnet facilitator: `https://api.cdp.coinbase.com/platform/v2/x402`
+- Coinbase mainnet facilitator: `https://api.cdp.coinbase.com/platform/v2/x402` — **requires CDP API key auth, returns 401 without it**
+- **Dexter facilitator** (`https://x402.dexter.cash`): free, no auth, 20K settlements/day, Base mainnet — this is what we use in production
+- x402 402 response: body is `{}`, payment details are in `Payment-Required` header (base64 JSON)
 - USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` — OpenZeppelin proxy, scores 20/low
 - WETH on Base: `0x4200000000000000000000000000000000000006` — clean, scores 0/safe
 - `ExactEvmServerScheme` has a pyright type error (parameter name mismatch) — SDK bug, use `type: ignore[arg-type]`
+- Conway sandbox pip has broken distro module — patch `encoding="ascii"` to `"utf-8"` in `pip/_vendor/distro/distro.py`
+- Conway sandbox system python setuptools is read-only/corrupted — always use venv
+- Conway sandbox 512MB is too small for x402 deps — use 1024MB minimum
 
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."

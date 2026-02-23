@@ -36,8 +36,9 @@ def load_config() -> Config:
         wallet_address=wallet,
         base_rpc_url=os.environ.get("BASE_RPC_URL", "https://mainnet.base.org"),
         facilitator_url=os.environ.get(
-            "FACILITATOR_URL", "https://x402.org/facilitator"
+            "FACILITATOR_URL",
+            "https://x402.dexter.cash",
         ),
-        network=os.environ.get("NETWORK", "eip155:84532"),
+        network=os.environ.get("NETWORK", "eip155:8453"),
         price=os.environ.get("PRICE", "$0.01"),
     )
