@@ -82,7 +82,7 @@ def compute_score(
         category_points["tiny_bytecode"] = CATEGORY_CAPS["tiny_bytecode"]
 
     total = min(100, sum(category_points.values()))
-    level = _score_to_level(total)
+    level = score_to_level(total)
 
     return ScoreResult(
         score=total,
@@ -91,7 +91,7 @@ def compute_score(
     )
 
 
-def _score_to_level(score: int) -> RiskLevel:
+def score_to_level(score: int) -> RiskLevel:
     if score <= 15:
         return RiskLevel.SAFE
     if score <= 35:

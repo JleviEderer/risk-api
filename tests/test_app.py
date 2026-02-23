@@ -137,3 +137,47 @@ def test_agent_metadata_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/agent-metadata.json")
     assert resp.status_code == 200
     assert resp.get_json()["x402Support"] is True
+
+
+@responses.activate
+def test_analyze_proxy_response_includes_implementation(client):
+    """API response includes implementation object for proxy contracts."""
+    eip1967 = "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+    proxy_bytecode = "0x7f" + eip1967 + "f4" + "00" * 200
+
+    impl_addr_hex = "ab" * 20
+    impl_addr_padded = "0x" + "0" * 24 + impl_addr_hex
+    impl_bytecode = "0x" + "ff" + "00" * 200  # SELFDESTRUCT
+
+    # get_code for proxy
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": proxy_bytecode})
+    # storage slot returns impl address
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": impl_addr_padded})
+    # get_code for implementation
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": impl_bytecode})
+
+    addr = "0x" + "ee" * 20
+    resp = client.get(f"/analyze?address={addr}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+
+    assert "implementation" in data
+    impl = data["implementation"]
+    assert impl["address"] == "0x" + impl_addr_hex
+    assert impl["bytecode_size"] > 0
+    assert isinstance(impl["findings"], list)
+    assert isinstance(impl["category_scores"], dict)
+
+
+@responses.activate
+def test_analyze_non_proxy_no_implementation_key(client):
+    """Non-proxy contracts should NOT have implementation key."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "dd" * 20
+    resp = client.get(f"/analyze?address={addr}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+
+    assert "implementation" not in data

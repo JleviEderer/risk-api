@@ -39,4 +39,5 @@
 - All scores 0-100, higher = riskier
 - 8 detectors: 7 bytecode pattern detectors + 1 deployer reputation detector (Basescan)
 - Proxy detection covers EIP-1967, EIP-1822, and OpenZeppelin (pre-1967) slots
+- Proxy contracts auto-resolve implementation via `eth_getStorageAt` (max 1 hop). Impl findings get `impl_` prefixed detector names. Response includes nested `implementation` object. Graceful degradation if storage read or impl fetch fails.
 - Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it

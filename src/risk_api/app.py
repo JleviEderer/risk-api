@@ -235,12 +235,29 @@ def create_app(
         except RPCError as e:
             return jsonify({"error": f"RPC error: {e}"}), 502
 
-        return jsonify(
-            {
-                "address": result.address,
-                "score": result.score,
-                "level": result.level.value,
-                "bytecode_size": result.bytecode_size,
+        response_data: dict[str, object] = {
+            "address": result.address,
+            "score": result.score,
+            "level": result.level.value,
+            "bytecode_size": result.bytecode_size,
+            "findings": [
+                {
+                    "detector": f.detector,
+                    "severity": f.severity.value,
+                    "title": f.title,
+                    "description": f.description,
+                    "points": f.points,
+                }
+                for f in result.findings
+            ],
+            "category_scores": result.category_scores,
+        }
+
+        if result.implementation is not None:
+            impl = result.implementation
+            response_data["implementation"] = {
+                "address": impl.address,
+                "bytecode_size": impl.bytecode_size,
                 "findings": [
                     {
                         "detector": f.detector,
@@ -249,10 +266,11 @@ def create_app(
                         "description": f.description,
                         "points": f.points,
                     }
-                    for f in result.findings
+                    for f in impl.findings
                 ],
-                "category_scores": result.category_scores,
+                "category_scores": impl.category_scores,
             }
-        )
+
+        return jsonify(response_data)
 
     return app

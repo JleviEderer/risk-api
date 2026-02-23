@@ -70,18 +70,18 @@ def test_score_capped_at_100():
 
 
 def test_risk_level_boundaries():
-    from risk_api.analysis.scoring import _score_to_level
+    from risk_api.analysis.scoring import score_to_level
 
-    assert _score_to_level(0) == RiskLevel.SAFE
-    assert _score_to_level(15) == RiskLevel.SAFE
-    assert _score_to_level(16) == RiskLevel.LOW
-    assert _score_to_level(35) == RiskLevel.LOW
-    assert _score_to_level(36) == RiskLevel.MEDIUM
-    assert _score_to_level(55) == RiskLevel.MEDIUM
-    assert _score_to_level(56) == RiskLevel.HIGH
-    assert _score_to_level(75) == RiskLevel.HIGH
-    assert _score_to_level(76) == RiskLevel.CRITICAL
-    assert _score_to_level(100) == RiskLevel.CRITICAL
+    assert score_to_level(0) == RiskLevel.SAFE
+    assert score_to_level(15) == RiskLevel.SAFE
+    assert score_to_level(16) == RiskLevel.LOW
+    assert score_to_level(35) == RiskLevel.LOW
+    assert score_to_level(36) == RiskLevel.MEDIUM
+    assert score_to_level(55) == RiskLevel.MEDIUM
+    assert score_to_level(56) == RiskLevel.HIGH
+    assert score_to_level(75) == RiskLevel.HIGH
+    assert score_to_level(76) == RiskLevel.CRITICAL
+    assert score_to_level(100) == RiskLevel.CRITICAL
 
 
 def test_suspicious_selectors_scored():
