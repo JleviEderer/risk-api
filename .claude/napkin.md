@@ -11,6 +11,8 @@
 | 2026-02-22 | self | Used `network="base-sepolia"` (v1 string) | x402 SDK v2 requires CAIP-2: `eip155:84532` (sepolia) or `eip155:8453` (mainnet) |
 | 2026-02-22 | self | Only detected EIP-1967/1822 proxy slots | Real contracts (USDC) use older OpenZeppelin slots (`org.zeppelinos.proxy.implementation`). Include those too |
 | 2026-02-22 | self | Test assertion said score 30 = MEDIUM | Score 30 is LOW (16-35 range). Know the scoring boundaries before writing assertions |
+| 2026-02-23 | self | Uploaded updated app.py to `/root/risk-api/src/` but gunicorn loaded old code | Conway sandbox runs pip-installed package — gunicorn loads from `site-packages`, not source dir. Upload to BOTH paths or re-run `pip install -e .` |
+| 2026-02-23 | self | Dexter facilitator down (522), x402 middleware failed silently at startup | Have fallback facilitator ready. OpenFacilitator (`pay.openfacilitator.io`) is a working free alternative for Base mainnet |
 
 ## User Preferences
 - Prefers new private GitHub repos for new projects (not monorepo)
@@ -34,7 +36,8 @@
 - x402 SDK undeclared dependency: needs `httpx` at runtime, not listed in `x402[flask,evm]` extras
 - x402.org facilitator supports: `eip155:84532` (v2 exact), `base-sepolia` (v1 exact)
 - Coinbase mainnet facilitator: `https://api.cdp.coinbase.com/platform/v2/x402` — **requires CDP API key auth, returns 401 without it**
-- **Dexter facilitator** (`https://x402.dexter.cash`): free, no auth, 20K settlements/day, Base mainnet — this is what we use in production
+- **Dexter facilitator** (`https://x402.dexter.cash`): free, no auth, 20K settlements/day, Base mainnet — **DOWN 2026-02-23 (522 timeout)**
+- **OpenFacilitator** (`https://pay.openfacilitator.io`): free, no auth, supports eip155:8453 v2 exact — **current production facilitator**
 - x402 402 response: body is `{}`, payment details are in `Payment-Required` header (base64 JSON)
 - USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` — OpenZeppelin proxy, scores 20/low
 - WETH on Base: `0x4200000000000000000000000000000000000006` — clean, scores 0/safe

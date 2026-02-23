@@ -23,7 +23,7 @@
 ## Key Env Vars
 - `WALLET_ADDRESS` — payment destination (required)
 - `BASE_RPC_URL` — defaults to https://mainnet.base.org
-- `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth)
+- `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth). Production currently uses https://pay.openfacilitator.io (Dexter was down 2026-02-23)
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.10
 
