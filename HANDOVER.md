@@ -1,135 +1,154 @@
 # Handover — risk-api
 
-**Session date:** 2026-02-22
+**Session date:** 2026-02-23
 **Repo:** https://github.com/JleviEderer/risk-api (private)
-**Commit:** `456b300` on `master` — initial implementation, pushed to GitHub
+**Latest commit:** `a62f5af` on `master` — deployment + Dexter facilitator switch
+**Live at:** https://risk-api.life.conway.tech
 
 ---
 
-## What We Built
+## What We Did This Session
 
-A complete smart contract risk scoring API from scratch. No code existed before this session — everything was greenfield.
+Two tracks: **deployment/ops** (first half) and **strategic analysis** (second half).
 
-**Product:** Deterministic EVM bytecode risk analysis sold agent-to-agent via x402 at $0.01/call on Base. Pure pattern matching, no LLM inference per request.
+### Track 1: Deployment & Paywall Activation
 
-**Architecture:** `opcodes → disassembler → selectors/patterns → scoring → engine → Flask app + x402 middleware`
+Picked up from previous session where the API was built locally but not deployed.
 
-### Files Created (29 files, 1,965 lines)
+1. **Deployed to Conway sandbox** (`76cfc42df7955d2a7de0ec7e2473f686`, us-east, 1GB RAM)
+   - Created venv at `/root/risk-api-venv/`, installed all deps
+   - Wrote all source files via `sandbox_write_file`
+   - Started gunicorn with explicit env vars (dotenv doesn't work with gunicorn)
 
-```
-risk-api/
-├── pyproject.toml                         # Package config, deps, pytest config
-├── .env.example                           # Required: WALLET_ADDRESS
-├── .gitignore
-├── CLAUDE.md                              # Project-specific rules & gotchas
-├── src/risk_api/
-│   ├── __init__.py
-│   ├── app.py                             # Flask app factory + x402 middleware
-│   ├── config.py                          # Env loading (WALLET_ADDRESS required)
-│   ├── analysis/
-│   │   ├── __init__.py
-│   │   ├── opcodes.py                     # 149 EVM opcodes: int → (name, operand_size)
-│   │   ├── disassembler.py                # Bytecode hex → list[Instruction]
-│   │   ├── selectors.py                   # Function selector extraction + malicious DB
-│   │   ├── patterns.py                    # 7 detectors (selfdestruct, delegatecall, etc.)
-│   │   ├── scoring.py                     # Weighted 0-100 composite scoring
-│   │   └── engine.py                      # Orchestrator: fetch → disassemble → detect → score
-│   └── chain/
-│       ├── __init__.py
-│       └── rpc.py                         # Base RPC client (eth_getCode via requests)
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py                        # Fixtures: test_config, app, client, client_with_x402
-│   ├── fixtures/
-│   │   ├── __init__.py
-│   │   └── bytecodes.py                   # Hardcoded test bytecodes (clean, proxy, honeypot, etc.)
-│   ├── test_opcodes.py                    # 6 tests
-│   ├── test_disassembler.py               # 7 tests
-│   ├── test_selectors.py                  # 6 tests
-│   ├── test_patterns.py                   # 16 tests
-│   ├── test_scoring.py                    # 8 tests
-│   ├── test_rpc.py                        # 6 tests
-│   ├── test_engine.py                     # 5 tests
-│   └── test_app.py                        # 10 tests (incl. x402 402 verification)
-└── scripts/
-    └── fetch_test_bytecodes.py            # One-time: fetch real bytecodes from Base
-```
+2. **Switched facilitator from Coinbase to Dexter**
+   - Coinbase facilitator (`api.cdp.coinbase.com`) returned 401 — requires CDP API key
+   - Dexter (`https://x402.dexter.cash`) — free, no auth, 20K settlements/day
+   - Updated startup script, restarted gunicorn, verified paywall works
 
-### Verification Results
+3. **Verified live endpoints:**
+   - `/health` → 200 `{"status":"ok"}` (no paywall)
+   - `/analyze?address=0x...` → 402 with `Payment-Required` header containing base64 JSON payment details
+   - Payment details confirmed: USDC on Base, $0.01 (will be updated to $0.10), pay to wallet `0x1358...`
 
-| Check | Result |
-|-------|--------|
-| `pytest tests/ -v --cov` | 64 passed, 91% coverage |
-| `pyright src/risk_api/` | 0 errors, 0 warnings |
-| `/health` endpoint | 200 OK |
-| `/analyze` without payment | 402 Payment Required |
-| USDC (real contract) | Score 20, level "low" (proxy + delegatecall INFO) |
-| WETH (real contract) | Score 0, level "safe" |
+4. **Updated local config defaults** — `config.py`, `.env.example`, `.env.production`, `CLAUDE.md` all now default to Dexter
+5. **Added Docker setup** — Dockerfile, docker-compose.yml, .dockerignore, deploy.sh
+6. **Added gunicorn** to pyproject.toml dependencies
+7. **All 64 tests pass** locally after changes
+8. **Committed and pushed** as `a62f5af`
+
+### Track 2: Strategic Analysis
+
+Deep discussion about competitive positioning, pricing, and build priorities. Key outcomes:
+
+1. **GoPlus competitive analysis** — 717M calls/month, free API, 30+ chains. They check more things than us BUT can't serve autonomous agents (requires signup + API key). Our x402-native access is a categorical advantage, not just convenience.
+
+2. **Moat thesis** — The moat is x402 frictionlessness, not analysis depth. GoPlus can't easily add x402 (would cannibalize free tier). Moat is time-bounded (6-18 months). Ship fast, be first.
+
+3. **Pricing decision** — Single tier at $0.10/call. No free tier (removes differentiator). No tiered pricing (over-engineering for zero users). Can adjust down based on data.
+
+4. **Build priorities** — Discovery first (ERC-8004 + x402.jobs), then deployer reputation + expanded selectors, then iterate from live feedback. Don't build honeypot simulation or cross-contract analysis until users ask.
+
+5. **Updated docs:**
+   - `docs/BizPlanning.md` — comprehensive rewrite with GoPlus analysis, moat thesis, pricing, build priorities (sections 6-13 are new)
+   - `docs/DECISIONS.md` — added ADR-005 (pricing) and ADR-006 (ship fast, iterate)
+   - `MEMORY.md` — added Strategic Insights section
 
 ---
 
-## What Worked and What Didn't
+## What Worked
 
-### Worked smoothly
-- The entire analysis pipeline (opcodes → disassembler → selectors → patterns → scoring → engine) built cleanly with tests passing on first or second try
-- `responses` library for mocking HTTP in rpc/engine tests
-- Scoring formula and category caps worked as designed
+- Conway sandbox deployment via `sandbox_exec` + `sandbox_write_file` — reliable once you use simple commands (compound commands over SSH are flaky)
+- Dexter facilitator — zero-friction setup, just works
+- x402 middleware gracefully handles facilitator failures (try/except on `initialize()`)
+- The strategy discussion surfaced critical insights that changed the build plan
 
-### Problems encountered and fixed
+## What Didn't Work / Gotchas
 
-1. **`setuptools.backends._legacy` doesn't exist** — pyproject.toml had wrong build-backend. Fixed to `setuptools.build_meta`.
-
-2. **`responses` library raises raw `ConnectionError`** — not wrapped in `requests.RequestException`. Fixed by catching `(requests.RequestException, ConnectionError)` in `rpc.py`.
-
-3. **Context7 docs were WRONG about x402 SDK** — Claimed `from x402.flask.middleware import PaymentMiddleware` exists. It does NOT in v2.2.0. The actual API requires manually building Flask middleware using:
-   - `x402HTTPResourceServerSync` + `process_http_request()` for the before_request gate
-   - `FlaskHTTPAdapter` class implementing the `HTTPAdapter` protocol
-   - `process_settlement()` in after_request for payment settlement
-
-4. **`HTTPFacilitatorClientSync` constructor** — Context7 showed `url=` kwarg. Real API requires `FacilitatorConfig(url=...)` object.
-
-5. **`FlaskHTTPAdapter` missing methods** — `HTTPAdapter` protocol requires `get_url()` and `get_user_agent()` which weren't in the initial implementation. Added them.
-
-6. **x402 SDK needs `httpx` at runtime** — Undeclared transitive dependency. `x402[flask,evm]` installs Flask and web3 but doesn't declare httpx. Had to add it to pyproject.toml.
-
-7. **Network string format** — `base-sepolia` is v1 format. SDK v2.2.0 requires CAIP-2: `eip155:84532`. The x402.org facilitator supports both but only v2 on the CAIP-2 identifier.
-
-8. **USDC proxy detection failed initially** — USDC uses older OpenZeppelin proxy slots (`org.zeppelinos.proxy.implementation`), not EIP-1967. Added `OZ_IMPL_SLOT` and `OZ_ADMIN_SLOT` to `PROXY_SLOTS` set.
-
-9. **Tests broke when x402 middleware started working** — Once httpx was installed and CAIP-2 network was correct, the middleware activated and all `/analyze` tests got 402. Fixed by adding `enable_x402=False` parameter to `create_app()` and using separate `client` vs `client_with_x402` fixtures.
+- **Coinbase facilitator needs CDP API key** — returns 401 without it. Not documented clearly. Use Dexter instead.
+- **Conway sandbox SSH flaky with compound commands** — `cmd1 && cmd2` often fails with exit 255. Write scripts via `sandbox_write_file` and execute them instead.
+- **gunicorn doesn't auto-load .env** — must pass env vars explicitly on command line or in startup script
+- **Taskmaster skill is annoying for discussion sessions** — designed for action tasks, kept blocking every response during strategy analysis. Disabled it mid-session. Re-enable for building sessions.
 
 ---
 
-## Key Decisions
+## Key Decisions Made
 
-1. **No web3.py** — Too heavy. Raw JSON-RPC via `requests` for `eth_getCode` only.
-2. **All selector hashes hardcoded** — Avoids keccak256 dependency. Keccak-256 != SHA3-256, so stdlib won't work.
-3. **`enable_x402` flag on `create_app()`** — Tests use `enable_x402=False` to test route logic without payment gate. Separate `client_with_x402` fixture for 402 behavior tests.
-4. **Proxy detection includes OpenZeppelin legacy slots** — Not just EIP-1967/1822. Real-world contracts (USDC) use older patterns.
-5. **x402 middleware is hand-built** — SDK provides building blocks, not a drop-in Flask middleware. Our `FlaskHTTPAdapter` + `before_request`/`after_request` hooks are the integration layer.
-6. **`functools.lru_cache` on `get_code()`** — Avoids redundant RPC calls. `clear_cache()` exposed for testing.
-7. **One `type: ignore` in app.py** — x402 SDK has a parameter name mismatch (`extension_keys` vs `extensions`) in `ExactEvmServerScheme`. Pyright flags it but runtime works fine. SDK bug, not ours.
-
----
-
-## Lessons Learned / Gotchas
-
-- **Never trust Context7 docs for x402** — The documented `PaymentMiddleware` class does not exist in v2.2.0. Always verify imports against the actual installed package.
-- **x402 `initialize()` hits the network** — It calls the facilitator's `/supported` endpoint. Wrap in try/except for graceful degradation when facilitator is unreachable.
-- **The `responses` library and `ConnectionError`** — When you set `body=ConnectionError(...)`, it raises the raw exception, not a `requests.RequestException`. Catch both.
-- **Taskmaster skill** was disabled this session (removed Stop hook from `~/.claude/settings.json`). The hook scripts still exist at `~/.claude/hooks/` and `~/.claude/skills/taskmaster/`.
+| Decision | Why | ADR |
+|----------|-----|-----|
+| Dexter facilitator (not Coinbase) | Free, no auth, 20K/day. Coinbase needs CDP key. | — |
+| Single tier $0.10/call | Simple, good margins, adjustable. No free tier. | ADR-005 |
+| Ship fast, iterate from data | Zero users = zero feedback. Discovery > features. | ADR-006 |
+| Don't match GoPlus features | Different market (agents vs humans). x402 access is the moat. | — |
+| No LLM in scoring pipeline | Speed + reliability + margins favor deterministic | — |
 
 ---
 
-## Next Steps
+## Current State
 
-1. **Deploy to VPS** — The app runs locally. Need to deploy to a $5-8/month VPS with `WALLET_ADDRESS` and `NETWORK=eip155:8453` (mainnet) set.
-2. **Switch to mainnet** — Change `NETWORK` to `eip155:8453` and `FACILITATOR_URL` to `https://api.cdp.coinbase.com/platform/v2/x402` (Coinbase hosted, free tier 1K tx/month).
-3. **Register on ERC-8004** — Permissionless on Base mainnet at `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`. Register the API endpoint + wallet.
-4. **List on x402.jobs** — Public discovery for agent-to-agent commerce.
-5. **Expand detectors** — Current 7 detectors are a solid foundation. Could add: storage collision detection, access control analysis, token standard compliance checks.
-6. **Integration tests with real RPC** — `tests/fixtures/bytecodes.py` has samples but no `@pytest.mark.integration` tests that hit real Base mainnet yet. The `scripts/fetch_test_bytecodes.py` can populate real bytecodes.
-7. **Add Basescan deployer lookup** — `rpc.py` has a placeholder concept but deployer analysis isn't implemented yet.
+### Live API
+- **URL:** https://risk-api.life.conway.tech
+- **Sandbox:** `76cfc42df7955d2a7de0ec7e2473f686` (us-east, 1GB)
+- **Startup script:** `/root/start-risk-api.sh` (env vars + gunicorn)
+- **Restart:** `kill $(pgrep -f gunicorn) && nohup /root/start-risk-api.sh > /root/gunicorn.log 2>&1 &`
+- **Price:** Currently $0.01 (needs update to $0.10)
+- **Facilitator:** Dexter (`https://x402.dexter.cash`)
+- **Paywall:** Active on `/analyze`, open on `/health`
+
+### Local Dev
+- **64 tests pass**, 91% coverage, 0 pyright errors
+- Default facilitator: Dexter (updated in config.py, .env.example, .env.production)
+- Git: clean working tree, `a62f5af` pushed to origin/master
+
+### Taskmaster
+- **Currently disabled** — Stop hook removed from `~/.claude/settings.json`
+- Re-enable by adding the Stop hook back (see napkin.md for config)
+
+---
+
+## Next Steps (Priority Order)
+
+### Immediate
+1. **Update price to $0.10** — Change `PRICE` in `/root/start-risk-api.sh` on sandbox, restart gunicorn
+2. **Register on ERC-8004** — Permissionless contract at `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` on Base mainnet. Need to call it from wallet `0x1358...`. This makes us discoverable to agents.
+3. **List on x402.jobs** — Additional discovery channel for agent-to-agent services.
+
+### Phase 2 (while waiting for traffic)
+4. **Deployer wallet reputation** — Add Basescan API call (free tier, 5/sec). Deployer age + contract count. High signal, fast win.
+5. **Expand selector database** — Research common scam signatures, grow from 15 to 50-100. Our bytecode approach works on unverified contracts (most scams).
+6. **Storage state reads** — `eth_getStorageAt` for paused state, owner address.
+
+### Phase 3 (after seeing real traffic)
+7. Build whatever users actually ask for — we don't know yet what matters most.
+
+---
+
+## Important Files Modified/Created This Session
+
+### risk-api/ (committed as `a62f5af`)
+| File | Change |
+|------|--------|
+| `src/risk_api/config.py` | Default facilitator → Dexter, network → mainnet |
+| `pyproject.toml` | Added gunicorn dependency |
+| `Dockerfile` | New — containerized deployment |
+| `docker-compose.yml` | New — one-command Docker deploy |
+| `.dockerignore` | New |
+| `.env.production` | New — mainnet config template (Dexter) |
+| `scripts/deploy.sh` | New — VPS deploy script |
+| `.env.example` | Updated defaults (Dexter, mainnet) |
+| `CLAUDE.md` | Updated stack, commands, env var defaults |
+| `.claude/napkin.md` | Added Dexter notes, Conway sandbox gotchas |
+
+### docs/ (in web4/, NOT in risk-api — not committed yet)
+| File | Change |
+|------|--------|
+| `docs/BizPlanning.md` | Major rewrite — sections 6-13 new (GoPlus analysis, moat, pricing, priorities) |
+| `docs/DECISIONS.md` | Added ADR-005 (pricing) and ADR-006 (ship fast) |
+
+### Memory/Config
+| File | Change |
+|------|--------|
+| `~/.claude/projects/.../MEMORY.md` | Added Strategic Insights section, updated price/status |
+| `~/.claude/settings.json` | Taskmaster Stop hook removed (disabled) |
 
 ---
 
@@ -147,10 +166,16 @@ pytest tests/ -v --cov=src/risk_api
 # Type check
 pyright src/risk_api/
 
-# Run locally
+# Run locally (dev)
 WALLET_ADDRESS=0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891 flask --app risk_api.app:create_app run
 
-# Verify endpoints
-curl http://localhost:5000/health          # → 200 {"status": "ok"}
-curl http://localhost:5000/analyze?address=0x...  # → 402 (no payment)
+# Run locally (prod)
+gunicorn "risk_api.app:create_app()" --bind 0.0.0.0:8000 --workers 2
+
+# Docker
+docker compose up -d --build
+
+# Verify live
+curl https://risk-api.life.conway.tech/health
+curl -sD - https://risk-api.life.conway.tech/analyze?address=0x4200000000000000000000000000000000000006
 ```
