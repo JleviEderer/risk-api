@@ -40,5 +40,5 @@ def load_config() -> Config:
             "https://x402.dexter.cash",
         ),
         network=os.environ.get("NETWORK", "eip155:8453"),
-        price=os.environ.get("PRICE", "$0.01"),
+        price=os.environ.get("PRICE", "$0.10"),
     )

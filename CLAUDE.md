@@ -25,7 +25,7 @@
 - `BASE_RPC_URL` — defaults to https://mainnet.base.org
 - `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth)
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
-- `PRICE` — defaults to $0.01
+- `PRICE` — defaults to $0.10
 
 ## Gotchas
 - No web3.py — we use raw JSON-RPC via requests

@@ -43,6 +43,27 @@
 - Conway sandbox system python setuptools is read-only/corrupted — always use venv
 - Conway sandbox 512MB is too small for x402 deps — use 1024MB minimum
 
+## ERC-8004 Registration Notes (2026-02-23)
+- Registry: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` on Base mainnet (ERC-1967 proxy)
+- Function: `register(string agentURI)` — selector `0xf2c298be`
+- Returns ERC-721 NFT (AGENT token) with unique agentId
+- Cost: gas only (~$0.002 on Base), no protocol fee
+- agentURI can be HTTPS URL, IPFS, or `data:application/json;base64,...`
+- Post-register: `setAgentURI(agentId, newURI)` to update metadata
+- 45,379+ agents registered across all chains, 19,069+ on Base
+- No-code: 8004scan.io/create (requires wallet connect)
+- `web3` and `eth_account` are available (transitive deps from x402) — can sign/send txs directly
+- `web3.eth.contract().functions.register().build_transaction()` TxParams TypedDict is strict — use `type: ignore[arg-type]`
+
+## x402.jobs Registration Notes (2026-02-23)
+- API: `POST https://api.x402.jobs/api/v1/resources` with `x-api-key` header
+- Required fields: `name`, `resource_url`. Optional: `description`, `category`, `tags`, `capabilities`, `server_name`
+- Free tier during beta — sufficient for listing a resource
+- Pricing auto-detected from x402 402 response
+- Account required (email or X/Google OAuth) — no programmatic signup
+- Rate limits: 100/min, 1000/hr per API key
+
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."
 - **CAIP-2 network format** — always use `eip155:CHAINID` not string names with x402 v2
+- **Context7 doesn't have x402.jobs docs** — use direct scraping for x402.jobs API reference

@@ -109,3 +109,31 @@ def test_x402_health_not_gated(client_with_x402):
     resp = client_with_x402.get("/health")
     assert resp.status_code == 200
     assert resp.get_json() == {"status": "ok"}
+
+
+def test_agent_metadata_endpoint(client):
+    resp = client.get("/agent-metadata.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["x402Support"] is True
+    assert data["active"] is True
+    assert len(data["services"]) == 1
+    assert data["services"][0]["name"] == "web"
+    assert "registrations" not in data
+
+
+def test_agent_metadata_with_agent_id(app):
+    app.config["ERC8004_AGENT_ID"] = 12345
+    with app.test_client() as c:
+        resp = c.get("/agent-metadata.json")
+        data = resp.get_json()
+        assert "registrations" in data
+        assert data["registrations"][0]["agentId"] == 12345
+
+
+def test_agent_metadata_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/agent-metadata.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["x402Support"] is True

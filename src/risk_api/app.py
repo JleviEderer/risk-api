@@ -174,6 +174,45 @@ def create_app(
     def health():
         return jsonify({"status": "ok"})
 
+    @app.route("/agent-metadata.json")
+    def agent_metadata():
+        """ERC-8004 agent registration metadata."""
+        metadata = {
+            "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+            "name": "Smart Contract Risk Scorer",
+            "description": (
+                "EVM smart contract risk scoring API on Base. "
+                "Analyzes bytecode patterns (proxy detection, reentrancy, "
+                "selfdestruct, honeypot, hidden mint, fee manipulation, "
+                "delegatecall) and returns a composite 0-100 risk score. "
+                "Pay $0.10/call via x402 in USDC on Base. "
+                "Endpoint: GET /analyze?address={contract_address}"
+            ),
+            "services": [
+                {
+                    "name": "web",
+                    "endpoint": request.url_root.rstrip("/") + "/",
+                }
+            ],
+            "x402Support": True,
+            "active": True,
+            "supportedTrust": ["reputation"],
+        }
+
+        agent_id = app.config.get("ERC8004_AGENT_ID")
+        if agent_id is not None:
+            metadata["registrations"] = [
+                {
+                    "agentId": agent_id,
+                    "agentRegistry": (
+                        "eip155:8453:"
+                        "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+                    ),
+                }
+            ]
+
+        return jsonify(metadata)
+
     @app.route("/analyze")
     def analyze():
         address = request.args.get("address", "").strip()

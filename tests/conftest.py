@@ -11,7 +11,7 @@ def test_config():
         base_rpc_url="https://mainnet.base.org",
         facilitator_url="https://x402.org/facilitator",
         network="eip155:84532",
-        price="$0.01",
+        price="$0.10",
     )
 
 
