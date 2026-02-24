@@ -105,12 +105,10 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
             return None
 
         adapter = FlaskHTTPAdapter()
-        payment_header = request.headers.get("X-PAYMENT")
         context = HTTPRequestContext(
             adapter=adapter,
             path=request.path,
             method=request.method,
-            payment_header=payment_header,
         )
         result = http_server.process_http_request(context)
 
