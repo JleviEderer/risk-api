@@ -42,7 +42,7 @@ def load_config() -> Config:
         base_rpc_url=os.environ.get("BASE_RPC_URL", "https://mainnet.base.org"),
         facilitator_url=os.environ.get(
             "FACILITATOR_URL",
-            "https://x402.dexter.cash",
+            "https://v2.facilitator.mogami.tech",
         ),
         network=os.environ.get("NETWORK", "eip155:8453"),
         price=os.environ.get("PRICE", "$0.10"),

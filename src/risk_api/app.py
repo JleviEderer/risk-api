@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -14,6 +15,7 @@ from risk_api.chain.rpc import RPCError
 from risk_api.config import Config, load_config
 
 logger = logging.getLogger(__name__)
+request_logger = logging.getLogger("risk_api.requests")
 
 # Ethereum address pattern: 0x followed by 40 hex chars
 ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
@@ -154,6 +156,71 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
     return True
 
 
+def _configure_request_log_file(app: Flask) -> None:
+    """Attach a file handler to the request logger if REQUEST_LOG_PATH is set."""
+    import os
+
+    log_path = os.environ.get("REQUEST_LOG_PATH", "")
+    if not log_path:
+        return
+
+    app.config["REQUEST_LOG_PATH"] = log_path
+    os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
+
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    request_logger.addHandler(handler)
+    request_logger.setLevel(logging.INFO)
+    logger.info("Request logging enabled: %s", log_path)
+
+
+def _setup_request_logging(app: Flask) -> None:
+    """Log every /analyze request as structured JSON for analytics."""
+
+    @app.before_request
+    def _start_timer() -> None:
+        if request.path == "/analyze":
+            request.environ["_req_start"] = time.monotonic()
+
+    @app.after_request
+    def _log_analyze(response: Response) -> Response:
+        if request.path != "/analyze":
+            return response
+
+        start = request.environ.get("_req_start")
+        duration_ms = (
+            round((time.monotonic() - start) * 1000) if start else None
+        )
+
+        address = request.args.get("address", "")
+        if not address and request.is_json:
+            body = request.get_json(silent=True)
+            if body and isinstance(body, dict):
+                address = str(body.get("address", ""))
+
+        entry: dict[str, object] = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "address": address,
+            "status": response.status_code,
+            "paid": request.environ.get("x402_payload") is not None,
+            "duration_ms": duration_ms,
+            "user_agent": request.headers.get("User-Agent", ""),
+            "method": request.method,
+        }
+
+        if response.status_code == 200:
+            try:
+                data = response.get_json(silent=True)
+                if data and isinstance(data, dict):
+                    entry["score"] = data.get("score")
+                    entry["level"] = data.get("level")
+            except Exception:
+                pass
+
+        request_logger.info(json.dumps(entry, separators=(",", ":")))
+        return response
+
+
 def create_app(
     config: Config | None = None,
     *,
@@ -172,6 +239,9 @@ def create_app(
     if config.erc8004_agent_id is not None:
         app.config["ERC8004_AGENT_ID"] = config.erc8004_agent_id
 
+    _setup_request_logging(app)
+    _configure_request_log_file(app)
+
     if enable_x402:
         _setup_x402_middleware(app, config)
 
@@ -182,6 +252,40 @@ def create_app(
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"})
+
+    @app.route("/stats")
+    def stats():
+        """Basic analytics from the request log."""
+        log_path = app.config.get("REQUEST_LOG_PATH", "")
+        if not log_path:
+            return jsonify({"error": "logging not configured"}), 501
+
+        import os
+        if not os.path.exists(log_path):
+            return jsonify({"total_requests": 0, "paid_requests": 0, "recent": []})
+
+        total = 0
+        paid = 0
+        recent: list[dict[str, object]] = []
+        with open(log_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                total += 1
+                if entry.get("paid"):
+                    paid += 1
+                recent.append(entry)
+
+        return jsonify({
+            "total_requests": total,
+            "paid_requests": paid,
+            "recent": recent[-20:],
+        })
 
     @app.route("/agent-metadata.json")
     def agent_metadata():

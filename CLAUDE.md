@@ -17,17 +17,19 @@
 ## Structure
 - `src/risk_api/analysis/` — EVM bytecode analysis pipeline
 - `src/risk_api/chain/` — Base RPC client
-- `src/risk_api/app.py` — Flask app + x402 middleware
+- `src/risk_api/app.py` — Flask app + x402 middleware + request logging
 - `src/risk_api/config.py` — Environment config
+- `scripts/health_check.py` — External health check for monitoring/alerting
 
 ## Key Env Vars
 - `WALLET_ADDRESS` — payment destination (required)
 - `BASE_RPC_URL` — defaults to https://mainnet.base.org
-- `FACILITATOR_URL` — defaults to https://x402.dexter.cash (Dexter — free, no auth). Production currently uses https://pay.openfacilitator.io (Dexter was down 2026-02-23)
+- `FACILITATOR_URL` — defaults to https://v2.facilitator.mogami.tech (Mogami — free, no auth, confirmed working for Base USDC). OpenFacilitator has gas limit bug (100k < 109k needed). Dexter was down 2026-02-23/24 (server upgrade).
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.10
 - `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
 - `BASESCAN_API_KEY` — Basescan API key for deployer reputation checks (optional, degrades gracefully)
+- `REQUEST_LOG_PATH` — path for structured JSON-lines request log (optional, e.g. `/root/risk-api-logs/requests.jsonl`)
 
 ## Gotchas
 - No web3.py — we use raw JSON-RPC via requests
