@@ -33,6 +33,7 @@
 - No web3.py — we use raw JSON-RPC via requests
 - Bytecode analysis is pure pattern matching, no LLM inference
 - x402 SDK v2.2.0 has no `PaymentMiddleware` class — we build Flask middleware manually using `x402HTTPResourceServerSync` + `process_http_request`
+- x402 SDK v2 reads payment from `PAYMENT-SIGNATURE` header (not `X-PAYMENT`) via the adapter's `get_header()` — clients must send this header name
 - x402 SDK needs `httpx` at runtime (undeclared transitive dep)
 - Network must be CAIP-2 format: `eip155:84532` (sepolia), `eip155:8453` (mainnet)
 - `create_app(enable_x402=False)` to skip payment middleware in tests

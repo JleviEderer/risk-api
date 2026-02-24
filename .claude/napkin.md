@@ -13,6 +13,14 @@
 | 2026-02-22 | self | Test assertion said score 30 = MEDIUM | Score 30 is LOW (16-35 range). Know the scoring boundaries before writing assertions |
 | 2026-02-23 | self | Uploaded updated app.py to `/root/risk-api/src/` but gunicorn loaded old code | Conway sandbox runs pip-installed package — gunicorn loads from `site-packages`, not source dir. Upload to BOTH paths or re-run `pip install -e .` |
 | 2026-02-23 | self | Dexter facilitator down (522), x402 middleware failed silently at startup | Have fallback facilitator ready. OpenFacilitator (`pay.openfacilitator.io`) is a working free alternative for Base mainnet |
+| 2026-02-23 | self | Assumed x402 reads payment from `X-PAYMENT` header | SDK v2 reads from `PAYMENT-SIGNATURE` header via adapter's `get_header()`. The `payment_header` kwarg on `HTTPRequestContext` is ignored. Clients must send `PAYMENT-SIGNATURE`. |
+| 2026-02-23 | self | Python `/tmp/` path in MINGW doesn't map to bash `/tmp/` | On MINGW/Windows, Python's tempfile uses `C:\Users\...\AppData\Local\Temp\`. Use project-relative paths instead. |
+| 2026-02-23 | self | Conway file upload API: tried `{"files": [...]}` batch format | Conway expects one file per request: `{"path": "...", "content": "..."}` at top level. Loop over files. |
+| 2026-02-23 | self | `eth_account.encode_typed_data()` — passed `primary_type` kwarg | This version doesn't accept `primary_type`. Use `full_message=` format with `primaryType` key in the dict instead. |
+| 2026-02-24 | self | Restarted gunicorn with `export PRICE="$0.10"` — bash expanded `$0` to script name | Always use single quotes for dollar-sign values: `export PRICE='$0.10'`. Double quotes allow variable expansion. |
+| 2026-02-24 | self | Tried to DELETE x402.jobs resource by slug with `x-api-key` header | x402.jobs DELETE only works by UUID: `DELETE /api/v1/resources/{uuid}` with `x-api-key`. Slug-based DELETE returns "Missing authorization header". |
+| 2026-02-24 | self | Re-POSTed same resource URL to x402.jobs expecting upsert | x402.jobs POST creates a NEW resource with different slug (appends `-base`). Not idempotent — delete old resource first by UUID. |
+| 2026-02-24 | self | Used `monkeypatch.delenv()` to isolate config tests from `.env` | `load_dotenv()` re-reads `.env` on every `load_config()` call, overriding monkeypatch. Must mock `load_dotenv` itself: `monkeypatch.setattr("risk_api.config.load_dotenv", lambda **kwargs: None)` |
 
 ## User Preferences
 - Prefers new private GitHub repos for new projects (not monorepo)
@@ -39,8 +47,8 @@
 - **Dexter facilitator** (`https://x402.dexter.cash`): free, no auth, 20K settlements/day, Base mainnet — **DOWN 2026-02-23 (522 timeout)**
 - **OpenFacilitator** (`https://pay.openfacilitator.io`): free, no auth, supports eip155:8453 v2 exact — **current production facilitator**
 - x402 402 response: body is `{}`, payment details are in `Payment-Required` header (base64 JSON)
-- USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` — OpenZeppelin proxy, scores 20/low
-- WETH on Base: `0x4200000000000000000000000000000000000006` — clean, scores 0/safe
+- USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` — EIP-1967 proxy, impl `0x2ce6...d779` (23KB), scores 63/high (proxy+delegatecall+impl_delegatecall+impl_hidden_mint)
+- WETH on Base: `0x4200000000000000000000000000000000000006` — scores 3/safe (deployer_reputation finding: precompile address has no Basescan deployer record)
 - `ExactEvmServerScheme` has a pyright type error (parameter name mismatch) — SDK bug, use `type: ignore[arg-type]`
 - Conway sandbox pip has broken distro module — patch `encoding="ascii"` to `"utf-8"` in `pip/_vendor/distro/distro.py`
 - Conway sandbox system python setuptools is read-only/corrupted — always use venv
@@ -66,7 +74,17 @@
 - Account required (email or X/Google OAuth) — no programmatic signup
 - Rate limits: 100/min, 1000/hr per API key
 
+## x402.jobs Platform Mechanics (2026-02-24)
+- **Resources vs Jobs:** Resources = public directory listings (what agents discover). Jobs = internal workflow automations (chain triggers → resources → outputs). We care about Resources.
+- **Custodial payments:** "Run" button payments are internal accounting, NOT on-chain USDC transfers. Earnings tracked separately from spending balance. Calling your own resource nets to zero.
+- **On-chain settlement:** Does NOT happen through x402.jobs Run button. Direct API calls (not through x402.jobs) should go through facilitator settlement — this path is UNTESTED.
+- **Health tracking:** x402.jobs tracks success/failure rates per resource, publicly visible. A 422 counts as a failure → "0% success / degraded" badge. Include a default working address in `resourceUrl` so the Run button works out of box.
+- **API quirks:** POST (create) works with `x-api-key`. PUT/PATCH/DELETE by slug fail ("Missing authorization header"). DELETE by UUID works with `x-api-key`. Re-POST creates duplicate, not upsert.
+- **Visibility factors:** Verified badge (claim server) + avatar + call count matter. Input Schema config enables proper Run button UX with input fields.
+- **API key stored in:** `.env` (gitignored), read by `scripts/register_x402jobs.py` via `load_dotenv()`
+
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."
 - **CAIP-2 network format** — always use `eip155:CHAINID` not string names with x402 v2
 - **Context7 doesn't have x402.jobs docs** — use direct scraping for x402.jobs API reference
+- **Bash dollar-sign quoting** — when setting env vars with `$` in values (prices, paths), always use single quotes. Seen twice now (Conway restart + docs).

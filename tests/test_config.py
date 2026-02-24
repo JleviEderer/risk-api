@@ -9,7 +9,9 @@ from risk_api.config import Config, ConfigError, load_config
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    """Ensure required env var is set and optional ones are cleared."""
+    """Ensure required env var is set, optional ones cleared, and .env not loaded."""
+    # Prevent load_dotenv() from picking up the project .env file
+    monkeypatch.setattr("risk_api.config.load_dotenv", lambda **kwargs: None)
     monkeypatch.setenv("WALLET_ADDRESS", "0x" + "ab" * 20)
     monkeypatch.delenv("ERC8004_AGENT_ID", raising=False)
     monkeypatch.delenv("BASESCAN_API_KEY", raising=False)

@@ -75,14 +75,19 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
     resource_server = x402ResourceServerSync(facilitator)
     resource_server.register(config.network, ExactEvmServerScheme())  # type: ignore[arg-type]  # x402 SDK parameter name mismatch
 
+    payment_option = PaymentOption(
+        scheme="exact",
+        pay_to=config.wallet_address,
+        price=config.price,
+        network=config.network,
+    )
     routes = {
         "GET /analyze": RouteConfig(
-            accepts=PaymentOption(
-                scheme="exact",
-                pay_to=config.wallet_address,
-                price=config.price,
-                network=config.network,
-            ),
+            accepts=payment_option,
+            description="Smart contract risk scoring",
+        ),
+        "POST /analyze": RouteConfig(
+            accepts=payment_option,
             description="Smart contract risk scoring",
         ),
     }
@@ -170,6 +175,10 @@ def create_app(
     if enable_x402:
         _setup_x402_middleware(app, config)
 
+    @app.route("/.well-known/x402-verification.json")
+    def x402_verification():
+        return jsonify({"x402": "64cb3a6a29bb"})
+
     @app.route("/health")
     def health():
         return jsonify({"status": "ok"})
@@ -213,9 +222,13 @@ def create_app(
 
         return jsonify(metadata)
 
-    @app.route("/analyze")
+    @app.route("/analyze", methods=["GET", "POST"])
     def analyze():
         address = request.args.get("address", "").strip()
+        if not address and request.is_json:
+            body = request.get_json(silent=True)
+            if body and isinstance(body, dict):
+                address = str(body.get("address", "")).strip()
 
         if not address:
             return jsonify({"error": "Missing 'address' query parameter"}), 422

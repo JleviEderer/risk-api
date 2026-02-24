@@ -21,6 +21,18 @@ def test_health_endpoint(client):
     assert resp.get_json() == {"status": "ok"}
 
 
+def test_x402_verification_endpoint(client):
+    resp = client.get("/.well-known/x402-verification.json")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"x402": "64cb3a6a29bb"}
+
+
+def test_x402_verification_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/.well-known/x402-verification.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["x402"] == "64cb3a6a29bb"
+
+
 def test_missing_address(client):
     resp = client.get("/analyze")
     assert resp.status_code == 422
@@ -181,3 +193,47 @@ def test_analyze_non_proxy_no_implementation_key(client):
     data = resp.get_json()
 
     assert "implementation" not in data
+
+
+@responses.activate
+def test_analyze_post_with_json_body(client):
+    """POST /analyze with address in JSON body should work."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": bytecode},
+    )
+    addr = "0x" + "ab" * 20
+    resp = client.post("/analyze", json={"address": addr})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["address"] == addr
+    assert data["score"] == 0
+
+
+@responses.activate
+def test_analyze_post_with_query_param(client):
+    """POST /analyze with address in query param should also work."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": bytecode},
+    )
+    addr = "0x" + "ab" * 20
+    resp = client.post(f"/analyze?address={addr}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["address"] == addr
+
+
+def test_analyze_post_missing_address(client):
+    """POST /analyze with no address should return 422."""
+    resp = client.post("/analyze", json={})
+    assert resp.status_code == 422
+
+
+def test_x402_post_returns_402_without_payment(client_with_x402):
+    """POST /analyze should also be behind x402 paywall."""
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.post("/analyze", json={"address": addr})
+    assert resp.status_code == 402
