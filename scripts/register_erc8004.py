@@ -1,8 +1,9 @@
 """Register risk-api on ERC-8004 Identity Registry (Base mainnet).
 
 Usage:
-    python scripts/register_erc8004.py              # register new agent
-    python scripts/register_erc8004.py --update-uri  # update agentURI for existing agent
+    python scripts/register_erc8004.py                          # register new agent
+    python scripts/register_erc8004.py --update-uri              # update agentURI to default HTTP URL
+    python scripts/register_erc8004.py --update-uri ipfs://Qm... # update agentURI to custom URI (e.g. IPFS)
 
 Requires:
     - ETH in the agent wallet for gas (~$0.002)
@@ -219,7 +220,13 @@ def update_uri(agent_id: int, new_uri: str) -> None:
 
 def main() -> None:
     if "--update-uri" in sys.argv:
-        update_uri(AGENT_ID, AGENT_METADATA_URL)
+        idx = sys.argv.index("--update-uri")
+        # Use next positional arg as URI if provided, else default HTTP URL
+        if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
+            uri = sys.argv[idx + 1]
+        else:
+            uri = AGENT_METADATA_URL
+        update_uri(AGENT_ID, uri)
     else:
         register()
 

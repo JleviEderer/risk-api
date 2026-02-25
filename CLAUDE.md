@@ -31,6 +31,7 @@
 - `BASESCAN_API_KEY` — Basescan API key for deployer reputation checks (optional, degrades gracefully)
 - `PUBLIC_URL` — public base URL for agent metadata endpoint (optional, e.g. `https://risk-api.life.conway.tech`). Falls back to `request.url_root` if unset. Required behind reverse proxies that rewrite the origin.
 - `REQUEST_LOG_PATH` — path for structured JSON-lines request log (optional, e.g. `/root/risk-api-logs/requests.jsonl`)
+- `PINATA_JWT` — Pinata API JWT for IPFS pinning (optional, used by `scripts/pin_metadata_ipfs.py`)
 
 ## Gotchas
 - No web3.py — we use raw JSON-RPC via requests
@@ -52,3 +53,4 @@
 - `/.well-known/ai-plugin.json` serves AI plugin manifest for agent tool discovery
 - `/agent-metadata.json` includes `image`, `updatedAt`, `pricing`, `openapi_url`, `capabilities` fields for registry quality scoring
 - All discovery endpoints (`/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/agent-metadata.json`) are NOT behind x402 paywall
+- On-chain `agentURI` points to IPFS (`ipfs://{CID}`) for content-addressed metadata (fixes 8004scan WA040). HTTP endpoint stays live for other discovery. To update: `python scripts/pin_metadata_ipfs.py` → `python scripts/register_erc8004.py --update-uri ipfs://{CID}`
