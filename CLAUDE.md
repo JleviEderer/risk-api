@@ -29,6 +29,7 @@
 - `PRICE` — defaults to $0.10
 - `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
 - `BASESCAN_API_KEY` — Basescan API key for deployer reputation checks (optional, degrades gracefully)
+- `PUBLIC_URL` — public base URL for agent metadata endpoint (optional, e.g. `https://risk-api.life.conway.tech`). Falls back to `request.url_root` if unset. Required behind reverse proxies that rewrite the origin.
 - `REQUEST_LOG_PATH` — path for structured JSON-lines request log (optional, e.g. `/root/risk-api-logs/requests.jsonl`)
 
 ## Gotchas
@@ -44,4 +45,5 @@
 - Proxy detection covers EIP-1967, EIP-1822, and OpenZeppelin (pre-1967) slots
 - Proxy contracts auto-resolve implementation via `eth_getStorageAt` (max 1 hop). Impl findings get `impl_` prefixed detector names. Response includes nested `implementation` object. Graceful degradation if storage read or impl fetch fails.
 - Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it
+- `analyze_contract()` results are cached (TTL 5 min, max 512 entries, case-insensitive address keys). Use `clear_analysis_cache()` in test setup/teardown. RPC-level caching also exists via `@lru_cache` on `get_code()`/`get_storage_at()`.
 - `/dashboard` serves an inline HTML analytics page (Chart.js from CDN, auto-refreshes every 30s, not behind x402 paywall)

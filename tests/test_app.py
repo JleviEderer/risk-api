@@ -1,6 +1,7 @@
 import pytest
 import responses
 
+from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
 
 
@@ -9,10 +10,12 @@ RPC_URL = "https://mainnet.base.org"
 
 def setup_function():
     clear_cache()
+    clear_analysis_cache()
 
 
 def teardown_function():
     clear_cache()
+    clear_analysis_cache()
 
 
 def test_health_endpoint(client):
@@ -134,6 +137,21 @@ def test_agent_metadata_endpoint(client):
     assert len(data["services"]) == 1
     assert data["services"][0]["name"] == "web"
     assert "registrations" not in data
+
+
+def test_agent_metadata_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/agent-metadata.json")
+        data = resp.get_json()
+        assert data["services"][0]["endpoint"] == "https://risk-api.life.conway.tech/"
+
+
+def test_agent_metadata_falls_back_to_request_url(client):
+    resp = client.get("/agent-metadata.json")
+    data = resp.get_json()
+    endpoint = data["services"][0]["endpoint"]
+    assert "localhost" in endpoint or "127.0.0.1" in endpoint
 
 
 def test_agent_metadata_with_agent_id(app):

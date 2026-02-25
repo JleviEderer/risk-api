@@ -4,6 +4,7 @@ import responses
 from risk_api.analysis.engine import (
     ImplementationResult,
     analyze_contract,
+    clear_analysis_cache,
     resolve_implementation,
 )
 from risk_api.analysis.patterns import EIP_1822_SLOT, EIP_1967_IMPL_SLOT
@@ -41,10 +42,12 @@ def _risky_impl_bytecode() -> str:
 
 
 @pytest.fixture(autouse=True)
-def _clear_rpc_cache():
+def _clear_caches():
     clear_cache()
+    clear_analysis_cache()
     yield
     clear_cache()
+    clear_analysis_cache()
 
 
 # --- Existing tests (updated for storage slot mocks) ---
@@ -257,3 +260,46 @@ def test_analyze_proxy_impl_bytecode_fetch_fails():
 
     assert result.implementation is None
     assert result.score == 20  # proxy(10) + delegatecall(10)
+
+
+# --- Analysis cache tests ---
+
+
+@responses.activate
+def test_cache_returns_same_result():
+    """Second call returns cached result without extra RPC calls."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    # Only register ONE RPC response — second call must use cache
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    addr = "0x" + "d4" * 20
+    result1 = analyze_contract(addr, RPC_URL)
+    result2 = analyze_contract(addr, RPC_URL)
+
+    assert result1 is result2
+    assert len(responses.calls) == 1  # Only 1 RPC call, not 2
+
+
+@responses.activate
+def test_cache_is_case_insensitive():
+    """Cache key normalizes address to lowercase."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    addr_lower = "0x" + "ab" * 20
+    addr_upper = "0x" + "AB" * 20
+    result1 = analyze_contract(addr_lower, RPC_URL)
+    result2 = analyze_contract(addr_upper, RPC_URL)
+
+    assert result1 is result2
+    assert len(responses.calls) == 1
+
+
+def test_clear_analysis_cache_works():
+    """clear_analysis_cache() empties the cache."""
+    from risk_api.analysis.engine import _analysis_cache
+
+    _analysis_cache[("test", "url", "")] = (None, 0)  # type: ignore[assignment]
+    assert len(_analysis_cache) == 1
+    clear_analysis_cache()
+    assert len(_analysis_cache) == 0

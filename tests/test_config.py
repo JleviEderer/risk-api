@@ -45,3 +45,14 @@ def test_load_config_missing_wallet(monkeypatch):
     monkeypatch.delenv("WALLET_ADDRESS")
     with pytest.raises(ConfigError):
         load_config()
+
+
+def test_load_config_public_url_default(monkeypatch):
+    config = load_config()
+    assert config.public_url == ""
+
+
+def test_load_config_public_url_set(monkeypatch):
+    monkeypatch.setenv("PUBLIC_URL", "https://risk-api.life.conway.tech")
+    config = load_config()
+    assert config.public_url == "https://risk-api.life.conway.tech"

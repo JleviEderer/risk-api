@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 
 from risk_api.analysis.disassembler import disassemble
@@ -52,6 +53,43 @@ class AnalysisResult:
     category_scores: dict[str, int]
     bytecode_size: int
     implementation: ImplementationResult | None = None
+
+
+# TTL cache for analysis results: (address, rpc_url, basescan_key) → (result, timestamp)
+_analysis_cache: dict[tuple[str, str, str], tuple[AnalysisResult, float]] = {}
+_CACHE_TTL_SECONDS = 300  # 5 minutes
+_CACHE_MAX_SIZE = 512
+
+
+def _cache_get(
+    address: str, rpc_url: str, basescan_api_key: str
+) -> AnalysisResult | None:
+    """Return cached result if present and not expired."""
+    key = (address.lower(), rpc_url, basescan_api_key)
+    entry = _analysis_cache.get(key)
+    if entry is None:
+        return None
+    result, ts = entry
+    if time.monotonic() - ts > _CACHE_TTL_SECONDS:
+        del _analysis_cache[key]
+        return None
+    return result
+
+
+def _cache_put(
+    address: str, rpc_url: str, basescan_api_key: str, result: AnalysisResult
+) -> None:
+    """Store result in cache, evicting oldest if at capacity."""
+    if len(_analysis_cache) >= _CACHE_MAX_SIZE:
+        oldest_key = next(iter(_analysis_cache))
+        del _analysis_cache[oldest_key]
+    key = (address.lower(), rpc_url, basescan_api_key)
+    _analysis_cache[key] = (result, time.monotonic())
+
+
+def clear_analysis_cache() -> None:
+    """Clear the analysis result cache (useful for testing)."""
+    _analysis_cache.clear()
 
 
 def resolve_implementation(address: str, rpc_url: str) -> str | None:
@@ -151,8 +189,13 @@ def analyze_contract(
     """Full analysis pipeline: fetch bytecode → disassemble → detect → score.
 
     For proxy contracts, also resolves and analyzes the implementation (max 1 hop).
+    Results are cached for 5 minutes (TTL) to avoid redundant RPC calls.
     Raises RPCError if bytecode fetch fails.
     """
+    cached = _cache_get(address, rpc_url, basescan_api_key)
+    if cached is not None:
+        return cached
+
     bytecode_hex = get_code(address, rpc_url)
 
     # Strip 0x prefix for size calculation
@@ -187,7 +230,7 @@ def analyze_contract(
 
     final_level = score_to_level(final_score)
 
-    return AnalysisResult(
+    result = AnalysisResult(
         address=address,
         score=final_score,
         level=final_level,
@@ -196,3 +239,5 @@ def analyze_contract(
         bytecode_size=bytecode_size,
         implementation=impl_result,
     )
+    _cache_put(address, rpc_url, basescan_api_key, result)
+    return result

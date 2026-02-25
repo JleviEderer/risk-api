@@ -21,6 +21,7 @@ class Config:
     price: str
     erc8004_agent_id: int | None = None
     basescan_api_key: str = ""
+    public_url: str = ""
 
 
 def load_config() -> Config:
@@ -48,4 +49,5 @@ def load_config() -> Config:
         price=os.environ.get("PRICE", "$0.10"),
         erc8004_agent_id=erc8004_agent_id,
         basescan_api_key=os.environ.get("BASESCAN_API_KEY", ""),
+        public_url=os.environ.get("PUBLIC_URL", ""),
     )

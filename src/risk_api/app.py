@@ -370,6 +370,8 @@ def create_app(
     app.config["RISK_API_CONFIG"] = config
     if config.erc8004_agent_id is not None:
         app.config["ERC8004_AGENT_ID"] = config.erc8004_agent_id
+    if config.public_url:
+        app.config["PUBLIC_URL"] = config.public_url
 
     _setup_request_logging(app)
     _configure_request_log_file(app)
@@ -471,6 +473,7 @@ def create_app(
     @app.route("/agent-metadata.json")
     def agent_metadata():
         """ERC-8004 agent registration metadata."""
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         metadata = {
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Smart Contract Risk Scorer",
@@ -485,7 +488,7 @@ def create_app(
             "services": [
                 {
                     "name": "web",
-                    "endpoint": request.url_root.rstrip("/") + "/",
+                    "endpoint": base_url.rstrip("/") + "/",
                 }
             ],
             "x402Support": True,

@@ -7,6 +7,7 @@ import pytest
 import responses
 
 from risk_api.app import create_app
+from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
 from risk_api.config import Config
 
@@ -15,10 +16,12 @@ RPC_URL = "https://mainnet.base.org"
 
 def setup_function():
     clear_cache()
+    clear_analysis_cache()
 
 
 def teardown_function():
     clear_cache()
+    clear_analysis_cache()
 
 
 @pytest.fixture()
