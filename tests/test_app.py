@@ -134,8 +134,9 @@ def test_agent_metadata_endpoint(client):
     assert data["name"] == "Smart Contract Risk Scorer"
     assert data["x402Support"] is True
     assert data["active"] is True
-    assert len(data["services"]) == 1
-    assert data["services"][0]["name"] == "web"
+    assert len(data["services"]) == 4
+    service_names = [s["name"] for s in data["services"]]
+    assert service_names == ["web", "A2A", "OASF", "agentWallet"]
     assert "registrations" not in data
     # New discovery fields
     assert "/avatar.png" in data["image"]
@@ -347,3 +348,56 @@ def test_ai_plugin_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/.well-known/ai-plugin.json")
     assert resp.status_code == 200
     assert resp.get_json()["schema_version"] == "v1"
+
+
+def test_a2a_agent_card_endpoint(client):
+    resp = client.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["version"] == "1.0.0"
+    assert data["capabilities"]["streaming"] is False
+    assert len(data["skills"]) == 1
+    assert data["skills"][0]["id"] == "analyze-contract"
+    assert data["interfaces"][0]["type"] == "http"
+    assert data["security"] == []
+    assert data["defaultInputModes"] == ["application/json"]
+
+
+def test_a2a_agent_card_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/.well-known/agent.json")
+        data = resp.get_json()
+        assert data["url"] == "https://risk-api.life.conway.tech"
+        assert data["interfaces"][0]["baseUrl"] == "https://risk-api.life.conway.tech"
+
+
+def test_a2a_agent_card_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "Smart Contract Risk Scorer"
+
+
+def test_agent_metadata_has_a2a_service(client):
+    resp = client.get("/agent-metadata.json")
+    data = resp.get_json()
+    a2a = next(s for s in data["services"] if s["name"] == "A2A")
+    assert "/.well-known/agent.json" in a2a["endpoint"]
+    assert a2a["version"] == "0.3.0"
+
+
+def test_agent_metadata_has_oasf_service(client):
+    resp = client.get("/agent-metadata.json")
+    data = resp.get_json()
+    oasf = next(s for s in data["services"] if s["name"] == "OASF")
+    assert "contract risk scoring" in oasf["skills"]
+    assert "blockchain" in oasf["domains"]
+    assert "security" in oasf["domains"]
+
+
+def test_agent_metadata_has_agent_wallet_service(client):
+    resp = client.get("/agent-metadata.json")
+    data = resp.get_json()
+    wallet = next(s for s in data["services"] if s["name"] == "agentWallet")
+    assert wallet["endpoint"].startswith("eip155:8453:0x")

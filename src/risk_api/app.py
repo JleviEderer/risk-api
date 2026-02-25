@@ -704,10 +704,52 @@ def create_app(
             },
         })
 
+    @app.route("/.well-known/agent.json")
+    def a2a_agent_card():
+        """A2A (Agent-to-Agent) protocol agent card for discovery."""
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        return jsonify({
+            "name": "Smart Contract Risk Scorer",
+            "description": (
+                "EVM smart contract risk scoring API on Base. "
+                "Analyzes bytecode patterns and returns a 0-100 risk score. "
+                "Pay $0.10/call via x402 in USDC on Base."
+            ),
+            "provider": {"organization": "risk-api"},
+            "version": "1.0.0",
+            "url": base_url,
+            "interfaces": [
+                {
+                    "type": "http",
+                    "baseUrl": base_url,
+                }
+            ],
+            "capabilities": {
+                "streaming": False,
+                "pushNotifications": False,
+                "extendedAgentCard": False,
+            },
+            "skills": [
+                {
+                    "id": "analyze-contract",
+                    "name": "Analyze Smart Contract",
+                    "description": (
+                        "Fetch on-chain bytecode for a contract address "
+                        "and run 8 detectors to produce a 0-100 risk score."
+                    ),
+                },
+            ],
+            "security": [],
+            "securitySchemes": {},
+            "defaultInputModes": ["application/json"],
+            "defaultOutputModes": ["application/json"],
+        })
+
     @app.route("/agent-metadata.json")
     def agent_metadata():
         """ERC-8004 agent registration metadata."""
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        wallet_addr = config.wallet_address
         metadata: dict[str, object] = {
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Smart Contract Risk Scorer",
@@ -723,7 +765,28 @@ def create_app(
                 {
                     "name": "web",
                     "endpoint": base_url.rstrip("/") + "/",
-                }
+                },
+                {
+                    "name": "A2A",
+                    "endpoint": f"{base_url}/.well-known/agent.json",
+                    "version": "0.3.0",
+                },
+                {
+                    "name": "OASF",
+                    "skills": [
+                        "contract risk scoring",
+                        "proxy detection",
+                        "bytecode analysis",
+                        "honeypot detection",
+                        "reentrancy detection",
+                        "security assessment",
+                    ],
+                    "domains": ["blockchain", "security", "defi"],
+                },
+                {
+                    "name": "agentWallet",
+                    "endpoint": f"eip155:8453:{wallet_addr}",
+                },
             ],
             "x402Support": True,
             "active": True,

@@ -19,7 +19,9 @@ class TestBuildMetadata:
         assert meta["x402Support"] is True
         assert meta["active"] is True
         assert isinstance(meta["services"], list)
-        assert len(meta["services"]) == 1  # type: ignore[arg-type]
+        assert len(meta["services"]) == 4  # type: ignore[arg-type]
+        service_names = [s["name"] for s in meta["services"]]  # type: ignore[union-attr]
+        assert service_names == ["web", "A2A", "OASF", "agentWallet"]
 
     def test_has_ipfs_specific_fields(self) -> None:
         """Metadata for IPFS should have fixed timestamps and absolute URLs."""

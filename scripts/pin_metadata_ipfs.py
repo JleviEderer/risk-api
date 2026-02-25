@@ -32,6 +32,7 @@ BASE_URL = "https://risk-api.life.conway.tech"
 # ERC-8004 agent registration
 AGENT_ID = 19074
 REGISTRY_ADDRESS = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+WALLET_ADDRESS = "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891"
 
 
 def build_metadata() -> dict[str, object]:
@@ -55,7 +56,28 @@ def build_metadata() -> dict[str, object]:
             {
                 "name": "web",
                 "endpoint": f"{BASE_URL}/",
-            }
+            },
+            {
+                "name": "A2A",
+                "endpoint": f"{BASE_URL}/.well-known/agent.json",
+                "version": "0.3.0",
+            },
+            {
+                "name": "OASF",
+                "skills": [
+                    "contract risk scoring",
+                    "proxy detection",
+                    "bytecode analysis",
+                    "honeypot detection",
+                    "reentrancy detection",
+                    "security assessment",
+                ],
+                "domains": ["blockchain", "security", "defi"],
+            },
+            {
+                "name": "agentWallet",
+                "endpoint": f"eip155:8453:{WALLET_ADDRESS}",
+            },
         ],
         "x402Support": True,
         "active": True,

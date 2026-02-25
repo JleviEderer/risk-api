@@ -52,5 +52,7 @@
 - `/openapi.json` serves OpenAPI 3.0.3 spec with dynamic `servers` array from `PUBLIC_URL`
 - `/.well-known/ai-plugin.json` serves AI plugin manifest for agent tool discovery
 - `/agent-metadata.json` includes `image`, `updatedAt`, `pricing`, `openapi_url`, `capabilities` fields for registry quality scoring
-- All discovery endpoints (`/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/agent-metadata.json`) are NOT behind x402 paywall
+- `/.well-known/agent.json` serves A2A (Agent-to-Agent) protocol agent card for discovery
+- All discovery endpoints (`/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/agent-metadata.json`) are NOT behind x402 paywall
+- Agent metadata `services` array includes: web, A2A, OASF (skills+domains), agentWallet (CAIP-10 format)
 - On-chain `agentURI` points to IPFS (`ipfs://{CID}`) for content-addressed metadata (fixes 8004scan WA040). HTTP endpoint stays live for other discovery. To update: `python scripts/pin_metadata_ipfs.py` → `python scripts/register_erc8004.py --update-uri ipfs://{CID}`
