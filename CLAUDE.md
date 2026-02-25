@@ -17,7 +17,7 @@
 ## Structure
 - `src/risk_api/analysis/` — EVM bytecode analysis pipeline
 - `src/risk_api/chain/` — Base RPC client
-- `src/risk_api/app.py` — Flask app + x402 middleware + request logging
+- `src/risk_api/app.py` — Flask app + x402 middleware + request logging + dashboard
 - `src/risk_api/config.py` — Environment config
 - `scripts/health_check.py` — External health check for monitoring/alerting
 
@@ -44,3 +44,4 @@
 - Proxy detection covers EIP-1967, EIP-1822, and OpenZeppelin (pre-1967) slots
 - Proxy contracts auto-resolve implementation via `eth_getStorageAt` (max 1 hop). Impl findings get `impl_` prefixed detector names. Response includes nested `implementation` object. Graceful degradation if storage read or impl fetch fails.
 - Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it
+- `/dashboard` serves an inline HTML analytics page (Chart.js from CDN, auto-refreshes every 30s, not behind x402 paywall)

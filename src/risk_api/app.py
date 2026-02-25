@@ -23,6 +23,138 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 # Routes that require x402 payment
 PROTECTED_ROUTES = {"/analyze"}
 
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>risk-api dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0f1117;color:#e0e0e0;padding:24px;max-width:1200px;margin:0 auto}
+h1{font-size:1.4rem;color:#a0aec0;margin-bottom:20px;font-weight:500}
+h1 span{color:#63b3ed}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.card{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px}
+.card .label{font-size:.75rem;color:#718096;text-transform:uppercase;letter-spacing:.05em}
+.card .value{font-size:2rem;font-weight:700;margin-top:4px}
+.card .value.blue{color:#63b3ed}
+.card .value.green{color:#68d391}
+.card .value.orange{color:#f6ad55}
+.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:20px}
+.section h2{font-size:.9rem;color:#a0aec0;margin-bottom:14px;font-weight:500}
+#chart-container{position:relative;height:260px}
+#chart-fallback{display:none;color:#718096;padding:40px;text-align:center}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;color:#718096;font-weight:500;padding:8px 10px;border-bottom:1px solid #2d3148}
+td{padding:8px 10px;border-bottom:1px solid #1e2235}
+.addr{font-family:monospace;font-size:.8rem;color:#90cdf4}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase}
+.badge.safe{background:#22543d;color:#68d391}
+.badge.low{background:#2a4365;color:#63b3ed}
+.badge.medium{background:#744210;color:#f6ad55}
+.badge.high{background:#742a2a;color:#fc8181}
+.badge.critical{background:#63171b;color:#feb2b2}
+.badge.paid{background:#2a4365;color:#63b3ed}
+.badge.unpaid{background:#2d3748;color:#718096}
+.ts{color:#718096;font-size:.75rem}
+.status{text-align:center}
+.status-bar{font-size:.7rem;color:#4a5568;margin-top:16px;text-align:right}
+</style>
+</head>
+<body>
+<h1><span>risk-api</span> dashboard</h1>
+<div class="cards">
+  <div class="card"><div class="label">Total Requests</div><div class="value blue" id="total">-</div></div>
+  <div class="card"><div class="label">Paid Requests</div><div class="value green" id="paid">-</div></div>
+  <div class="card"><div class="label">Avg Response Time</div><div class="value orange" id="avgdur">-</div></div>
+</div>
+<div class="section">
+  <h2>Requests per hour</h2>
+  <div id="chart-container"><canvas id="chart"></canvas></div>
+  <div id="chart-fallback">Chart unavailable (Chart.js CDN unreachable)</div>
+</div>
+<div class="section">
+  <h2>Recent requests</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Address</th><th>Status</th><th>Score</th><th>Level</th><th>Paid</th><th>Duration</th></tr></thead>
+    <tbody id="recent"></tbody>
+  </table>
+</div>
+<div class="status-bar">Auto-refreshes every 30s &middot; <span id="updated"></span></div>
+
+<script>
+var chartInstance=null,chartLoaded=false;
+function loadChart(){
+  return new Promise(function(resolve){
+    if(window.Chart){chartLoaded=true;resolve();return}
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+    s.onload=function(){chartLoaded=true;resolve()};
+    s.onerror=function(){
+      document.getElementById('chart-container').querySelector('canvas').style.display='none';
+      document.getElementById('chart-fallback').style.display='block';
+      resolve();
+    };
+    document.head.appendChild(s);
+  });
+}
+function relTime(ts){
+  if(!ts)return '';
+  var d=new Date(ts),now=new Date(),s=Math.floor((now-d)/1000);
+  if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';
+}
+function truncAddr(a){
+  if(!a||a.length<12)return a||'';
+  return a.slice(0,6)+'\\u2026'+a.slice(-4);
+}
+function refresh(){
+  fetch('/stats').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('total').textContent=d.total_requests;
+    document.getElementById('paid').textContent=d.paid_requests;
+    document.getElementById('avgdur').textContent=d.avg_duration_ms?d.avg_duration_ms+'ms':'-';
+    document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString();
+
+    if(chartLoaded&&window.Chart&&d.hourly){
+      var labels=d.hourly.map(function(h){return h.hour.slice(11,16)});
+      var paidData=d.hourly.map(function(h){return h.paid});
+      var unpaidData=d.hourly.map(function(h){return h.count-h.paid});
+      if(chartInstance){chartInstance.destroy()}
+      var ctx=document.getElementById('chart').getContext('2d');
+      chartInstance=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[
+        {label:'Paid',data:paidData,backgroundColor:'#68d391',borderRadius:3},
+        {label:'Unpaid',data:unpaidData,backgroundColor:'#4a5568',borderRadius:3}
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0'}}},
+        scales:{x:{stacked:true,ticks:{color:'#718096'},grid:{color:'#1e2235'}},
+                y:{stacked:true,beginAtZero:true,ticks:{color:'#718096',stepSize:1},grid:{color:'#1e2235'}}}}});
+    }
+
+    var tbody=document.getElementById('recent');
+    tbody.innerHTML='';
+    var rows=(d.recent||[]).slice().reverse();
+    rows.forEach(function(e){
+      var tr=document.createElement('tr');
+      var lvl=e.level||'';
+      var paidBadge=e.paid?'<span class="badge paid">paid</span>':'<span class="badge unpaid">free</span>';
+      tr.innerHTML='<td class="ts">'+relTime(e.ts)+'</td>'
+        +'<td class="addr">'+truncAddr(e.address)+'</td>'
+        +'<td class="status">'+e.status+'</td>'
+        +'<td>'+(e.score!=null?e.score:'')+'</td>'
+        +'<td>'+(lvl?'<span class="badge '+lvl+'">'+lvl+'</span>':'')+'</td>'
+        +'<td>'+paidBadge+'</td>'
+        +'<td>'+(e.duration_ms!=null?e.duration_ms+'ms':'')+'</td>';
+      tbody.appendChild(tr);
+    });
+  }).catch(function(){});
+}
+loadChart().then(refresh);
+setInterval(refresh,30000);
+</script>
+</body>
+</html>"""
+
 
 class FlaskHTTPAdapter:
     """Adapts Flask request to x402 HTTPAdapter protocol."""
@@ -253,6 +385,10 @@ def create_app(
     def health():
         return jsonify({"status": "ok"})
 
+    @app.route("/dashboard")
+    def dashboard():
+        return Response(DASHBOARD_HTML, content_type="text/html")
+
     @app.route("/stats")
     def stats():
         """Basic analytics from the request log."""
@@ -262,10 +398,19 @@ def create_app(
 
         import os
         if not os.path.exists(log_path):
-            return jsonify({"total_requests": 0, "paid_requests": 0, "recent": []})
+            return jsonify({
+                "total_requests": 0,
+                "paid_requests": 0,
+                "avg_duration_ms": 0,
+                "hourly": [],
+                "recent": [],
+            })
 
         total = 0
         paid = 0
+        duration_sum = 0.0
+        duration_count = 0
+        hourly_buckets: dict[str, dict[str, int]] = {}
         recent: list[dict[str, object]] = []
         with open(log_path, encoding="utf-8") as f:
             for line in f:
@@ -279,11 +424,47 @@ def create_app(
                 total += 1
                 if entry.get("paid"):
                     paid += 1
+
+                dur = entry.get("duration_ms")
+                if isinstance(dur, (int, float)):
+                    duration_sum += dur
+                    duration_count += 1
+
+                ts = entry.get("ts", "")
+                if len(ts) >= 13:
+                    hour_key = ts[:13] + ":00:00Z"
+                    bucket = hourly_buckets.get(hour_key)
+                    if bucket is None:
+                        bucket = {"count": 0, "paid": 0, "dur_sum": 0, "dur_n": 0}
+                        hourly_buckets[hour_key] = bucket
+                    bucket["count"] += 1
+                    if entry.get("paid"):
+                        bucket["paid"] += 1
+                    if isinstance(dur, (int, float)):
+                        bucket["dur_sum"] += int(dur)
+                        bucket["dur_n"] += 1
+
                 recent.append(entry)
+
+        hourly = [
+            {
+                "hour": h,
+                "count": b["count"],
+                "paid": b["paid"],
+                "avg_duration_ms": (
+                    round(b["dur_sum"] / b["dur_n"]) if b["dur_n"] else 0
+                ),
+            }
+            for h, b in sorted(hourly_buckets.items())
+        ]
 
         return jsonify({
             "total_requests": total,
             "paid_requests": paid,
+            "avg_duration_ms": (
+                round(duration_sum / duration_count) if duration_count else 0
+            ),
+            "hourly": hourly,
             "recent": recent[-20:],
         })
 

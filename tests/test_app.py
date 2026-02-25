@@ -237,3 +237,17 @@ def test_x402_post_returns_402_without_payment(client_with_x402):
     addr = "0x" + "ab" * 20
     resp = client_with_x402.post("/analyze", json={"address": addr})
     assert resp.status_code == 402
+
+
+def test_dashboard_returns_html(client):
+    resp = client.get("/dashboard")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"risk-api" in resp.data
+    assert b"<canvas" in resp.data
+
+
+def test_dashboard_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/dashboard")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")

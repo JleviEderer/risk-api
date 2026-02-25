@@ -147,3 +147,29 @@ def test_stats_returns_501_without_log_path(test_config):
     client = app.test_client()
     resp = client.get("/stats")
     assert resp.status_code == 501
+
+
+@responses.activate
+def test_stats_includes_hourly_and_avg_duration(client_logged, app_with_logging):
+    """Stats response includes avg_duration_ms and hourly buckets."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "ab" * 20
+    client_logged.get(f"/analyze?address={addr}")
+    client_logged.get(f"/analyze?address={addr}")
+
+    resp = client_logged.get("/stats")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "avg_duration_ms" in data
+    assert isinstance(data["avg_duration_ms"], int)
+    assert data["avg_duration_ms"] >= 0
+    assert "hourly" in data
+    assert isinstance(data["hourly"], list)
+    assert len(data["hourly"]) >= 1
+    bucket = data["hourly"][0]
+    assert "hour" in bucket
+    assert bucket["count"] == 2
+    assert "avg_duration_ms" in bucket
