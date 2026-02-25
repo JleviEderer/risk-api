@@ -47,3 +47,8 @@
 - Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it
 - `analyze_contract()` results are cached (TTL 5 min, max 512 entries, case-insensitive address keys). Use `clear_analysis_cache()` in test setup/teardown. RPC-level caching also exists via `@lru_cache` on `get_code()`/`get_storage_at()`.
 - `/dashboard` serves an inline HTML analytics page (Chart.js from CDN, auto-refreshes every 30s, not behind x402 paywall)
+- `/avatar.png` serves agent avatar image (loaded from `x402JobsAvatar.png` at module level, searches package dir then repo root)
+- `/openapi.json` serves OpenAPI 3.0.3 spec with dynamic `servers` array from `PUBLIC_URL`
+- `/.well-known/ai-plugin.json` serves AI plugin manifest for agent tool discovery
+- `/agent-metadata.json` includes `image`, `updatedAt`, `pricing`, `openapi_url`, `capabilities` fields for registry quality scoring
+- All discovery endpoints (`/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/agent-metadata.json`) are NOT behind x402 paywall

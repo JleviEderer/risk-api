@@ -137,6 +137,19 @@ def test_agent_metadata_endpoint(client):
     assert len(data["services"]) == 1
     assert data["services"][0]["name"] == "web"
     assert "registrations" not in data
+    # New discovery fields
+    assert "/avatar.png" in data["image"]
+    assert isinstance(data["updatedAt"], int)
+    assert data["updatedAt"] > 0
+    assert data["pricing"] == {
+        "amount": "0.10",
+        "currency": "USDC",
+        "network": "eip155:8453",
+    }
+    assert "/openapi.json" in data["openapi_url"]
+    assert isinstance(data["capabilities"], list)
+    assert "contract risk scoring" in data["capabilities"]
+    assert "proxy detection" in data["capabilities"]
 
 
 def test_agent_metadata_uses_public_url(app):
@@ -269,3 +282,68 @@ def test_dashboard_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/dashboard")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
+
+
+def test_avatar_returns_png(client):
+    resp = client.get("/avatar.png")
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+    # PNG magic bytes
+    assert resp.data[:4] == b"\x89PNG"
+
+
+def test_avatar_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/avatar.png")
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+
+
+def test_openapi_returns_valid_json(client):
+    resp = client.get("/openapi.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["openapi"] == "3.0.3"
+    assert data["info"]["title"] == "Smart Contract Risk Scorer"
+    assert "/analyze" in data["paths"]
+    assert "servers" in data
+    assert "get" in data["paths"]["/analyze"]
+    assert "post" in data["paths"]["/analyze"]
+
+
+def test_openapi_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/openapi.json")
+        data = resp.get_json()
+        assert data["servers"][0]["url"] == "https://risk-api.life.conway.tech"
+
+
+def test_openapi_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/openapi.json")
+    assert resp.status_code == 200
+    assert "openapi" in resp.get_json()
+
+
+def test_ai_plugin_json_endpoint(client):
+    resp = client.get("/.well-known/ai-plugin.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["schema_version"] == "v1"
+    assert data["name_for_model"] == "smart_contract_risk_scorer"
+    assert data["auth"] == {"type": "none"}
+    assert data["api"]["type"] == "openapi"
+    assert "/openapi.json" in data["api"]["url"]
+
+
+def test_ai_plugin_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/.well-known/ai-plugin.json")
+        data = resp.get_json()
+        assert data["api"]["url"] == "https://risk-api.life.conway.tech/openapi.json"
+
+
+def test_ai_plugin_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/.well-known/ai-plugin.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["schema_version"] == "v1"

@@ -46,6 +46,8 @@ METADATA = {
     "x402Support": True,
     "active": True,
     "supportedTrust": ["reputation"],
+    "image": "https://risk-api.life.conway.tech/avatar.png",
+    "updatedAt": 1740528000,  # 2025-02-26T00:00:00Z — update when re-registering
 }
 
 AGENT_ID = 19074

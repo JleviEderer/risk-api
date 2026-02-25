@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -22,6 +23,200 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 # Routes that require x402 payment
 PROTECTED_ROUTES = {"/analyze"}
+
+# Load avatar image bytes at module level
+_AVATAR_BYTES: bytes | None = None
+for _avatar_path in [
+    Path(__file__).resolve().parent / "x402JobsAvatar.png",
+    Path(__file__).resolve().parent.parent.parent / "x402JobsAvatar.png",
+]:
+    if _avatar_path.exists():
+        _AVATAR_BYTES = _avatar_path.read_bytes()
+        break
+
+# OpenAPI 3.0.3 specification for the risk scoring API
+OPENAPI_SPEC: dict[str, object] = {
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Smart Contract Risk Scorer",
+        "version": "1.0.0",
+        "description": (
+            "EVM smart contract risk scoring API on Base. "
+            "Analyzes bytecode patterns (proxy detection, reentrancy, "
+            "selfdestruct, honeypot, hidden mint, fee manipulation, "
+            "delegatecall) and returns a composite 0-100 risk score. "
+            "Pay $0.10/call via x402 in USDC on Base."
+        ),
+        "contact": {
+            "url": "https://github.com/JleviEderer/risk-api",
+        },
+    },
+    "paths": {
+        "/analyze": {
+            "get": {
+                "operationId": "analyzeContract",
+                "summary": "Analyze a smart contract for risk",
+                "description": (
+                    "Fetches on-chain bytecode for the given contract address "
+                    "and runs 8 detectors (proxy, reentrancy, selfdestruct, "
+                    "honeypot, hidden mint, fee manipulation, delegatecall, "
+                    "deployer reputation). Returns a composite 0-100 risk score."
+                ),
+                "parameters": [
+                    {
+                        "name": "address",
+                        "in": "query",
+                        "required": True,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$",
+                        },
+                        "description": "EVM contract address (0x-prefixed, 40 hex chars)",
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Risk analysis result",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/AnalysisResult"},
+                            }
+                        },
+                    },
+                    "402": {
+                        "description": "Payment required — send x402 payment and retry",
+                    },
+                    "422": {
+                        "description": "Invalid or missing contract address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {"type": "string"},
+                                    },
+                                },
+                            }
+                        },
+                    },
+                },
+                "x-x402-price": "$0.10",
+                "x-x402-network": "eip155:8453",
+                "x-x402-pay-to": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+            },
+            "post": {
+                "operationId": "analyzeContractPost",
+                "summary": "Analyze a smart contract for risk (POST)",
+                "description": "Same as GET but accepts address in JSON body.",
+                "parameters": [
+                    {
+                        "name": "address",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$",
+                        },
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "address": {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-fA-F]{40}$",
+                                    },
+                                },
+                            },
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Risk analysis result",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/AnalysisResult"},
+                            }
+                        },
+                    },
+                    "402": {
+                        "description": "Payment required — send x402 payment and retry",
+                    },
+                    "422": {
+                        "description": "Invalid or missing contract address",
+                    },
+                },
+                "x-x402-price": "$0.10",
+                "x-x402-network": "eip155:8453",
+                "x-x402-pay-to": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+            },
+        },
+    },
+    "components": {
+        "schemas": {
+            "Finding": {
+                "type": "object",
+                "properties": {
+                    "detector": {"type": "string"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["info", "low", "medium", "high", "critical"],
+                    },
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "points": {"type": "integer"},
+                },
+            },
+            "ImplementationResult": {
+                "type": "object",
+                "nullable": True,
+                "properties": {
+                    "address": {"type": "string"},
+                    "bytecode_size": {"type": "integer"},
+                    "findings": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Finding"},
+                    },
+                    "category_scores": {
+                        "type": "object",
+                        "additionalProperties": {"type": "number"},
+                    },
+                },
+            },
+            "AnalysisResult": {
+                "type": "object",
+                "properties": {
+                    "address": {"type": "string"},
+                    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "level": {
+                        "type": "string",
+                        "enum": ["safe", "low", "medium", "high", "critical"],
+                    },
+                    "bytecode_size": {"type": "integer"},
+                    "findings": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Finding"},
+                    },
+                    "category_scores": {
+                        "type": "object",
+                        "additionalProperties": {"type": "number"},
+                    },
+                    "implementation": {
+                        "$ref": "#/components/schemas/ImplementationResult",
+                    },
+                },
+                "required": [
+                    "address", "score", "level", "bytecode_size",
+                    "findings", "category_scores",
+                ],
+            },
+        },
+    },
+}
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -470,11 +665,50 @@ def create_app(
             "recent": recent[-20:],
         })
 
+    @app.route("/avatar.png")
+    def avatar():
+        if _AVATAR_BYTES is None:
+            return Response("Avatar not found", status=404)
+        return Response(_AVATAR_BYTES, content_type="image/png")
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        spec = dict(OPENAPI_SPEC)
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        spec["servers"] = [{"url": base_url}]
+        return jsonify(spec)
+
+    @app.route("/.well-known/ai-plugin.json")
+    def ai_plugin():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        return jsonify({
+            "schema_version": "v1",
+            "name_for_human": "Smart Contract Risk Scorer",
+            "name_for_model": "smart_contract_risk_scorer",
+            "description_for_human": (
+                "EVM smart contract risk scoring on Base via x402. "
+                "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
+                "honeypot, hidden mint, fee manipulation, and delegatecall "
+                "patterns. Returns a 0-100 risk score."
+            ),
+            "description_for_model": (
+                "Analyzes EVM smart contract bytecode on Base mainnet. "
+                "Send a contract address to /analyze and receive a 0-100 "
+                "risk score with detailed findings from 8 detectors. "
+                "Requires x402 payment of $0.10 USDC on Base."
+            ),
+            "auth": {"type": "none"},
+            "api": {
+                "type": "openapi",
+                "url": f"{base_url}/openapi.json",
+            },
+        })
+
     @app.route("/agent-metadata.json")
     def agent_metadata():
         """ERC-8004 agent registration metadata."""
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
-        metadata = {
+        metadata: dict[str, object] = {
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Smart Contract Risk Scorer",
             "description": (
@@ -494,6 +728,22 @@ def create_app(
             "x402Support": True,
             "active": True,
             "supportedTrust": ["reputation"],
+            "image": f"{base_url}/avatar.png",
+            "updatedAt": int(time.time()),
+            "pricing": {
+                "amount": "0.10",
+                "currency": "USDC",
+                "network": "eip155:8453",
+            },
+            "openapi_url": f"{base_url}/openapi.json",
+            "capabilities": [
+                "contract risk scoring",
+                "proxy detection",
+                "bytecode analysis",
+                "honeypot detection",
+                "reentrancy detection",
+                "security assessment",
+            ],
         }
 
         agent_id = app.config.get("ERC8004_AGENT_ID")
