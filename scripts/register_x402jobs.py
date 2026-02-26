@@ -61,6 +61,23 @@ RESOURCE = {
         "security assessment",
     ],
     "server_name": "risk-api",
+    "documentation_url": "https://risk-api.life.conway.tech/openapi.json",
+    "price_usdc": "0.10",
+    "logo_url": "https://risk-api.life.conway.tech/avatar.png",
+    "example_request": (
+        "GET /analyze?address=0x4200000000000000000000000000000000000006"
+    ),
+    "response_schema": {
+        "address": "string",
+        "score": "integer (0-100)",
+        "level": "safe | low | medium | high | critical",
+        "bytecode_size": "integer",
+        "findings": "[{detector, severity, title, description, points}]",
+        "category_scores": "{category: number}",
+        "implementation": "object | null (for proxy contracts)",
+    },
+    "authentication": "x402 (USDC on Base)",
+    "output_format": "application/json",
 }
 
 

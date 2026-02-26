@@ -705,6 +705,7 @@ def create_app(
         })
 
     @app.route("/.well-known/agent.json")
+    @app.route("/.well-known/agent-card.json")
     def a2a_agent_card():
         """A2A (Agent-to-Agent) protocol agent card for discovery."""
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
@@ -732,11 +733,12 @@ def create_app(
             "skills": [
                 {
                     "id": "analyze-contract",
-                    "name": "Analyze Smart Contract",
+                    "name": "Risk Classification (OASF 1304)",
                     "description": (
                         "Fetch on-chain bytecode for a contract address "
                         "and run 8 detectors to produce a 0-100 risk score."
                     ),
+                    "tags": ["oasf:1304", "oasf:109", "oasf:10903", "oasf:405"],
                 },
             ],
             "security": [],
@@ -768,20 +770,13 @@ def create_app(
                 },
                 {
                     "name": "A2A",
-                    "endpoint": f"{base_url}/.well-known/agent.json",
+                    "endpoint": f"{base_url}/.well-known/agent-card.json",
                     "version": "0.3.0",
                 },
                 {
                     "name": "OASF",
-                    "skills": [
-                        "contract risk scoring",
-                        "proxy detection",
-                        "bytecode analysis",
-                        "honeypot detection",
-                        "reentrancy detection",
-                        "security assessment",
-                    ],
-                    "domains": ["blockchain", "security", "defi"],
+                    "skills": ["1304"],
+                    "domains": ["109", "10903", "405"],
                 },
                 {
                     "name": "agentWallet",

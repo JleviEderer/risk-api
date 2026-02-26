@@ -359,9 +359,23 @@ def test_a2a_agent_card_endpoint(client):
     assert data["capabilities"]["streaming"] is False
     assert len(data["skills"]) == 1
     assert data["skills"][0]["id"] == "analyze-contract"
+    assert data["skills"][0]["name"] == "Risk Classification (OASF 1304)"
+    assert "oasf:1304" in data["skills"][0]["tags"]
+    assert "oasf:109" in data["skills"][0]["tags"]
     assert data["interfaces"][0]["type"] == "http"
     assert data["security"] == []
     assert data["defaultInputModes"] == ["application/json"]
+
+
+def test_a2a_agent_card_json_endpoint(client):
+    """/.well-known/agent-card.json serves same A2A card (8004scan canonical path)."""
+    resp = client.get("/.well-known/agent-card.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["version"] == "1.0.0"
+    assert data["skills"][0]["id"] == "analyze-contract"
+    assert data["skills"][0]["tags"] == ["oasf:1304", "oasf:109", "oasf:10903", "oasf:405"]
 
 
 def test_a2a_agent_card_uses_public_url(app):
@@ -373,8 +387,24 @@ def test_a2a_agent_card_uses_public_url(app):
         assert data["interfaces"][0]["baseUrl"] == "https://risk-api.life.conway.tech"
 
 
+def test_a2a_agent_card_json_uses_public_url(app):
+    """agent-card.json path also respects PUBLIC_URL."""
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/.well-known/agent-card.json")
+        data = resp.get_json()
+        assert data["url"] == "https://risk-api.life.conway.tech"
+
+
 def test_a2a_agent_card_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/.well-known/agent.json")
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "Smart Contract Risk Scorer"
+
+
+def test_a2a_agent_card_json_not_behind_paywall(client_with_x402):
+    """agent-card.json should also be exempt from x402 paywall."""
+    resp = client_with_x402.get("/.well-known/agent-card.json")
     assert resp.status_code == 200
     assert resp.get_json()["name"] == "Smart Contract Risk Scorer"
 
@@ -383,7 +413,7 @@ def test_agent_metadata_has_a2a_service(client):
     resp = client.get("/agent-metadata.json")
     data = resp.get_json()
     a2a = next(s for s in data["services"] if s["name"] == "A2A")
-    assert "/.well-known/agent.json" in a2a["endpoint"]
+    assert "/.well-known/agent-card.json" in a2a["endpoint"]
     assert a2a["version"] == "0.3.0"
 
 
@@ -391,9 +421,8 @@ def test_agent_metadata_has_oasf_service(client):
     resp = client.get("/agent-metadata.json")
     data = resp.get_json()
     oasf = next(s for s in data["services"] if s["name"] == "OASF")
-    assert "contract risk scoring" in oasf["skills"]
-    assert "blockchain" in oasf["domains"]
-    assert "security" in oasf["domains"]
+    assert oasf["skills"] == ["1304"]
+    assert oasf["domains"] == ["109", "10903", "405"]
 
 
 def test_agent_metadata_has_agent_wallet_service(client):

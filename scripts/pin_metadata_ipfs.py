@@ -59,20 +59,13 @@ def build_metadata() -> dict[str, object]:
             },
             {
                 "name": "A2A",
-                "endpoint": f"{BASE_URL}/.well-known/agent.json",
+                "endpoint": f"{BASE_URL}/.well-known/agent-card.json",
                 "version": "0.3.0",
             },
             {
                 "name": "OASF",
-                "skills": [
-                    "contract risk scoring",
-                    "proxy detection",
-                    "bytecode analysis",
-                    "honeypot detection",
-                    "reentrancy detection",
-                    "security assessment",
-                ],
-                "domains": ["blockchain", "security", "defi"],
+                "skills": ["1304"],
+                "domains": ["109", "10903", "405"],
             },
             {
                 "name": "agentWallet",

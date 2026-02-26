@@ -23,6 +23,17 @@ class TestBuildMetadata:
         service_names = [s["name"] for s in meta["services"]]  # type: ignore[union-attr]
         assert service_names == ["web", "A2A", "OASF", "agentWallet"]
 
+    def test_a2a_uses_agent_card_json(self) -> None:
+        meta = build_metadata()
+        a2a = [s for s in meta["services"] if s["name"] == "A2A"][0]  # type: ignore[union-attr]
+        assert "/.well-known/agent-card.json" in a2a["endpoint"]  # type: ignore[index]
+
+    def test_oasf_uses_taxonomy_codes(self) -> None:
+        meta = build_metadata()
+        oasf = [s for s in meta["services"] if s["name"] == "OASF"][0]  # type: ignore[union-attr]
+        assert oasf["skills"] == ["1304"]  # type: ignore[index]
+        assert oasf["domains"] == ["109", "10903", "405"]  # type: ignore[index]
+
     def test_has_ipfs_specific_fields(self) -> None:
         """Metadata for IPFS should have fixed timestamps and absolute URLs."""
         meta = build_metadata()
@@ -81,6 +92,7 @@ class TestPinToIpfs:
         assert len(responses.calls) == 1
         req = responses.calls[0].request
         assert req.headers["Authorization"] == "Bearer test_jwt_token"
+        assert req.body is not None
         body = json.loads(req.body)
         assert body["pinataContent"] == {"test": "data"}
         assert body["pinataMetadata"]["name"] == "risk-api-agent-metadata"
