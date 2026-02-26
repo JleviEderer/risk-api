@@ -1,6 +1,6 @@
 # Handover — risk-api
 
-**Session date:** 2026-02-24 (evening)
+**Session date:** 2026-02-25 (afternoon)
 **Repo:** `C:/Users/justi/dev/risk-api/`
 **Live at:** https://risk-api.life.conway.tech
 **Git status:** Clean — all changes committed and pushed to `origin/master`
@@ -9,88 +9,89 @@
 
 ## What We Did This Session
 
-### 1. Built `/dashboard` HTML Analytics Page
+### 1. IPFS Metadata Pinning (`f2e7e7c`)
 
-Added a self-hosted dark-themed analytics dashboard at `/dashboard`:
+Created infrastructure to pin agent metadata to IPFS via Pinata, fixing the 8004scan WA040 warning ("HTTP/HTTPS URI is not content-addressed").
 
-- **3 summary cards:** Total Requests, Paid Requests, Avg Response Time
-- **Hourly bar chart:** Paid vs unpaid requests (Chart.js 4.x from CDN, stacked bars)
-- **Recent requests table:** Last 20 entries with truncated addresses, risk level badges, relative timestamps
-- **Auto-refresh:** `setInterval` every 30s, no full page reload
-- **Graceful degradation:** If Chart.js CDN is unreachable, shows "Chart unavailable" text
-- **Not behind x402 paywall** — operational tool, not monetized
+- **New script:** `scripts/pin_metadata_ipfs.py` — builds the full metadata JSON (matching `/agent-metadata.json` output), pins it to IPFS via Pinata API, returns the CID
+- **Updated:** `scripts/register_erc8004.py` — `--update-uri` now accepts a custom URI argument (e.g., `ipfs://Qm...`) instead of always using the HTTP endpoint
+- **Env var:** `PINATA_JWT` added (user's Pinata account: jleviederer@gmail.com)
+- **12 new tests** in `tests/test_pin_metadata.py` covering pin script and URI arg parsing
+- **On-chain TX:** `0xeb2c6b...` — first agentURI update to `ipfs://QmPPrqHQNQvU5FQ9Rwy7QRbrxkWBrcbsabgB5nQLX3XmCK`
 
-The entire dashboard is a single inline HTML string constant (`DASHBOARD_HTML`) in `app.py` — no templates directory, no new files, no new Python dependencies.
+### 2. A2A Agent Card + OASF + agentWallet Services (`0b19c81`)
 
-### 2. Enhanced `/stats` JSON Endpoint
+Added A2A protocol support and enriched metadata services to target 8004scan's Service dimension (25% weight).
 
-Added two new fields to the existing `/stats` response (backward-compatible):
-
-- `avg_duration_ms` — global average response time across all logged requests
-- `hourly` — list of `{"hour": "2026-02-24T14:00:00Z", "count": N, "paid": N, "avg_duration_ms": N}` bucketed by hour
-
-Computed in the existing single-pass file read with accumulators. Hourly buckets use `ts[:13]` for grouping.
-
-### 3. Deployed to Conway
-
-Uploaded `app.py` to both Conway paths and restarted gunicorn:
-- `/root/risk-api/src/risk_api/app.py` (source)
-- `/root/risk-api-venv/lib/python3.10/site-packages/risk_api/app.py` (site-packages — where gunicorn loads from)
-
-Verified all live endpoints:
-- `https://risk-api.life.conway.tech/health` — OK
-- `https://risk-api.life.conway.tech/dashboard` — serving HTML
-- `https://risk-api.life.conway.tech/stats` — includes new `hourly` and `avg_duration_ms` fields
-
-### 4. Set Up BetterStack Uptime Monitoring
-
-User created a BetterStack account and configured uptime monitoring:
-- **Monitor:** `https://risk-api.life.conway.tech/health`
-- **Alerts:** Email + Slack (free tier — no phone)
-- **Interval:** 3 minutes
-- This closes the last ops gap (alerting when gunicorn dies)
-
-### 5. Committed & Pushed
-
-Single commit `1cbe4c7`: `feat(app): add /dashboard HTML analytics page with hourly charts`
-- Pushed to `origin/master`
+- **New endpoint:** `/.well-known/agent.json` — serves A2A (Agent-to-Agent) protocol agent card with capabilities, skills, and provider info
+- **Updated metadata services array** with three new entries:
+  - **A2A** — `/.well-known/agent.json` URL, version 0.2.1
+  - **OASF** — skills (`smart-contract-risk-scoring`) and domains (`defi-security`)
+  - **agentWallet** — CAIP-10 format (`eip155:8453:0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`)
+- **Re-pinned to IPFS** with updated metadata → new CID
+- **On-chain TX:** `0x8b6e08...` — second agentURI update to `ipfs://QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` (current)
+- **58 lines added** to `tests/test_app.py` covering A2A endpoint response shape and paywall exclusion
+- **Deployed to Conway** and verified live
 
 ---
 
-## What Worked
+## Key Artifacts
 
-- **Inline HTML approach** — single constant in `app.py`, no template engine, no new files. Clean and self-contained.
-- **Single-pass stats computation** — hourly bucketing and avg duration computed in the same file read loop as total/paid counts. No second pass needed.
-- **Conway deploy via API** — upload JSON + exec works reliably. Upload to both paths (source + site-packages) then `pkill -f gunicorn` + `nohup start script`.
-
-## What Didn't Work / Gotchas
-
-- **`/tmp` paths on Windows/MINGW** — Python's `open('/tmp/...')` resolves differently on Windows vs MINGW bash. Use `tempfile.mkdtemp()` for cross-platform temp files.
-- **`git diff --stat` argument order** — `--stat` must come before file paths. Use `git diff --stat -- file1 file2`.
-- **x402 tests take 20+ minutes** — Tests using `client_with_x402` fixture connect to the real Mogami facilitator during `http_server.initialize()`. This is a pre-existing issue, not caused by our changes. Use `-k "not x402"` to skip them for fast iteration (non-x402 tests run in ~3 seconds).
-- **Conway upload API format** — It's `{"path": "...", "content": "..."}` (flat), NOT `{"files": [{"path": "...", "content": "..."}]}` (array).
-
----
-
-## Key Decisions
-
-| Decision | Why |
-|----------|-----|
-| Inline HTML constant, not templates | No Jinja2 dependency, no templates directory. Dashboard is ~130 lines of HTML/CSS/JS — small enough for a string constant. |
-| Chart.js from CDN, not bundled | Zero build step. Graceful fallback if CDN is down. |
-| `/dashboard` NOT behind x402 paywall | It's an operational tool for the owner, not a product endpoint. |
-| BetterStack for uptime monitoring | Free tier: 10 monitors, 3-min intervals, email+Slack alerts. Recommended over UptimeRobot (5-min intervals on free tier). |
-| All 3 ops gaps now closed | Logging/analytics (dashboard), rate limiting (x402 paywall), alerting (BetterStack). |
+| Artifact | Value |
+|----------|-------|
+| Commit 1 | `f2e7e7c` — feat(scripts): add IPFS metadata pinning and update on-chain agentURI |
+| Commit 2 | `0b19c81` — feat(app): add A2A agent card, OASF, and agentWallet services for 8004scan score |
+| On-chain CID | `QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` |
+| TX 1 (first URI) | `0xeb2c6b...` |
+| TX 2 (second URI) | `0x8b6e08...` |
+| ERC-8004 Agent | #19074 on Base mainnet |
+| 8004scan score | 65.53 (pending re-index) |
 
 ---
 
-## Ops Gaps Status (All Closed)
+## Files Modified This Session
 
-| Gap | Status | Solution |
-|-----|--------|----------|
-| No logging/analytics | **CLOSED** | Request logging (`REQUEST_LOG_PATH`), `/stats` JSON, `/dashboard` HTML |
-| No rate limiting | **CLOSED** (N/A) | x402 paywall at $0.10/call is natural rate limiting |
-| No alerting | **CLOSED** | BetterStack uptime monitoring (email + Slack, 3-min intervals) |
+| File | Changes |
+|------|---------|
+| `scripts/pin_metadata_ipfs.py` | **New** — 165 lines. Builds metadata, pins to IPFS via Pinata API |
+| `scripts/register_erc8004.py` | `--update-uri` accepts custom URI argument |
+| `src/risk_api/app.py` | +65 lines: `/.well-known/agent.json` A2A endpoint, OASF/agentWallet services in metadata |
+| `tests/test_pin_metadata.py` | **New** — 153 lines. 12 tests for pin script + URI arg parsing |
+| `tests/test_app.py` | +58 lines: A2A endpoint tests, paywall exclusion tests |
+| `CLAUDE.md` | Added PINATA_JWT env var, IPFS workflow, A2A/OASF/agentWallet docs |
+
+---
+
+## IPFS Pinning Workflow
+
+To update on-chain metadata after code changes:
+
+```bash
+# 1. Pin updated metadata to IPFS
+python scripts/pin_metadata_ipfs.py
+# Returns: ipfs://Qm...
+
+# 2. Update on-chain agentURI
+python scripts/register_erc8004.py --update-uri ipfs://Qm<new-CID>
+```
+
+Requires `PINATA_JWT` env var set (Pinata account: jleviederer@gmail.com).
+
+---
+
+## 8004scan Score Analysis
+
+**Current score: 65.53** (pending re-index by their indexer)
+
+### What we improved (code-actionable)
+- **Metadata (20% weight):** Fixed WA040 (HTTP URI → IPFS content-addressed), enriched services array
+- **Service (25% weight):** Added A2A agent card, OASF skills+domains, agentWallet CAIP-10
+
+### What remains (NOT code-actionable)
+- **Engagement (30% weight):** Organic usage metrics — needs real API traffic / agent-to-agent calls
+- **Publisher (20% weight):** Publisher reputation — builds over time with consistent uptime and usage
+
+These remaining dimensions require organic growth, not code changes.
 
 ---
 
@@ -101,52 +102,21 @@ Single commit `1cbe4c7`: `feat(app): add /dashboard HTML analytics page with hou
 - **Status:** Healthy, all routes working
 - **Facilitator:** Mogami (`https://v2.facilitator.mogami.tech`)
 - **Paywall:** Active on `/analyze` (GET+POST)
-- **Open routes:** `/health`, `/stats`, `/dashboard`, `/agent-metadata.json`, `/.well-known/x402-verification.json`
-- **Logging:** Active at `/root/risk-api-logs/requests.jsonl`
-- **Monitoring:** BetterStack uptime (email + Slack alerts)
+- **Open routes:** `/health`, `/stats`, `/dashboard`, `/agent-metadata.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/openapi.json`, `/avatar.png`
+- **On-chain URI:** `ipfs://QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ`
 
 ### Agent Wallet
 - **Address:** `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`
 - **USDC Balance:** $0.20 (2 settlements via Mogami)
 
 ### Local Dev
-- **118 tests pass**, 0 pyright errors
+- **151 tests pass**, 0 pyright errors
 - Git: clean, pushed to origin/master
 
 ### Discovery
-- **ERC-8004:** Agent #19074 on Base mainnet
+- **ERC-8004:** Agent #19074 on Base mainnet (https://8004scan.io/agents/base/19074)
 - **x402.jobs:** Listed at https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base
-
----
-
-## Files Modified This Session
-
-| File | Changes |
-|------|---------|
-| `src/risk_api/app.py` | Added `DASHBOARD_HTML` constant (~130 lines), `/dashboard` route, enhanced `/stats` with `avg_duration_ms` + `hourly` bucketing |
-| `tests/test_app.py` | +2 tests: `test_dashboard_returns_html`, `test_dashboard_not_behind_paywall` |
-| `tests/test_logging.py` | +1 test: `test_stats_includes_hourly_and_avg_duration` |
-| `CLAUDE.md` | Updated structure line, added `/dashboard` to gotchas |
-
----
-
-## Open Issues
-
-1. **Facilitator fallback not implemented** — Need to test Heurist/PayAI/Dexter gas limits before adding fallback logic
-2. **Dexter coming back** — Watch @dexteraisol on X. When back, test gas limit with real settlement
-3. **Settlement errors are silent** — Server returns 200 even if facilitator settlement fails. Consider: log more aggressively, or return a warning header to client
-4. **Result caching** — Same contract re-analyzed every call. Add TTL cache when traffic justifies it
-5. **x402 tests are slow** — `client_with_x402` fixture hits real facilitator (~20 min). Could mock the facilitator connection for faster CI.
-
----
-
-## Next Steps
-
-1. **Monitor dashboard** — Check `https://risk-api.life.conway.tech/dashboard` for organic traffic
-2. **Test facilitator gas limits** — When Dexter is back, run `scripts/test_x402_client.py` against each facilitator
-3. **Add facilitator fallback** — Once 2-3 facilitators confirmed working, add retry logic in settlement
-4. **Result caching** — Add TTL cache for contract analysis when traffic justifies it
-5. **Consider mocking x402 in tests** — Speed up test suite from 21 min to <5 sec
+- **IPFS:** Metadata pinned via Pinata, agentURI points to IPFS CID
 
 ---
 
@@ -169,15 +139,20 @@ npx pyright src/ tests/
 
 # Run dev server
 flask --app risk_api.app:create_app run
-# Then open http://localhost:5000/dashboard
+
+# Pin metadata to IPFS
+python scripts/pin_metadata_ipfs.py
+
+# Update on-chain agentURI
+python scripts/register_erc8004.py --update-uri ipfs://Qm<CID>
 
 # Health check
 python scripts/health_check.py
 
 # Check live
 curl https://risk-api.life.conway.tech/health
-curl https://risk-api.life.conway.tech/stats
-# Open https://risk-api.life.conway.tech/dashboard in browser
+curl https://risk-api.life.conway.tech/.well-known/agent.json
+curl https://risk-api.life.conway.tech/agent-metadata.json
 
 # Conway sandbox
 # Sandbox ID: 76cfc42df7955d2a7de0ec7e2473f686
