@@ -13,6 +13,7 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | IPFS | Live | `QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-01 |
 | 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | — | 2026-03-01 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | — | 2026-03-01 |
+| x402 Bazaar | Live | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | — | 2026-03-01 |
 
 ### How to verify wallet on 8004scan
 

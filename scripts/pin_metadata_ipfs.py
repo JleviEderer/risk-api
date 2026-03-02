@@ -45,11 +45,11 @@ def build_metadata() -> dict[str, object]:
         "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
         "name": "Augur",
         "description": (
-            "EVM smart contract risk scoring API on Base. "
+            "EVM smart contract risk scoring API. "
             "Analyzes bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
             "delegatecall) and returns a composite 0-100 risk score. "
-            "Pay $0.10/call via x402 in USDC on Base. "
+            "Pay $0.10/call via x402 in USDC. "
             "Endpoint: GET /analyze?address={contract_address}"
         ),
         "services": [
