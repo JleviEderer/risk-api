@@ -1,7 +1,7 @@
 # risk-api — Augur: Smart Contract Risk Scoring API
 
 ## Stack
-- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx, jsonschema
+- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx, jsonschema, PyJWT, cryptography
 - requests (Base RPC), python-dotenv
 - pytest + responses (testing), pyright (type checking)
 - Docker + docker-compose (production deployment)
@@ -18,6 +18,7 @@
 - `src/risk_api/analysis/` — EVM bytecode analysis pipeline
 - `src/risk_api/chain/` — Base RPC client
 - `src/risk_api/app.py` — Flask app + x402 middleware + request logging + dashboard
+- `src/risk_api/cdp_auth.py` — CDP facilitator JWT auth provider
 - `src/risk_api/config.py` — Environment config
 - `scripts/health_check.py` — External health check for monitoring/alerting
 - `scripts/register_moltmart.py` — Register agent + list service on MoltMart marketplace
@@ -26,7 +27,9 @@
 ## Key Env Vars
 - `WALLET_ADDRESS` — payment destination (required)
 - `BASE_RPC_URL` — defaults to https://mainnet.base.org
-- `FACILITATOR_URL` — defaults to https://v2.facilitator.mogami.tech (Mogami — free, no auth, confirmed working for Base USDC). OpenFacilitator has gas limit bug (100k < 109k needed). Dexter was down 2026-02-23/24 (server upgrade).
+- `FACILITATOR_URL` — defaults to https://v2.facilitator.mogami.tech. Production uses CDP (`https://api.cdp.coinbase.com/platform/v2/x402`) for Bazaar indexing. Mogami is free fallback. OpenFacilitator has gas limit bug (100k < 109k needed).
+- `CDP_API_KEY_ID` — Coinbase Developer Platform API key ID (optional, required for CDP facilitator auth)
+- `CDP_API_KEY_SECRET` — Coinbase Developer Platform API key secret (optional, Ed25519 base64, required for CDP facilitator auth)
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.10
 - `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
@@ -66,4 +69,5 @@
 - All discovery endpoints (`/`, `/robots.txt`, `/sitemap.xml`, `/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/.well-known/agent-card.json`, `/.well-known/x402`, `/.well-known/api-catalog`, `/agent-metadata.json`) are NOT behind x402 paywall
 - Agent metadata `services` array includes: web, A2A, OASF (skills=OASF taxonomy codes, domains=OASF taxonomy codes), agentWallet (CAIP-10 format)
 - OASF taxonomy: skills `risk_classification`, `vulnerability_analysis`, `threat_detection`; domains `technology/blockchain` (slug format per OASF v0.8.0)
+- CDP facilitator requires JWT auth (Ed25519-signed, EdDSA algorithm). `cdp_auth.py` implements this without the full `cdp-sdk`. Auth headers are generated per-request via `CreateHeadersAuthProvider`. Degrades gracefully if PyJWT/cryptography not installed.
 - On-chain `agentURI` points to IPFS (`ipfs://{CID}`) for content-addressed metadata (fixes 8004scan WA040). HTTP endpoint stays live for other discovery. To update: `python scripts/pin_metadata_ipfs.py` → `python scripts/register_erc8004.py --update-uri ipfs://{CID}`

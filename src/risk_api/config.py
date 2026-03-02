@@ -22,6 +22,8 @@ class Config:
     erc8004_agent_id: int | None = None
     basescan_api_key: str = ""
     public_url: str = ""
+    cdp_api_key_id: str = ""
+    cdp_api_key_secret: str = ""
 
 
 def load_config() -> Config:
@@ -50,4 +52,6 @@ def load_config() -> Config:
         erc8004_agent_id=erc8004_agent_id,
         basescan_api_key=os.environ.get("BASESCAN_API_KEY", ""),
         public_url=os.environ.get("PUBLIC_URL", ""),
+        cdp_api_key_id=os.environ.get("CDP_API_KEY_ID", ""),
+        cdp_api_key_secret=os.environ.get("CDP_API_KEY_SECRET", ""),
     )

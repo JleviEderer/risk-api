@@ -521,7 +521,30 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         logger.warning("x402 SDK not available — payment middleware disabled")
         return False
 
-    fac_config = FacilitatorConfig(url=config.facilitator_url)
+    auth_provider = None
+    if config.cdp_api_key_id and config.cdp_api_key_secret:
+        try:
+            from risk_api.cdp_auth import create_cdp_auth_headers
+
+            from x402.http import CreateHeadersAuthProvider
+
+            auth_provider = CreateHeadersAuthProvider(
+                lambda: create_cdp_auth_headers(
+                    config.cdp_api_key_id,
+                    config.cdp_api_key_secret,
+                    config.facilitator_url,
+                )
+            )
+            logger.info("CDP auth provider configured for facilitator")
+        except ImportError:
+            logger.warning(
+                "PyJWT/cryptography not available — CDP auth disabled, "
+                "facilitator may reject requests"
+            )
+
+    fac_config = FacilitatorConfig(
+        url=config.facilitator_url, auth_provider=auth_provider
+    )
     facilitator = HTTPFacilitatorClientSync(fac_config)
     resource_server = x402ResourceServerSync(facilitator)
     resource_server.register(config.network, ExactEvmServerScheme())  # type: ignore[arg-type]  # x402 SDK parameter name mismatch
