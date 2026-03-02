@@ -80,6 +80,74 @@ OPENAPI_SPEC: dict[str, object] = {
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
+                                "examples": {
+                                    "safe_contract": {
+                                        "summary": "Simple contract — no risks detected",
+                                        "value": {
+                                            "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                                            "score": 0,
+                                            "level": "safe",
+                                            "bytecode_size": 2846,
+                                            "findings": [],
+                                            "category_scores": {},
+                                        },
+                                    },
+                                    "proxy_contract": {
+                                        "summary": "Proxy contract — high risk with implementation analysis",
+                                        "value": {
+                                            "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                            "score": 60,
+                                            "level": "high",
+                                            "bytecode_size": 1485,
+                                            "findings": [
+                                                {
+                                                    "detector": "proxy",
+                                                    "severity": "medium",
+                                                    "title": "EIP-1967 Proxy Detected",
+                                                    "description": "Contract uses the EIP-1967 transparent proxy pattern. Logic resides in a separate implementation contract that can be upgraded.",
+                                                    "points": 20,
+                                                },
+                                                {
+                                                    "detector": "delegatecall",
+                                                    "severity": "medium",
+                                                    "title": "Delegatecall Usage",
+                                                    "description": "Contract uses DELEGATECALL to execute code from another contract.",
+                                                    "points": 15,
+                                                },
+                                            ],
+                                            "category_scores": {
+                                                "proxy": 20,
+                                                "delegatecall": 15,
+                                                "impl_delegatecall": 15,
+                                                "impl_hidden_mint": 10,
+                                            },
+                                            "implementation": {
+                                                "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
+                                                "bytecode_size": 24576,
+                                                "findings": [
+                                                    {
+                                                        "detector": "impl_delegatecall",
+                                                        "severity": "medium",
+                                                        "title": "Implementation Uses Delegatecall",
+                                                        "description": "The implementation contract also uses DELEGATECALL.",
+                                                        "points": 15,
+                                                    },
+                                                    {
+                                                        "detector": "impl_hidden_mint",
+                                                        "severity": "medium",
+                                                        "title": "Implementation Has Hidden Mint",
+                                                        "description": "The implementation contract contains patterns consistent with unauthorized token minting.",
+                                                        "points": 10,
+                                                    },
+                                                ],
+                                                "category_scores": {
+                                                    "impl_delegatecall": 15,
+                                                    "impl_hidden_mint": 10,
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
                             }
                         },
                     },
@@ -95,6 +163,9 @@ OPENAPI_SPEC: dict[str, object] = {
                                     "properties": {
                                         "error": {"type": "string"},
                                     },
+                                },
+                                "example": {
+                                    "error": "Missing 'address' query parameter",
                                 },
                             }
                         },
@@ -149,6 +220,14 @@ OPENAPI_SPEC: dict[str, object] = {
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
+                                "example": {
+                                    "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                                    "score": 0,
+                                    "level": "safe",
+                                    "bytecode_size": 2846,
+                                    "findings": [],
+                                    "category_scores": {},
+                                },
                             }
                         },
                     },
@@ -157,6 +236,19 @@ OPENAPI_SPEC: dict[str, object] = {
                     },
                     "422": {
                         "description": "Invalid or missing contract address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {"type": "string"},
+                                    },
+                                },
+                                "example": {
+                                    "error": "Missing 'address' query parameter",
+                                },
+                            }
+                        },
                     },
                 },
                 "x-x402-price": "$0.10",
@@ -178,15 +270,34 @@ OPENAPI_SPEC: dict[str, object] = {
         "schemas": {
             "Finding": {
                 "type": "object",
+                "description": "A risk finding from one of the 8 detectors.",
                 "properties": {
-                    "detector": {"type": "string"},
+                    "detector": {
+                        "type": "string",
+                        "description": (
+                            "Detector that produced this finding: proxy, reentrancy, "
+                            "selfdestruct, honeypot, hidden_mint, fee_manipulation, "
+                            "delegatecall, or deployer_reputation. Prefixed with impl_ "
+                            "for findings from a proxy's implementation contract."
+                        ),
+                    },
                     "severity": {
                         "type": "string",
                         "enum": ["info", "low", "medium", "high", "critical"],
+                        "description": "Finding severity level.",
                     },
-                    "title": {"type": "string"},
-                    "description": {"type": "string"},
-                    "points": {"type": "integer"},
+                    "title": {
+                        "type": "string",
+                        "description": "Human-readable title of the finding.",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed explanation of what was detected and why it matters.",
+                    },
+                    "points": {
+                        "type": "integer",
+                        "description": "Risk points this finding contributes to the composite score.",
+                    },
                 },
             },
             "ImplementationResult": {
@@ -208,23 +319,43 @@ OPENAPI_SPEC: dict[str, object] = {
             "AnalysisResult": {
                 "type": "object",
                 "properties": {
-                    "address": {"type": "string"},
-                    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "address": {"type": "string", "description": "The analyzed contract address."},
+                    "score": {
+                        "type": "integer", "minimum": 0, "maximum": 100,
+                        "description": "Composite risk score from 0 (safest) to 100 (riskiest).",
+                    },
                     "level": {
                         "type": "string",
                         "enum": ["safe", "low", "medium", "high", "critical"],
+                        "description": (
+                            "Risk level derived from score: "
+                            "safe (0-15), low (16-35), medium (36-55), "
+                            "high (56-75), critical (76-100)."
+                        ),
                     },
-                    "bytecode_size": {"type": "integer"},
+                    "bytecode_size": {
+                        "type": "integer",
+                        "description": "Size of the contract bytecode in bytes.",
+                    },
                     "findings": {
                         "type": "array",
                         "items": {"$ref": "#/components/schemas/Finding"},
+                        "description": "List of risk findings from all detectors.",
                     },
                     "category_scores": {
                         "type": "object",
                         "additionalProperties": {"type": "number"},
+                        "description": (
+                            "Risk points broken down by detector category "
+                            "(e.g. proxy, reentrancy, delegatecall)."
+                        ),
                     },
                     "implementation": {
                         "$ref": "#/components/schemas/ImplementationResult",
+                        "description": (
+                            "Analysis of the proxy's implementation contract. "
+                            "Only present for proxy contracts."
+                        ),
                     },
                 },
                 "required": [
@@ -390,6 +521,7 @@ LANDING_HTML = """<!DOCTYPE html>
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
 <script type="application/ld+json">__JSON_LD__</script>
+<script type="application/ld+json">__FAQ_JSON_LD__</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -459,6 +591,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
   <a href="__BASE_URL__/.well-known/ai-plugin.json">AI Plugin Manifest <div class="path">/.well-known/ai-plugin.json</div></a>
   <a href="__BASE_URL__/.well-known/api-catalog">API Catalog (RFC 9727) <div class="path">/.well-known/api-catalog</div></a>
   <a href="__BASE_URL__/agent-metadata.json">Agent Metadata <div class="path">/agent-metadata.json</div></a>
+  <a href="__BASE_URL__/llms.txt">LLM Documentation <div class="path">/llms.txt</div></a>
   <a href="https://8004scan.io/agents/base/19074">ERC-8004 Registry <div class="path">8004scan.io/agents/base/19074</div></a>
 </div>
 </div>
@@ -468,6 +601,232 @@ Augur &middot; ERC-8004 Agent #19074 &middot; Powered by x402
 </footer>
 </body>
 </html>"""
+
+
+LLMS_TXT = """\
+# Augur
+
+> EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns \
+and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base. No API key needed.
+
+## What It Does
+
+Augur fetches on-chain bytecode for any EVM smart contract on Base (EIP-155:8453) \
+and runs 8 detectors to produce a composite risk score from 0 (safe) to 100 (critical).
+
+## How to Call
+
+```
+GET __BASE_URL__/analyze?address=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+```
+
+Payment: Include a `PAYMENT-SIGNATURE` header with an x402 payment proof ($0.10 USDC on Base). \
+Any x402-compatible HTTP client handles this automatically.
+
+## Example Response
+
+```json
+{
+  "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "score": 0,
+  "level": "safe",
+  "bytecode_size": 2846,
+  "findings": [],
+  "category_scores": {}
+}
+```
+
+## Risk Levels
+
+- **safe** (0-15): No significant risks detected
+- **low** (16-35): Minor concerns, generally safe
+- **medium** (36-55): Notable risks, review before interacting
+- **high** (56-75): Significant risks detected
+- **critical** (76-100): Severe risks, avoid interaction
+
+## Links
+
+- [OpenAPI Spec](__BASE_URL__/openapi.json)
+- [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
+- [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
+- [x402 Discovery](__BASE_URL__/.well-known/x402)
+- [API Catalog](__BASE_URL__/.well-known/api-catalog)
+- [Full Documentation](__BASE_URL__/llms-full.txt)
+"""
+
+LLMS_FULL_TXT = """\
+# Augur — Full Documentation
+
+> EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns \
+and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base. No API key needed.
+
+## Overview
+
+Augur is an agent-to-agent API that scores smart contract risk on Base (EIP-155:8453). \
+It uses deterministic bytecode pattern matching (no LLM) for fast, reliable results. \
+Payment is via the x402 HTTP payment protocol — no API key, no signup, no subscription.
+
+## Endpoint
+
+```
+GET __BASE_URL__/analyze?address={contract_address}
+POST __BASE_URL__/analyze  (body: {"address": "{contract_address}"})
+```
+
+**Payment:** $0.10 USDC on Base via x402. Send a request, receive 402 with payment \
+details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
+
+## Request Parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| address   | string | Yes      | EVM contract address, 0x-prefixed, 40 hex chars |
+
+## Example: Safe Contract
+
+```json
+{
+  "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "score": 0,
+  "level": "safe",
+  "bytecode_size": 2846,
+  "findings": [],
+  "category_scores": {}
+}
+```
+
+## Example: High-Risk Proxy Contract
+
+```json
+{
+  "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "score": 60,
+  "level": "high",
+  "bytecode_size": 1485,
+  "findings": [
+    {
+      "detector": "proxy",
+      "severity": "medium",
+      "title": "EIP-1967 Proxy Detected",
+      "description": "Contract uses the EIP-1967 transparent proxy pattern.",
+      "points": 20
+    },
+    {
+      "detector": "delegatecall",
+      "severity": "medium",
+      "title": "Delegatecall Usage",
+      "description": "Contract uses DELEGATECALL to execute code from another contract.",
+      "points": 15
+    }
+  ],
+  "category_scores": {
+    "proxy": 20,
+    "delegatecall": 15,
+    "impl_delegatecall": 15,
+    "impl_hidden_mint": 10
+  },
+  "implementation": {
+    "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
+    "bytecode_size": 24576,
+    "findings": [
+      {
+        "detector": "impl_delegatecall",
+        "severity": "medium",
+        "title": "Implementation Uses Delegatecall",
+        "points": 15
+      },
+      {
+        "detector": "impl_hidden_mint",
+        "severity": "medium",
+        "title": "Implementation Has Hidden Mint",
+        "points": 10
+      }
+    ],
+    "category_scores": {
+      "impl_delegatecall": 15,
+      "impl_hidden_mint": 10
+    }
+  }
+}
+```
+
+## Response Schema
+
+| Field            | Type    | Description |
+|------------------|---------|-------------|
+| address          | string  | The analyzed contract address |
+| score            | integer | Composite risk score, 0-100 |
+| level            | string  | Risk level: safe, low, medium, high, critical |
+| bytecode_size    | integer | Contract bytecode size in bytes |
+| findings         | array   | List of risk findings from detectors |
+| category_scores  | object  | Risk points by detector category |
+| implementation   | object  | Proxy implementation analysis (only for proxy contracts) |
+
+### Finding Object
+
+| Field       | Type    | Description |
+|-------------|---------|-------------|
+| detector    | string  | Detector name (e.g. proxy, reentrancy, selfdestruct) |
+| severity    | string  | info, low, medium, high, or critical |
+| title       | string  | Human-readable finding title |
+| description | string  | Detailed explanation |
+| points      | integer | Risk points contributed to composite score |
+
+## Risk Levels
+
+| Level    | Score Range | Meaning |
+|----------|-------------|---------|
+| safe     | 0-15        | No significant risks detected |
+| low      | 16-35       | Minor concerns, generally safe |
+| medium   | 36-55       | Notable risks, review before interacting |
+| high     | 56-75       | Significant risks detected |
+| critical | 76-100      | Severe risks, avoid interaction |
+
+## Detectors
+
+1. **Proxy Detection** — EIP-1967, EIP-1822, and OpenZeppelin proxy slots. \
+Proxy contracts auto-resolve implementation (max 1 hop).
+2. **Reentrancy** — CALL before state update patterns that enable reentrancy attacks.
+3. **Selfdestruct** — Contract contains SELFDESTRUCT opcode, allowing destruction.
+4. **Honeypot** — Transfer restriction patterns that prevent token selling.
+5. **Hidden Mint** — Unauthorized token creation functions not visible in the ABI.
+6. **Fee Manipulation** — Dynamic fee extraction patterns that can drain value.
+7. **Delegatecall** — External code execution that can change contract state.
+8. **Deployer Reputation** — Basescan deployer wallet history analysis.
+
+## Error Responses
+
+**422 — Invalid request:**
+```json
+{"error": "Missing 'address' query parameter"}
+{"error": "Invalid Ethereum address: 0x1234"}
+```
+
+**402 — Payment required:** Returned with x402 payment instructions. \
+Use an x402-compatible client to handle payment automatically.
+
+**502 — RPC error:** Upstream Base RPC node error. Retry after a moment.
+
+## Integration
+
+Use any x402-compatible HTTP client. The flow is:
+
+1. `GET /analyze?address=<addr>` → receives 402 with payment details
+2. Client signs USDC `transferWithAuthorization` on Base
+3. Client retries with `PAYMENT-SIGNATURE: <proof>` header
+4. Receives 200 with risk analysis JSON
+
+## Links
+
+- [OpenAPI Spec](__BASE_URL__/openapi.json)
+- [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
+- [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
+- [x402 Discovery](__BASE_URL__/.well-known/x402)
+- [API Catalog (RFC 9727)](__BASE_URL__/.well-known/api-catalog)
+- [Agent Metadata](__BASE_URL__/agent-metadata.json)
+- [ERC-8004 Registry](https://8004scan.io/agents/base/19074)
+- [Summary](__BASE_URL__/llms.txt)
+"""
 
 
 class FlaskHTTPAdapter:
@@ -819,9 +1178,86 @@ def create_app(
             },
             "documentation": f"{base_url}/openapi.json",
         })
+        faq_json_ld = json.dumps({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "What does Augur do?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            "Augur is an EVM smart contract risk scoring API. "
+                            "It fetches on-chain bytecode for any contract on Base and runs "
+                            "8 detectors (proxy, reentrancy, selfdestruct, honeypot, hidden mint, "
+                            "fee manipulation, delegatecall, deployer reputation) to produce a "
+                            "composite 0-100 risk score with detailed findings."
+                        ),
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "How much does it cost?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            "$0.10 per call, paid in USDC on Base via the x402 protocol. "
+                            "No subscription, no API key, no signup required."
+                        ),
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "How do AI agents pay for the API?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            "Via the x402 protocol: send GET /analyze?address=<contract>, "
+                            "receive a 402 response with payment details, sign a USDC "
+                            "authorization on Base, and retry the request with the "
+                            "PAYMENT-SIGNATURE header. The entire flow is automated by "
+                            "x402-compatible HTTP clients."
+                        ),
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "What risk patterns does Augur detect?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            "8 detectors: proxy contracts (EIP-1967/1822/OZ), reentrancy "
+                            "vulnerabilities, selfdestruct capability, honeypot patterns, "
+                            "hidden mint functions, fee manipulation, delegatecall usage, "
+                            "and deployer wallet reputation via Basescan."
+                        ),
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "What chains are supported?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Base (EIP-155:8453). Payment is also in USDC on Base.",
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "Do I need an API key?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            "No. x402 payment is the only authentication. Any agent or "
+                            "client with a USDC wallet on Base can call the API immediately."
+                        ),
+                    },
+                },
+            ],
+        })
         html = LANDING_HTML.replace("__BASE_URL__", base_url).replace(
             "__JSON_LD__", json_ld
-        )
+        ).replace("__FAQ_JSON_LD__", faq_json_ld)
         return Response(html, content_type="text/html")
 
     @app.route("/robots.txt")
@@ -833,6 +1269,8 @@ def create_app(
             "Allow: /openapi.json\n"
             "Allow: /.well-known/\n"
             "Allow: /agent-metadata.json\n"
+            "Allow: /llms.txt\n"
+            "Allow: /llms-full.txt\n"
             "Disallow: /stats\n"
             "Disallow: /dashboard\n"
             "\n"
@@ -851,6 +1289,8 @@ def create_app(
             "/.well-known/agent-card.json",
             "/.well-known/x402",
             "/.well-known/api-catalog",
+            "/llms.txt",
+            "/llms-full.txt",
         ]
         urls = "\n".join(
             f"  <url><loc>{base_url}{p}</loc></url>" for p in paths
@@ -1027,6 +1467,18 @@ def create_app(
             "defaultInputModes": ["application/json"],
             "defaultOutputModes": ["application/json"],
         })
+
+    @app.route("/llms.txt")
+    def llms_txt():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        body = LLMS_TXT.replace("__BASE_URL__", base_url)
+        return Response(body, content_type="text/plain; charset=utf-8")
+
+    @app.route("/llms-full.txt")
+    def llms_full_txt():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        body = LLMS_FULL_TXT.replace("__BASE_URL__", base_url)
+        return Response(body, content_type="text/plain; charset=utf-8")
 
     @app.route("/.well-known/x402")
     def wellknown_x402():

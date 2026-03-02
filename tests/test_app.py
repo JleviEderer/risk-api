@@ -733,3 +733,155 @@ def test_api_catalog_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/.well-known/api-catalog")
     assert resp.status_code == 200
     assert "linkset" in resp.get_json()
+
+
+# --- llms.txt tests ---
+
+
+def test_llms_txt_returns_markdown(client):
+    resp = client.get("/llms.txt")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+    text = resp.data.decode()
+    assert "# Augur" in text
+    assert "/analyze" in text
+    assert "$0.10" in text
+    assert "x402" in text
+
+
+def test_llms_txt_has_example_response(client):
+    resp = client.get("/llms.txt")
+    text = resp.data.decode()
+    assert '"score": 0' in text
+    assert '"level": "safe"' in text
+
+
+def test_llms_txt_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/llms.txt")
+        text = resp.data.decode()
+        assert "https://risk-api.life.conway.tech/analyze" in text
+        assert "https://risk-api.life.conway.tech/openapi.json" in text
+
+
+def test_llms_txt_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/llms.txt")
+    assert resp.status_code == 200
+    assert b"# Augur" in resp.data
+
+
+def test_llms_full_txt_returns_markdown(client):
+    resp = client.get("/llms-full.txt")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+    text = resp.data.decode()
+    assert "# Augur" in text
+    assert "Detectors" in text
+    assert "Proxy Detection" in text
+    assert "Reentrancy" in text
+    assert "Response Schema" in text
+
+
+def test_llms_full_txt_has_proxy_example(client):
+    resp = client.get("/llms-full.txt")
+    text = resp.data.decode()
+    assert '"score": 60' in text
+    assert '"level": "high"' in text
+    assert "implementation" in text
+
+
+def test_llms_full_txt_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/llms-full.txt")
+        text = resp.data.decode()
+        assert "https://risk-api.life.conway.tech/analyze" in text
+
+
+def test_llms_full_txt_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/llms-full.txt")
+    assert resp.status_code == 200
+    assert b"# Augur" in resp.data
+
+
+# --- OpenAPI examples tests ---
+
+
+def test_openapi_get_200_has_examples(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    examples = data["paths"]["/analyze"]["get"]["responses"]["200"]["content"]["application/json"]["examples"]
+    assert "safe_contract" in examples
+    assert examples["safe_contract"]["value"]["score"] == 0
+    assert examples["safe_contract"]["value"]["level"] == "safe"
+    assert "proxy_contract" in examples
+    assert examples["proxy_contract"]["value"]["score"] == 60
+    assert "implementation" in examples["proxy_contract"]["value"]
+
+
+def test_openapi_get_422_has_example(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    example = data["paths"]["/analyze"]["get"]["responses"]["422"]["content"]["application/json"]["example"]
+    assert "error" in example
+
+
+def test_openapi_post_200_has_example(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    example = data["paths"]["/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]
+    assert example["score"] == 0
+    assert example["level"] == "safe"
+
+
+def test_openapi_schemas_have_descriptions(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    schemas = data["components"]["schemas"]
+    # Finding schema has descriptions
+    finding = schemas["Finding"]
+    assert "description" in finding
+    assert "description" in finding["properties"]["detector"]
+    assert "description" in finding["properties"]["points"]
+    # AnalysisResult level has description with ranges
+    level = schemas["AnalysisResult"]["properties"]["level"]
+    assert "safe (0-15)" in level["description"]
+    assert "critical (76-100)" in level["description"]
+    # category_scores has description
+    assert "description" in schemas["AnalysisResult"]["properties"]["category_scores"]
+
+
+# --- FAQPage structured data tests ---
+
+
+def test_landing_has_faqpage_schema(client):
+    resp = client.get("/")
+    text = resp.data.decode()
+    assert text.count("application/ld+json") == 2  # WebAPI + FAQPage
+    assert "FAQPage" in text
+    assert "What does Augur do?" in text
+    assert "How much does it cost?" in text
+    assert "Do I need an API key?" in text
+
+
+# --- Updated sitemap/robots tests ---
+
+
+def test_sitemap_includes_llms(client):
+    resp = client.get("/sitemap.xml")
+    text = resp.data.decode()
+    assert "/llms.txt" in text
+    assert "/llms-full.txt" in text
+
+
+def test_robots_allows_llms(client):
+    resp = client.get("/robots.txt")
+    text = resp.data.decode()
+    assert "Allow: /llms.txt" in text
+    assert "Allow: /llms-full.txt" in text
+
+
+def test_landing_links_llms_txt(client):
+    resp = client.get("/")
+    assert b"/llms.txt" in resp.data

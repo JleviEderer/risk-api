@@ -10,7 +10,7 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | x402.jobs | Live | [x402.jobs listing](https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base) | `scripts/register_x402jobs.py` | `X402_JOBS_API_KEY` | 2026-02-23 |
 | MoltMart | Live | [moltmart.app](https://moltmart.app) | `scripts/register_moltmart.py` | `MOLTMART_API_KEY`, `MOLTMART_SERVICE_ID` | 2026-02-25 |
 | Work402 | Live (testnet) | [work402.com](https://work402.com) | `scripts/register_work402.py` | `WORK402_DID` | 2026-02-25 |
-| IPFS | Live | `QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-01 |
+| IPFS | Live | `QmUUtXC4uSTMfTUBNhnWncGUShJ6qnw8YWdNSU9g49hFfV` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-02 |
 | 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | — | 2026-03-01 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | — | 2026-03-01 |
 | x402 Bazaar | Live | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | — | 2026-03-01 |
