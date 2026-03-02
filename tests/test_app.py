@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import responses
 
@@ -117,6 +119,64 @@ def test_x402_returns_402_without_payment(client_with_x402):
     addr = "0x" + "ab" * 20
     resp = client_with_x402.get(f"/analyze?address={addr}")
     assert resp.status_code == 402
+
+
+def test_x402_402_response_has_bazaar_extension(client_with_x402):
+    """402 response Payment-Required header should include bazaar discovery extension."""
+    import base64
+
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.get(f"/analyze?address={addr}")
+    assert resp.status_code == 402
+
+    # Payment-Required header is base64-encoded JSON
+    pr_header = resp.headers.get("Payment-Required")
+    assert pr_header is not None, "Missing Payment-Required header"
+    pr_data = json.loads(base64.b64decode(pr_header))
+
+    # Must have extensions.bazaar with input schema
+    assert "extensions" in pr_data, f"No extensions in 402 response: {list(pr_data.keys())}"
+    bazaar = pr_data["extensions"].get("bazaar")
+    assert bazaar is not None, "No bazaar extension in 402 response"
+
+    # Check info.input has query params example
+    info = bazaar.get("info", {})
+    input_data = info.get("input", {})
+    assert input_data.get("type") == "http"
+    assert "queryParams" in input_data or "query_params" in input_data
+
+    # Check schema has address property
+    schema = bazaar.get("schema", {})
+    input_schema = schema.get("properties", {}).get("input", {})
+    query_schema = input_schema.get("properties", {}).get("queryParams", {})
+    assert "address" in query_schema.get("properties", {}), "Missing address in schema"
+
+
+def test_x402_402_post_has_bazaar_body_extension(client_with_x402):
+    """POST 402 response should include bazaar body discovery extension."""
+    import base64
+
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.post("/analyze", json={"address": addr})
+    assert resp.status_code == 402
+
+    pr_header = resp.headers.get("Payment-Required")
+    assert pr_header is not None
+    pr_data = json.loads(base64.b64decode(pr_header))
+
+    bazaar = pr_data.get("extensions", {}).get("bazaar")
+    assert bazaar is not None, "No bazaar extension in POST 402 response"
+
+    info = bazaar.get("info", {})
+    input_data = info.get("input", {})
+    assert input_data.get("type") == "http"
+    assert input_data.get("bodyType") == "json"
+
+    # Check schema has body with address property
+    schema = bazaar.get("schema", {})
+    input_schema = schema.get("properties", {}).get("input", {})
+    body_schema = input_schema.get("properties", {}).get("body", {})
+    assert "address" in body_schema.get("properties", {}), "Missing address in body schema"
 
 
 def test_x402_health_not_gated(client_with_x402):

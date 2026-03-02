@@ -12,6 +12,7 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | Work402 | Live (testnet) | [work402.com](https://work402.com) | `scripts/register_work402.py` | `WORK402_DID` | 2026-02-25 |
 | IPFS | Live | `QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-01 |
 | 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | — | 2026-03-01 |
+| x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | — | 2026-03-01 |
 
 ### How to verify wallet on 8004scan
 
@@ -21,7 +22,6 @@ Free points on publisher score. Go to https://8004scan.io, connect agent wallet 
 
 | Registry | Status | Notes |
 |----------|--------|-------|
-| x402scan | Ready to submit | OpenAPI spec now includes `x-payment-info` + `securitySchemes` (Bazaar standard). Submit at https://www.x402scan.com/resources/register. |
 | HOL.org | Pending | Sign in at `hol.org/registry/register`. ERC-8004 adapter not indexing agent #19074 — investigate. |
 | a2a-directory | PR pending | [GitHub PR #17](https://github.com/nicholascpark/a2a-directory/pull/17) |
 | e2b | PR pending | [GitHub PR #327](https://github.com/e2b-dev/awesome-ai-agents/pull/327) |

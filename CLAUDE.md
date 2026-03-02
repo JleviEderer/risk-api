@@ -1,7 +1,7 @@
 # risk-api — Augur: Smart Contract Risk Scoring API
 
 ## Stack
-- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx
+- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx, jsonschema
 - requests (Base RPC), python-dotenv
 - pytest + responses (testing), pyright (type checking)
 - Docker + docker-compose (production deployment)

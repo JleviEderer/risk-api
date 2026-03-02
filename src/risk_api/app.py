@@ -41,11 +41,11 @@ OPENAPI_SPEC: dict[str, object] = {
         "title": "Augur",
         "version": "1.0.0",
         "description": (
-            "EVM smart contract risk scoring API on Base. "
+            "EVM smart contract risk scoring API. "
             "Analyzes bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
             "delegatecall) and returns a composite 0-100 risk score. "
-            "Pay $0.10/call via x402 in USDC on Base."
+            "Pay $0.10/call via x402 in USDC."
         ),
         "contact": {
             "url": "https://github.com/JleviEderer/risk-api",
@@ -238,7 +238,7 @@ OPENAPI_SPEC: dict[str, object] = {
                 "type": "apiKey",
                 "in": "header",
                 "name": "PAYMENT-SIGNATURE",
-                "description": "x402 payment proof. Send USDC on Base via the x402 protocol.",
+                "description": "x402 payment proof. Send USDC via the x402 protocol.",
             },
         },
     },
@@ -381,11 +381,11 @@ LANDING_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Augur — x402 API on Base</title>
-<meta name="description" content="EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base.">
+<title>Augur - EVM Risk Scoring API</title>
+<meta name="description" content="EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns and returns a 0-100 score. Pay $0.10/call via x402 in USDC.">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Augur">
-<meta property="og:description" content="EVM smart contract risk scoring API on Base. 8 detectors, 0-100 risk score. Pay $0.10/call via x402.">
+<meta property="og:description" content="EVM smart contract risk scoring API. 8 detectors, 0-100 risk score. Pay $0.10/call via x402.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
@@ -421,7 +421,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 
 <div class="section">
 <h2>What it does</h2>
-<p>Fetches on-chain bytecode for any EVM contract on Base and runs 8 detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
+<p>Fetches on-chain bytecode for any EVM contract and runs 8 detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
 <div class="detectors">
   <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
   <div class="detector"><div class="name">Reentrancy</div><div class="desc">CALL before state update patterns</div></div>
@@ -446,8 +446,8 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <div class="section">
 <h2>Pricing</h2>
 <div class="price">$0.10 <span style="font-size:1rem;color:#a0aec0;font-weight:400">per call</span></div>
-<p class="price-note">USDC on Base &middot; Settled via x402 protocol &middot; No API key, no signup</p>
-<p style="margin-top:10px;color:#718096;font-size:.82rem">x402 is an HTTP-native payment protocol &mdash; your agent pays per call automatically, no API key or signup needed.</p>
+<p class="price-note">USDC &middot; Settled via x402 protocol &middot; No API key, no signup</p>
+<p style="margin-top:10px;color:#718096;font-size:.82rem">x402 is an HTTP-native payment protocol - your agent pays per call automatically, no API key or signup needed.</p>
 </div>
 
 <div class="section">
@@ -464,7 +464,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 </div>
 
 <footer>
-Augur &middot; Agent #19074 on Base &middot; Powered by x402
+Augur &middot; ERC-8004 Agent #19074 &middot; Powered by x402
 </footer>
 </body>
 </html>"""
@@ -526,6 +526,42 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
     resource_server = x402ResourceServerSync(facilitator)
     resource_server.register(config.network, ExactEvmServerScheme())  # type: ignore[arg-type]  # x402 SDK parameter name mismatch
 
+    # Register Bazaar discovery extension so 402 responses include input schema
+    try:
+        from x402.extensions.bazaar.resource_service import declare_discovery_extension
+        from x402.extensions.bazaar.server import bazaar_resource_server_extension
+
+        resource_server.register_extension(bazaar_resource_server_extension)
+
+        address_schema = {
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{40}$",
+                    "description": "EVM contract address (0x-prefixed, 40 hex chars)",
+                },
+            },
+            "required": ["address"],
+        }
+        example_input = {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}
+
+        get_bazaar = declare_discovery_extension(
+            input=example_input,
+            input_schema=address_schema,
+        )
+        post_bazaar = declare_discovery_extension(
+            input=example_input,
+            input_schema={
+                "type": "object",
+                **address_schema,
+            },
+            body_type="json",
+        )
+    except ImportError:
+        logger.warning("Bazaar extension not available — 402 responses will lack input schema")
+        get_bazaar = None
+        post_bazaar = None
+
     payment_option = PaymentOption(
         scheme="exact",
         pay_to=config.wallet_address,
@@ -536,10 +572,12 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         "GET /analyze": RouteConfig(
             accepts=payment_option,
             description="Smart contract risk scoring",
+            extensions=get_bazaar,
         ),
         "POST /analyze": RouteConfig(
             accepts=payment_option,
             description="Smart contract risk scoring",
+            extensions=post_bazaar,
         ),
     }
 
@@ -712,7 +750,7 @@ def create_app(
             "@type": "WebAPI",
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API on Base. "
+                "EVM smart contract risk scoring API. "
                 "Analyzes bytecode for 8 risk patterns and returns a 0-100 score."
             ),
             "url": base_url,
@@ -725,7 +763,7 @@ def create_app(
                 "price": "0.10",
                 "priceCurrency": "USD",
                 "url": f"{base_url}/analyze",
-                "description": "Per-call pricing via x402 protocol in USDC on Base",
+                "description": "Per-call pricing via x402 protocol in USDC",
             },
             "documentation": f"{base_url}/openapi.json",
         })
@@ -877,16 +915,16 @@ def create_app(
             "name_for_human": "Augur",
             "name_for_model": "augur",
             "description_for_human": (
-                "EVM smart contract risk scoring on Base via x402. "
+                "EVM smart contract risk scoring via x402. "
                 "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
                 "honeypot, hidden mint, fee manipulation, and delegatecall "
                 "patterns. Returns a 0-100 risk score."
             ),
             "description_for_model": (
-                "Analyzes EVM smart contract bytecode on Base mainnet. "
+                "Analyzes EVM smart contract bytecode. "
                 "Send a contract address to /analyze and receive a 0-100 "
                 "risk score with detailed findings from 8 detectors. "
-                "Requires x402 payment of $0.10 USDC on Base."
+                "Requires x402 payment of $0.10 USDC."
             ),
             "auth": {"type": "none"},
             "api": {
@@ -903,9 +941,9 @@ def create_app(
         return jsonify({
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API on Base. "
+                "EVM smart contract risk scoring API. "
                 "Analyzes bytecode patterns and returns a 0-100 risk score. "
-                "Pay $0.10/call via x402 in USDC on Base."
+                "Pay $0.10/call via x402 in USDC."
             ),
             "provider": {"organization": "risk-api"},
             "version": "1.0.0",
@@ -949,9 +987,9 @@ def create_app(
             ],
             "instructions": (
                 "# Augur\n\n"
-                "EVM bytecode risk scoring on Base. "
+                "EVM bytecode risk scoring. "
                 "GET /analyze?address={contract_address} returns a 0-100 risk score.\n\n"
-                "Pay $0.10/call via x402 (USDC on Base). No API key needed.\n\n"
+                "Pay $0.10/call via x402 (USDC). No API key needed.\n\n"
                 f"Agent Card: {base_url}/.well-known/agent-card.json\n"
                 f"OpenAPI: {base_url}/openapi.json"
             ),
@@ -989,11 +1027,11 @@ def create_app(
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API on Base. "
+                "EVM smart contract risk scoring API. "
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
                 "selfdestruct, honeypot, hidden mint, fee manipulation, "
                 "delegatecall) and returns a composite 0-100 risk score. "
-                "Pay $0.10/call via x402 in USDC on Base. "
+                "Pay $0.10/call via x402 in USDC. "
                 "Endpoint: GET /analyze?address={contract_address}"
             ),
             "services": [
