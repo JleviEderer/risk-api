@@ -70,4 +70,5 @@
 - Agent metadata `services` array includes: web, A2A, OASF (skills=OASF taxonomy codes, domains=OASF taxonomy codes), agentWallet (CAIP-10 format)
 - OASF taxonomy: skills `risk_classification`, `vulnerability_analysis`, `threat_detection`; domains `technology/blockchain` (slug format per OASF v0.8.0)
 - CDP facilitator requires JWT auth (Ed25519-signed, EdDSA algorithm). `cdp_auth.py` implements this without the full `cdp-sdk`. Auth headers are generated per-request via `CreateHeadersAuthProvider`. Degrades gracefully if PyJWT/cryptography not installed.
+- Pre-paywall validation rejects malformed `/analyze` requests (missing/invalid address) with 422 before x402 payment processing. Validation runs in `validate_analyze_params` before_request hook registered before `x402_payment_gate`.
 - On-chain `agentURI` points to IPFS (`ipfs://{CID}`) for content-addressed metadata (fixes 8004scan WA040). HTTP endpoint stays live for other discovery. To update: `python scripts/pin_metadata_ipfs.py` → `python scripts/register_erc8004.py --update-uri ipfs://{CID}`

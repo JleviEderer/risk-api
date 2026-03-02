@@ -114,6 +114,35 @@ def test_analyze_with_findings(client):
     assert data["findings"][0]["detector"] == "selfdestruct"
 
 
+def test_analyze_missing_address_returns_422_without_payment(client_with_x402):
+    """Missing address returns 422 before x402 payment processing."""
+    resp = client_with_x402.get("/analyze")
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert "Missing" in data["error"]
+
+
+def test_analyze_invalid_address_returns_422_without_payment(client_with_x402):
+    """Invalid address returns 422 before x402 payment processing."""
+    resp = client_with_x402.get("/analyze?address=0x1234")
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert "Invalid" in data["error"]
+
+
+def test_analyze_head_without_address_returns_422(client_with_x402):
+    """HEAD /analyze without address returns 422 before payment processing."""
+    resp = client_with_x402.head("/analyze")
+    assert resp.status_code == 422
+
+
+def test_analyze_head_with_address_returns_402(client_with_x402):
+    """HEAD /analyze with valid address returns 402 (payment required)."""
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.head(f"/analyze?address={addr}")
+    assert resp.status_code == 402
+
+
 def test_x402_returns_402_without_payment(client_with_x402):
     """With x402 middleware enabled, /analyze should return 402 without payment."""
     addr = "0x" + "ab" * 20

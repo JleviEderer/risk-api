@@ -621,11 +621,15 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         if request.path not in PROTECTED_ROUTES:
             return None
 
+        # HEAD should be gated same as GET for payment purposes;
+        # x402 SDK only registers GET/POST routes.
+        method = "GET" if request.method == "HEAD" else request.method
+
         adapter = FlaskHTTPAdapter()
         context = HTTPRequestContext(
             adapter=adapter,
             path=request.path,
-            method=request.method,
+            method=method,
         )
         result = http_server.process_http_request(context)
 
@@ -753,6 +757,31 @@ def create_app(
 
     _setup_request_logging(app)
     _configure_request_log_file(app)
+
+    @app.before_request
+    def validate_analyze_params():
+        """Reject malformed /analyze requests before the x402 paywall."""
+        if request.path != "/analyze":
+            return None
+
+        address = request.args.get("address", "").strip()
+        if not address and request.is_json:
+            body = request.get_json(silent=True)
+            if body and isinstance(body, dict):
+                address = str(body.get("address", "")).strip()
+
+        if not address:
+            return jsonify({"error": "Missing 'address' query parameter"}), 422
+
+        if not ADDRESS_RE.match(address):
+            return (
+                jsonify({"error": f"Invalid Ethereum address: {address}"}),
+                422,
+            )
+
+        # Store validated address for the route handler
+        request.environ["validated_address"] = address
+        return None
 
     if enable_x402:
         _setup_x402_middleware(app, config)
@@ -1116,20 +1145,8 @@ def create_app(
 
     @app.route("/analyze", methods=["GET", "POST"])
     def analyze():
-        address = request.args.get("address", "").strip()
-        if not address and request.is_json:
-            body = request.get_json(silent=True)
-            if body and isinstance(body, dict):
-                address = str(body.get("address", "")).strip()
-
-        if not address:
-            return jsonify({"error": "Missing 'address' query parameter"}), 422
-
-        if not ADDRESS_RE.match(address):
-            return (
-                jsonify({"error": f"Invalid Ethereum address: {address}"}),
-                422,
-            )
+        # Address already validated by validate_analyze_params before_request hook
+        address: str = request.environ["validated_address"]
 
         try:
             result = analyze_contract(
