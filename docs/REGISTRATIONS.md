@@ -14,7 +14,7 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | — | 2026-03-01 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | — | 2026-03-01 |
 | x402 Bazaar | Live | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | — | 2026-03-01 |
-| Coinbase Bazaar | Pending indexing | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) | Auto-indexed via CDP facilitator | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-01 |
+| Coinbase Bazaar | Live | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`risk-api.life.conway.tech/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-02 |
 
 ### How to verify wallet on 8004scan
 
