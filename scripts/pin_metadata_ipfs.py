@@ -43,7 +43,7 @@ def build_metadata() -> dict[str, object]:
     """
     return {
         "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-        "name": "Smart Contract Risk Scorer",
+        "name": "Augur",
         "description": (
             "EVM smart contract risk scoring API on Base. "
             "Analyzes bytecode patterns (proxy detection, reentrancy, "
@@ -64,8 +64,10 @@ def build_metadata() -> dict[str, object]:
             },
             {
                 "name": "OASF",
-                "skills": ["1304"],
-                "domains": ["109", "10903", "405"],
+                "endpoint": "https://github.com/agntcy/oasf/",
+                "version": "0.8.0",
+                "skills": ["risk_classification", "vulnerability_analysis", "threat_detection"],
+                "domains": ["technology/blockchain"],
             },
             {
                 "name": "agentWallet",

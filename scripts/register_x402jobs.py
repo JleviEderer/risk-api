@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 API_BASE = "https://api.x402.jobs/api/v1"
 
 RESOURCE = {
-    "name": "Smart Contract Risk Scorer",
+    "name": "Augur",
     "description": (
         "EVM smart contract risk scoring API on Base. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "

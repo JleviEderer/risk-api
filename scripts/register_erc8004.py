@@ -29,7 +29,7 @@ WALLET_FILE = Path.home() / ".automaton" / "wallet.json"
 # ERC-8004 registration metadata
 METADATA = {
     "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-    "name": "Smart Contract Risk Scorer",
+    "name": "Augur",
     "description": (
         "EVM smart contract risk scoring API on Base. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "

@@ -15,7 +15,7 @@ class TestBuildMetadata:
     def test_has_required_erc8004_fields(self) -> None:
         meta = build_metadata()
         assert meta["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
-        assert meta["name"] == "Smart Contract Risk Scorer"
+        assert meta["name"] == "Augur"
         assert meta["x402Support"] is True
         assert meta["active"] is True
         assert isinstance(meta["services"], list)
@@ -28,11 +28,13 @@ class TestBuildMetadata:
         a2a = [s for s in meta["services"] if s["name"] == "A2A"][0]  # type: ignore[union-attr]
         assert "/.well-known/agent-card.json" in a2a["endpoint"]  # type: ignore[index]
 
-    def test_oasf_uses_taxonomy_codes(self) -> None:
+    def test_oasf_uses_taxonomy_slugs(self) -> None:
         meta = build_metadata()
         oasf = [s for s in meta["services"] if s["name"] == "OASF"][0]  # type: ignore[union-attr]
-        assert oasf["skills"] == ["1304"]  # type: ignore[index]
-        assert oasf["domains"] == ["109", "10903", "405"]  # type: ignore[index]
+        assert oasf["endpoint"] == "https://github.com/agntcy/oasf/"  # type: ignore[index]
+        assert oasf["version"] == "0.8.0"  # type: ignore[index]
+        assert oasf["skills"] == ["risk_classification", "vulnerability_analysis", "threat_detection"]  # type: ignore[index]
+        assert oasf["domains"] == ["technology/blockchain"]  # type: ignore[index]
 
     def test_has_ipfs_specific_fields(self) -> None:
         """Metadata for IPFS should have fixed timestamps and absolute URLs."""

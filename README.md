@@ -1,4 +1,4 @@
-# risk-api
+# Augur (risk-api)
 
 Smart contract risk scoring API on Base, sold agent-to-agent via [x402](https://x402.org).
 
@@ -107,6 +107,10 @@ All free (no x402 payment required):
 
 - [ERC-8004 #19074](https://8004scan.io/agents/base/19074) — on-chain agent registry on Base
 - [x402.jobs](https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base) — x402 resource directory
+- [MoltMart](https://moltmart.app) — AI agent marketplace
+- [Work402](https://work402.com) — agent hiring marketplace (testnet)
+
+See [`docs/REGISTRATIONS.md`](docs/REGISTRATIONS.md) for the full tracker including pending registrations, discovery endpoints, and IPFS pinning workflow.
 
 ## Development
 

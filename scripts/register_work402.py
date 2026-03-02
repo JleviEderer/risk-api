@@ -26,7 +26,7 @@ API_BASE = "https://work402.com/api"
 WALLET_ADDRESS = "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891"
 
 AGENT_PROFILE = {
-    "name": "Smart Contract Risk Scorer",
+    "name": "Augur",
     "bio": (
         "EVM smart contract risk scoring API. Analyzes bytecode patterns "
         "(proxy detection, reentrancy, selfdestruct, honeypot, hidden mint, "

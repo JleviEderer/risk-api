@@ -1,97 +1,135 @@
 # Handover — risk-api
 
-**Session date:** 2026-02-25 (afternoon)
+**Session date:** 2026-02-26
 **Repo:** `C:/Users/justi/dev/risk-api/`
 **Live at:** https://risk-api.life.conway.tech
-**Git status:** Clean — all changes committed and pushed to `origin/master`
+**Git status:** Uncommitted changes on `master` — 3 files modified (`src/risk_api/app.py`, `tests/test_app.py`, `CLAUDE.md`), already deployed to Conway
 
 ---
 
 ## What We Did This Session
 
-### 1. IPFS Metadata Pinning (`f2e7e7c`)
+### Added `/.well-known/x402` Discovery Endpoint + Fixed 402 `resource.url`
 
-Created infrastructure to pin agent metadata to IPFS via Pinata, fixing the 8004scan WA040 warning ("HTTP/HTTPS URI is not content-addressed").
+Goal: make the service auto-discoverable by x402scan.com crawlers and fix the internal origin URL leaking through the 402 Payment-Required header.
 
-- **New script:** `scripts/pin_metadata_ipfs.py` — builds the full metadata JSON (matching `/agent-metadata.json` output), pins it to IPFS via Pinata API, returns the CID
-- **Updated:** `scripts/register_erc8004.py` — `--update-uri` now accepts a custom URI argument (e.g., `ipfs://Qm...`) instead of always using the HTTP endpoint
-- **Env var:** `PINATA_JWT` added (user's Pinata account: jleviederer@gmail.com)
-- **12 new tests** in `tests/test_pin_metadata.py` covering pin script and URI arg parsing
-- **On-chain TX:** `0xeb2c6b...` — first agentURI update to `ipfs://QmPPrqHQNQvU5FQ9Rwy7QRbrxkWBrcbsabgB5nQLX3XmCK`
+#### 1. New endpoint: `/.well-known/x402`
 
-### 2. A2A Agent Card + OASF + agentWallet Services (`0b19c81`)
+Added x402 discovery document at `src/risk_api/app.py:753-770`. Returns:
 
-Added A2A protocol support and enriched metadata services to target 8004scan's Service dimension (25% weight).
-
-- **New endpoint:** `/.well-known/agent.json` — serves A2A (Agent-to-Agent) protocol agent card with capabilities, skills, and provider info
-- **Updated metadata services array** with three new entries:
-  - **A2A** — `/.well-known/agent.json` URL, version 0.2.1
-  - **OASF** — skills (`smart-contract-risk-scoring`) and domains (`defi-security`)
-  - **agentWallet** — CAIP-10 format (`eip155:8453:0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`)
-- **Re-pinned to IPFS** with updated metadata → new CID
-- **On-chain TX:** `0x8b6e08...` — second agentURI update to `ipfs://QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` (current)
-- **58 lines added** to `tests/test_app.py` covering A2A endpoint response shape and paywall exclusion
-- **Deployed to Conway** and verified live
-
----
-
-## Key Artifacts
-
-| Artifact | Value |
-|----------|-------|
-| Commit 1 | `f2e7e7c` — feat(scripts): add IPFS metadata pinning and update on-chain agentURI |
-| Commit 2 | `0b19c81` — feat(app): add A2A agent card, OASF, and agentWallet services for 8004scan score |
-| On-chain CID | `QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ` |
-| TX 1 (first URI) | `0xeb2c6b...` |
-| TX 2 (second URI) | `0x8b6e08...` |
-| ERC-8004 Agent | #19074 on Base mainnet |
-| 8004scan score | 65.53 (pending re-index) |
-
----
-
-## Files Modified This Session
-
-| File | Changes |
-|------|---------|
-| `scripts/pin_metadata_ipfs.py` | **New** — 165 lines. Builds metadata, pins to IPFS via Pinata API |
-| `scripts/register_erc8004.py` | `--update-uri` accepts custom URI argument |
-| `src/risk_api/app.py` | +65 lines: `/.well-known/agent.json` A2A endpoint, OASF/agentWallet services in metadata |
-| `tests/test_pin_metadata.py` | **New** — 153 lines. 12 tests for pin script + URI arg parsing |
-| `tests/test_app.py` | +58 lines: A2A endpoint tests, paywall exclusion tests |
-| `CLAUDE.md` | Added PINATA_JWT env var, IPFS workflow, A2A/OASF/agentWallet docs |
-
----
-
-## IPFS Pinning Workflow
-
-To update on-chain metadata after code changes:
-
-```bash
-# 1. Pin updated metadata to IPFS
-python scripts/pin_metadata_ipfs.py
-# Returns: ipfs://Qm...
-
-# 2. Update on-chain agentURI
-python scripts/register_erc8004.py --update-uri ipfs://Qm<new-CID>
+```json
+{
+  "version": 1,
+  "resources": ["https://risk-api.life.conway.tech/analyze"],
+  "instructions": "# Smart Contract Risk Scorer\n\n..."
+}
 ```
 
-Requires `PINATA_JWT` env var set (Pinata account: jleviederer@gmail.com).
+- Uses `PUBLIC_URL` when set, falls back to `request.url_root`
+- NOT behind x402 paywall (follows existing pattern for discovery endpoints)
+
+#### 2. Fixed `resource.url` in 402 response
+
+`FlaskHTTPAdapter.get_url()` (`app.py:375-378`) was returning `request.url` which resolved to the internal Conway origin (`http://origin-us-east-3.conway.tech:8888/analyze`). Now uses `PUBLIC_URL` + `request.full_path` when configured.
+
+**Before:** `resource.url` = `http://origin-us-east-3.conway.tech:8888/analyze`
+**After:** `resource.url` = `https://risk-api.life.conway.tech/analyze`
+
+#### 3. Added 3 tests
+
+- `test_wellknown_x402_returns_discovery_doc` — JSON structure, version=1, resources array
+- `test_wellknown_x402_not_behind_paywall` — exempt from x402 payment gate
+- `test_wellknown_x402_uses_public_url` — resources/instructions use PUBLIC_URL
+
+#### 4. Updated CLAUDE.md
+
+Added `/.well-known/x402` to the discovery endpoints documentation list.
+
+#### 5. Deployed to Conway
+
+Uploaded `app.py` to both paths:
+- `/root/risk-api/src/risk_api/app.py`
+- `/root/risk-api-venv/lib/python3.10/site-packages/risk_api/app.py`
+
+Restarted gunicorn. Both endpoints verified live.
+
+#### 6. Verified
+
+- `pytest tests/ -v` — 191 passed, 0 failed
+- `npx pyright src/ tests/` — 0 errors
+- `curl https://risk-api.life.conway.tech/.well-known/x402` — returns valid discovery JSON
+- Decoded 402 `Payment-Required` header — confirms `resource.url` is now the public URL
 
 ---
 
-## 8004scan Score Analysis
+## What Worked
 
-**Current score: 65.53** (pending re-index by their indexer)
+- Conway upload API uses flat `{path, content}` payload (not `{files: [{path, content}]}`)
+- `pkill -f gunicorn` then `nohup /root/start-risk-api.sh` restart pattern works reliably
+- `current_app.config.get("PUBLIC_URL")` inside `FlaskHTTPAdapter` works because it's called during request context
 
-### What we improved (code-actionable)
-- **Metadata (20% weight):** Fixed WA040 (HTTP URI → IPFS content-addressed), enriched services array
-- **Service (25% weight):** Added A2A agent card, OASF skills+domains, agentWallet CAIP-10
+## What Didn't Work
 
-### What remains (NOT code-actionable)
-- **Engagement (30% weight):** Organic usage metrics — needs real API traffic / agent-to-agent calls
-- **Publisher (20% weight):** Publisher reputation — builds over time with consistent uptime and usage
+- First Conway upload attempt used `{files: [{path, content}]}` format and got 400 — the API expects flat `{path, content}` per file
 
-These remaining dimensions require organic growth, not code changes.
+---
+
+## Key Decisions
+
+1. **Used `current_app` import** for `get_url()` fix — the adapter is instantiated during request handling, so `current_app` is always available in the app context
+2. **`request.full_path.rstrip('?')`** — Flask's `full_path` includes a trailing `?` even with no query string; stripping it keeps URLs clean
+3. **Placed `/.well-known/x402` route after agent-card.json, before agent-metadata.json** — follows the existing endpoint ordering pattern
+
+---
+
+## Lessons Learned / Gotchas
+
+- **Conway file upload format:** `POST /v1/sandboxes/{id}/files/upload/json` expects `{"path": "...", "content": "..."}` (flat), NOT `{"files": [{"path": "...", "content": "..."}]}`
+- **`request.url` behind Conway proxy** leaks internal origin — always use `PUBLIC_URL` when constructing URLs that external clients/crawlers will see
+- **Flask `request.full_path`** always has trailing `?` (even without query params) — must `.rstrip('?')` to avoid ugly URLs
+
+---
+
+## Next Steps (Prioritized)
+
+### Immediate (user action)
+1. **Register on x402scan.com** — go to https://www.x402scan.com/resources/register, submit `https://risk-api.life.conway.tech/analyze`
+2. **Commit these changes** — 3 files modified, not yet committed
+
+### From Previous Session (still pending)
+- Open slavakurilyak PR manually via compare URL
+- Register on hol.org (sign in at `hol.org/registry/register`)
+- Submit to Swarms, AI Agent Store, AI Agents Directory, Agent.ai
+- Monitor 3 GitHub PRs (a2a-directory #17, e2b #327, kyrolabs #150)
+- Monitor a2aregistry.org for SSL fix
+
+### Consider Later
+- Switch from Mogami to a facilitator tracked by x402list.fun
+- Investigate why HOL's ERC-8004 adapter isn't indexing agent #19074
+- Pin updated metadata to IPFS (if `/.well-known/x402` should be referenced in on-chain metadata)
+
+---
+
+## Important Files
+
+### Modified This Session
+| File | What Changed |
+|------|-------------|
+| `src/risk_api/app.py` | Added `/.well-known/x402` route (lines 753-770), fixed `FlaskHTTPAdapter.get_url()` to use `PUBLIC_URL` (lines 375-378), added `current_app` import |
+| `tests/test_app.py` | Added 3 tests for the new endpoint (lines 435-462) |
+| `CLAUDE.md` | Added `/.well-known/x402` to discovery endpoints list |
+
+### Key Files (for reference)
+| File | Purpose |
+|------|---------|
+| `src/risk_api/app.py` | Flask app — all routes, x402 middleware, request logging, dashboard |
+| `src/risk_api/config.py` | Environment config (`Config` dataclass) |
+| `tests/test_app.py` | 45 tests for all app routes |
+| `tests/conftest.py` | Test fixtures (`app`, `client`, `client_with_x402`) |
+| `scripts/register_moltmart.py` | MoltMart marketplace registration |
+| `scripts/register_work402.py` | Work402 hiring marketplace onboarding |
+| `scripts/pin_metadata_ipfs.py` | Pin agent metadata to IPFS via Pinata |
+| `scripts/register_erc8004.py` | ERC-8004 on-chain registration / URI update |
 
 ---
 
@@ -99,67 +137,33 @@ These remaining dimensions require organic growth, not code changes.
 
 ### Live API
 - **URL:** https://risk-api.life.conway.tech
-- **Status:** Healthy, all routes working
+- **Status:** Healthy, all routes working (including new `/.well-known/x402`)
 - **Facilitator:** Mogami (`https://v2.facilitator.mogami.tech`)
-- **Paywall:** Active on `/analyze` (GET+POST)
-- **Open routes:** `/health`, `/stats`, `/dashboard`, `/agent-metadata.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/openapi.json`, `/avatar.png`
+- **Paywall:** Active on `/analyze` (GET+POST), 402 header now shows correct public URL
 - **On-chain URI:** `ipfs://QmNWWhyo7KHnYPTiEeMWdHik9i6yMAM3prDKEVQTSXNEFQ`
 
-### Agent Wallet
-- **Address:** `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`
-- **USDC Balance:** $0.20 (2 settlements via Mogami)
+### Discovery Endpoints (all live, none behind paywall)
+- `/health` — health check
+- `/dashboard` — analytics dashboard
+- `/avatar.png` — agent avatar
+- `/openapi.json` — OpenAPI 3.0.3 spec
+- `/.well-known/ai-plugin.json` — AI plugin manifest
+- `/.well-known/agent.json` / `/.well-known/agent-card.json` — A2A agent card
+- `/.well-known/x402` — x402 discovery document (NEW)
+- `/.well-known/x402-verification.json` — x402 verification
+- `/agent-metadata.json` — ERC-8004 metadata
 
-### Local Dev
-- **151 tests pass**, 0 pyright errors
-- Git: clean, pushed to origin/master
+### Test Suite
+- **191 tests**, all passing
+- **0 pyright errors**
 
-### Discovery
-- **ERC-8004:** Agent #19074 on Base mainnet (https://8004scan.io/agents/base/19074)
-- **x402.jobs:** Listed at https://x402.jobs/resources/risk-api-life-conway-tech/smart-contract-risk-scorer-base
-- **IPFS:** Metadata pinned via Pinata, agentURI points to IPFS CID
-
----
-
-## Commands
-
+### Commands
 ```bash
 cd C:/Users/justi/dev/risk-api
-
-# Install
 pip install -e ".[dev]"
-
-# Test (fast — skip x402 facilitator tests)
-pytest tests/ -v -k "not x402"
-
-# Test (full — includes x402 tests, takes ~20 min)
 pytest tests/ -v
-
-# Type check
 npx pyright src/ tests/
-
-# Run dev server
 flask --app risk_api.app:create_app run
-
-# Pin metadata to IPFS
-python scripts/pin_metadata_ipfs.py
-
-# Update on-chain agentURI
-python scripts/register_erc8004.py --update-uri ipfs://Qm<CID>
-
-# Health check
-python scripts/health_check.py
-
-# Check live
+curl https://risk-api.life.conway.tech/.well-known/x402
 curl https://risk-api.life.conway.tech/health
-curl https://risk-api.life.conway.tech/.well-known/agent.json
-curl https://risk-api.life.conway.tech/agent-metadata.json
-
-# Conway sandbox
-# Sandbox ID: 76cfc42df7955d2a7de0ec7e2473f686
-# API: https://api.conway.tech, Auth: cnwy_k_LKnBkOgIX3FH817Zr7sB_y3KuraHR1fM
-# Startup script: /root/start-risk-api.sh
-# Request log: /root/risk-api-logs/requests.jsonl
-# Gunicorn log: /root/gunicorn.log
-# Restart: pkill -f gunicorn (separate exec), then nohup /root/start-risk-api.sh > /root/gunicorn.log 2>&1 &
-# Deploy: Upload to BOTH /root/risk-api/src/risk_api/ AND /root/risk-api-venv/lib/python3.10/site-packages/risk_api/
 ```

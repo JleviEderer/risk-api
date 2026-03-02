@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, current_app, jsonify, request
 
 from risk_api.analysis.engine import analyze_contract
 from risk_api.chain.rpc import RPCError
@@ -38,7 +38,7 @@ for _avatar_path in [
 OPENAPI_SPEC: dict[str, object] = {
     "openapi": "3.0.3",
     "info": {
-        "title": "Smart Contract Risk Scorer",
+        "title": "Augur",
         "version": "1.0.0",
         "description": (
             "EVM smart contract risk scoring API on Base. "
@@ -103,6 +103,15 @@ OPENAPI_SPEC: dict[str, object] = {
                 "x-x402-price": "$0.10",
                 "x-x402-network": "eip155:8453",
                 "x-x402-pay-to": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+                "x-payment-info": {
+                    "protocols": ["x402"],
+                    "pricingMode": "fixed",
+                    "price": "0.10",
+                    "currency": "USDC",
+                    "network": "eip155:8453",
+                    "payTo": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+                },
+                "security": [{"x402": []}],
             },
             "post": {
                 "operationId": "analyzeContractPost",
@@ -153,6 +162,15 @@ OPENAPI_SPEC: dict[str, object] = {
                 "x-x402-price": "$0.10",
                 "x-x402-network": "eip155:8453",
                 "x-x402-pay-to": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+                "x-payment-info": {
+                    "protocols": ["x402"],
+                    "pricingMode": "fixed",
+                    "price": "0.10",
+                    "currency": "USDC",
+                    "network": "eip155:8453",
+                    "payTo": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
+                },
+                "security": [{"x402": []}],
             },
         },
     },
@@ -213,6 +231,14 @@ OPENAPI_SPEC: dict[str, object] = {
                     "address", "score", "level", "bytecode_size",
                     "findings", "category_scores",
                 ],
+            },
+        },
+        "securitySchemes": {
+            "x402": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "PAYMENT-SIGNATURE",
+                "description": "x402 payment proof. Send USDC on Base via the x402 protocol.",
             },
         },
     },
@@ -350,6 +376,99 @@ setInterval(refresh,30000);
 </body>
 </html>"""
 
+LANDING_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Augur — x402 API on Base</title>
+<meta name="description" content="EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base.">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="Augur">
+<meta property="og:description" content="EVM smart contract risk scoring API on Base. 8 detectors, 0-100 risk score. Pay $0.10/call via x402.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="__BASE_URL__">
+<meta property="og:image" content="__BASE_URL__/avatar.png">
+<script type="application/ld+json">__JSON_LD__</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0f1117;color:#e0e0e0;padding:24px;max-width:900px;margin:0 auto;line-height:1.6}
+h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:4px;font-weight:600}
+h2{font-size:1.1rem;color:#a0aec0;margin:28px 0 12px;font-weight:500}
+.subtitle{color:#718096;font-size:1rem;margin-bottom:16px}
+.badge{display:inline-block;background:#1a365d;color:#63b3ed;padding:4px 12px;border-radius:6px;font-size:.85rem;margin-bottom:24px}
+.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}
+.detectors{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px}
+.detector{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;font-size:.85rem}
+.detector .name{color:#90cdf4;font-weight:500}
+.detector .desc{color:#718096;font-size:.78rem;margin-top:2px}
+pre{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.82rem;color:#68d391;margin-top:8px}
+.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:8px}
+.links a{display:block;background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;
+  color:#90cdf4;text-decoration:none;font-size:.85rem;transition:border-color .2s}
+.links a:hover{border-color:#63b3ed}
+.links a .path{color:#68d391;font-family:monospace;font-size:.8rem}
+.price{font-size:2rem;font-weight:700;color:#68d391}
+.price-note{color:#718096;font-size:.85rem}
+footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a5568;font-size:.78rem;text-align:center}
+</style>
+</head>
+<body>
+<h1>Augur</h1>
+<p class="subtitle">Know if a smart contract is safe before your agent interacts with it.</p>
+<span class="badge">$0.10/call via x402 &middot; No API key needed</span>
+
+<div class="section">
+<h2>What it does</h2>
+<p>Fetches on-chain bytecode for any EVM contract on Base and runs 8 detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
+<div class="detectors">
+  <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
+  <div class="detector"><div class="name">Reentrancy</div><div class="desc">CALL before state update patterns</div></div>
+  <div class="detector"><div class="name">Selfdestruct</div><div class="desc">Contract destruction capability</div></div>
+  <div class="detector"><div class="name">Honeypot</div><div class="desc">Transfer restriction patterns</div></div>
+  <div class="detector"><div class="name">Hidden Mint</div><div class="desc">Unauthorized token creation</div></div>
+  <div class="detector"><div class="name">Fee Manipulation</div><div class="desc">Dynamic fee extraction patterns</div></div>
+  <div class="detector"><div class="name">Delegatecall</div><div class="desc">External code execution risk</div></div>
+  <div class="detector"><div class="name">Deployer Reputation</div><div class="desc">Basescan deployer history</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Try it</h2>
+<pre>curl -s "__BASE_URL__/analyze?address=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" \\
+  -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
+<p style="margin-top:8px;color:#718096;font-size:.82rem">
+Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores.
+</p>
+</div>
+
+<div class="section">
+<h2>Pricing</h2>
+<div class="price">$0.10 <span style="font-size:1rem;color:#a0aec0;font-weight:400">per call</span></div>
+<p class="price-note">USDC on Base &middot; Settled via x402 protocol &middot; No API key, no signup</p>
+<p style="margin-top:10px;color:#718096;font-size:.82rem">x402 is an HTTP-native payment protocol &mdash; your agent pays per call automatically, no API key or signup needed.</p>
+</div>
+
+<div class="section">
+<h2>Discovery &amp; Integration</h2>
+<div class="links">
+  <a href="__BASE_URL__/openapi.json">OpenAPI Spec <div class="path">/openapi.json</div></a>
+  <a href="__BASE_URL__/.well-known/agent-card.json">A2A Agent Card <div class="path">/.well-known/agent-card.json</div></a>
+  <a href="__BASE_URL__/.well-known/x402">x402 Discovery <div class="path">/.well-known/x402</div></a>
+  <a href="__BASE_URL__/.well-known/ai-plugin.json">AI Plugin Manifest <div class="path">/.well-known/ai-plugin.json</div></a>
+  <a href="__BASE_URL__/.well-known/api-catalog">API Catalog (RFC 9727) <div class="path">/.well-known/api-catalog</div></a>
+  <a href="__BASE_URL__/agent-metadata.json">Agent Metadata <div class="path">/agent-metadata.json</div></a>
+  <a href="https://8004scan.io/agents/base/19074">ERC-8004 Registry <div class="path">8004scan.io/agents/base/19074</div></a>
+</div>
+</div>
+
+<footer>
+Augur &middot; Agent #19074 on Base &middot; Powered by x402
+</footer>
+</body>
+</html>"""
+
 
 class FlaskHTTPAdapter:
     """Adapts Flask request to x402 HTTPAdapter protocol."""
@@ -373,6 +492,9 @@ class FlaskHTTPAdapter:
         return dict(request.args)
 
     def get_url(self) -> str:
+        public_url = current_app.config.get("PUBLIC_URL")
+        if public_url:
+            return f"{public_url}{request.full_path.rstrip('?')}"
         return request.url
 
     def get_user_agent(self) -> str:
@@ -582,6 +704,75 @@ def create_app(
     def health():
         return jsonify({"status": "ok"})
 
+    @app.route("/")
+    def landing():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        json_ld = json.dumps({
+            "@context": "https://schema.org",
+            "@type": "WebAPI",
+            "name": "Augur",
+            "description": (
+                "EVM smart contract risk scoring API on Base. "
+                "Analyzes bytecode for 8 risk patterns and returns a 0-100 score."
+            ),
+            "url": base_url,
+            "provider": {
+                "@type": "Organization",
+                "name": "risk-api",
+            },
+            "offers": {
+                "@type": "Offer",
+                "price": "0.10",
+                "priceCurrency": "USD",
+                "url": f"{base_url}/analyze",
+                "description": "Per-call pricing via x402 protocol in USDC on Base",
+            },
+            "documentation": f"{base_url}/openapi.json",
+        })
+        html = LANDING_HTML.replace("__BASE_URL__", base_url).replace(
+            "__JSON_LD__", json_ld
+        )
+        return Response(html, content_type="text/html")
+
+    @app.route("/robots.txt")
+    def robots_txt():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        body = (
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Allow: /openapi.json\n"
+            "Allow: /.well-known/\n"
+            "Allow: /agent-metadata.json\n"
+            "Disallow: /stats\n"
+            "Disallow: /dashboard\n"
+            "\n"
+            f"Sitemap: {base_url}/sitemap.xml\n"
+        )
+        return Response(body, content_type="text/plain")
+
+    @app.route("/sitemap.xml")
+    def sitemap_xml():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        paths = [
+            "/",
+            "/openapi.json",
+            "/agent-metadata.json",
+            "/.well-known/ai-plugin.json",
+            "/.well-known/agent-card.json",
+            "/.well-known/x402",
+            "/.well-known/api-catalog",
+        ]
+        urls = "\n".join(
+            f"  <url><loc>{base_url}{p}</loc></url>" for p in paths
+        )
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{urls}\n"
+            "</urlset>\n"
+        )
+        return Response(xml, content_type="application/xml")
+
     @app.route("/dashboard")
     def dashboard():
         return Response(DASHBOARD_HTML, content_type="text/html")
@@ -683,8 +874,8 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         return jsonify({
             "schema_version": "v1",
-            "name_for_human": "Smart Contract Risk Scorer",
-            "name_for_model": "smart_contract_risk_scorer",
+            "name_for_human": "Augur",
+            "name_for_model": "augur",
             "description_for_human": (
                 "EVM smart contract risk scoring on Base via x402. "
                 "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
@@ -710,7 +901,7 @@ def create_app(
         """A2A (Agent-to-Agent) protocol agent card for discovery."""
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         return jsonify({
-            "name": "Smart Contract Risk Scorer",
+            "name": "Augur",
             "description": (
                 "EVM smart contract risk scoring API on Base. "
                 "Analyzes bytecode patterns and returns a 0-100 risk score. "
@@ -738,7 +929,7 @@ def create_app(
                         "Fetch on-chain bytecode for a contract address "
                         "and run 8 detectors to produce a 0-100 risk score."
                     ),
-                    "tags": ["oasf:1304", "oasf:109", "oasf:10903", "oasf:405"],
+                    "tags": ["oasf:risk_classification", "oasf:vulnerability_analysis", "oasf:threat_detection"],
                 },
             ],
             "security": [],
@@ -747,6 +938,48 @@ def create_app(
             "defaultOutputModes": ["application/json"],
         })
 
+    @app.route("/.well-known/x402")
+    def wellknown_x402():
+        """x402 discovery document for x402scan and compatible crawlers."""
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        return jsonify({
+            "version": 1,
+            "resources": [
+                f"{base_url}/analyze",
+            ],
+            "instructions": (
+                "# Augur\n\n"
+                "EVM bytecode risk scoring on Base. "
+                "GET /analyze?address={contract_address} returns a 0-100 risk score.\n\n"
+                "Pay $0.10/call via x402 (USDC on Base). No API key needed.\n\n"
+                f"Agent Card: {base_url}/.well-known/agent-card.json\n"
+                f"OpenAPI: {base_url}/openapi.json"
+            ),
+        })
+
+    @app.route("/.well-known/api-catalog")
+    def api_catalog():
+        """RFC 9727 API Catalog for machine discovery of API descriptions."""
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        catalog = {
+            "linkset": [{
+                "anchor": f"{base_url}/.well-known/api-catalog",
+                "service-desc": [
+                    {"href": f"{base_url}/openapi.json", "type": "application/json"},
+                ],
+                "service-doc": [
+                    {"href": f"{base_url}/", "type": "text/html"},
+                ],
+            }],
+        }
+        return Response(
+            json.dumps(catalog),
+            content_type=(
+                'application/linkset+json;'
+                ' profile="https://www.rfc-editor.org/info/rfc9727"'
+            ),
+        )
+
     @app.route("/agent-metadata.json")
     def agent_metadata():
         """ERC-8004 agent registration metadata."""
@@ -754,7 +987,7 @@ def create_app(
         wallet_addr = config.wallet_address
         metadata: dict[str, object] = {
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-            "name": "Smart Contract Risk Scorer",
+            "name": "Augur",
             "description": (
                 "EVM smart contract risk scoring API on Base. "
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
@@ -775,8 +1008,10 @@ def create_app(
                 },
                 {
                     "name": "OASF",
-                    "skills": ["1304"],
-                    "domains": ["109", "10903", "405"],
+                    "endpoint": "https://github.com/agntcy/oasf/",
+                    "version": "0.8.0",
+                    "skills": ["risk_classification", "vulnerability_analysis", "threat_detection"],
+                    "domains": ["technology/blockchain"],
                 },
                 {
                     "name": "agentWallet",

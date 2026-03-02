@@ -131,7 +131,7 @@ def test_agent_metadata_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
-    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["name"] == "Augur"
     assert data["x402Support"] is True
     assert data["active"] is True
     assert len(data["services"]) == 4
@@ -304,11 +304,27 @@ def test_openapi_returns_valid_json(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["openapi"] == "3.0.3"
-    assert data["info"]["title"] == "Smart Contract Risk Scorer"
+    assert data["info"]["title"] == "Augur"
     assert "/analyze" in data["paths"]
     assert "servers" in data
     assert "get" in data["paths"]["/analyze"]
     assert "post" in data["paths"]["/analyze"]
+    # x-payment-info (Bazaar standard for x402scan)
+    for method in ("get", "post"):
+        op = data["paths"]["/analyze"][method]
+        pi = op["x-payment-info"]
+        assert pi["protocols"] == ["x402"]
+        assert pi["pricingMode"] == "fixed"
+        assert pi["price"] == "0.10"
+        assert pi["currency"] == "USDC"
+        assert pi["network"] == "eip155:8453"
+        assert pi["payTo"].startswith("0x")
+        assert op["security"] == [{"x402": []}]
+    # securitySchemes
+    scheme = data["components"]["securitySchemes"]["x402"]
+    assert scheme["type"] == "apiKey"
+    assert scheme["in"] == "header"
+    assert scheme["name"] == "PAYMENT-SIGNATURE"
 
 
 def test_openapi_uses_public_url(app):
@@ -330,7 +346,7 @@ def test_ai_plugin_json_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["schema_version"] == "v1"
-    assert data["name_for_model"] == "smart_contract_risk_scorer"
+    assert data["name_for_model"] == "augur"
     assert data["auth"] == {"type": "none"}
     assert data["api"]["type"] == "openapi"
     assert "/openapi.json" in data["api"]["url"]
@@ -354,14 +370,14 @@ def test_a2a_agent_card_endpoint(client):
     resp = client.get("/.well-known/agent.json")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["name"] == "Augur"
     assert data["version"] == "1.0.0"
     assert data["capabilities"]["streaming"] is False
     assert len(data["skills"]) == 1
     assert data["skills"][0]["id"] == "analyze-contract"
     assert data["skills"][0]["name"] == "Risk Classification (OASF 1304)"
-    assert "oasf:1304" in data["skills"][0]["tags"]
-    assert "oasf:109" in data["skills"][0]["tags"]
+    assert "oasf:risk_classification" in data["skills"][0]["tags"]
+    assert "oasf:vulnerability_analysis" in data["skills"][0]["tags"]
     assert data["interfaces"][0]["type"] == "http"
     assert data["security"] == []
     assert data["defaultInputModes"] == ["application/json"]
@@ -372,10 +388,10 @@ def test_a2a_agent_card_json_endpoint(client):
     resp = client.get("/.well-known/agent-card.json")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["name"] == "Smart Contract Risk Scorer"
+    assert data["name"] == "Augur"
     assert data["version"] == "1.0.0"
     assert data["skills"][0]["id"] == "analyze-contract"
-    assert data["skills"][0]["tags"] == ["oasf:1304", "oasf:109", "oasf:10903", "oasf:405"]
+    assert data["skills"][0]["tags"] == ["oasf:risk_classification", "oasf:vulnerability_analysis", "oasf:threat_detection"]
 
 
 def test_a2a_agent_card_uses_public_url(app):
@@ -399,14 +415,14 @@ def test_a2a_agent_card_json_uses_public_url(app):
 def test_a2a_agent_card_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/.well-known/agent.json")
     assert resp.status_code == 200
-    assert resp.get_json()["name"] == "Smart Contract Risk Scorer"
+    assert resp.get_json()["name"] == "Augur"
 
 
 def test_a2a_agent_card_json_not_behind_paywall(client_with_x402):
     """agent-card.json should also be exempt from x402 paywall."""
     resp = client_with_x402.get("/.well-known/agent-card.json")
     assert resp.status_code == 200
-    assert resp.get_json()["name"] == "Smart Contract Risk Scorer"
+    assert resp.get_json()["name"] == "Augur"
 
 
 def test_agent_metadata_has_a2a_service(client):
@@ -421,8 +437,10 @@ def test_agent_metadata_has_oasf_service(client):
     resp = client.get("/agent-metadata.json")
     data = resp.get_json()
     oasf = next(s for s in data["services"] if s["name"] == "OASF")
-    assert oasf["skills"] == ["1304"]
-    assert oasf["domains"] == ["109", "10903", "405"]
+    assert oasf["endpoint"] == "https://github.com/agntcy/oasf/"
+    assert oasf["version"] == "0.8.0"
+    assert oasf["skills"] == ["risk_classification", "vulnerability_analysis", "threat_detection"]
+    assert oasf["domains"] == ["technology/blockchain"]
 
 
 def test_agent_metadata_has_agent_wallet_service(client):
@@ -430,3 +448,199 @@ def test_agent_metadata_has_agent_wallet_service(client):
     data = resp.get_json()
     wallet = next(s for s in data["services"] if s["name"] == "agentWallet")
     assert wallet["endpoint"].startswith("eip155:8453:0x")
+
+
+def test_wellknown_x402_returns_discovery_doc(client):
+    """/.well-known/x402 returns valid x402 discovery document."""
+    resp = client.get("/.well-known/x402")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["version"] == 1
+    assert isinstance(data["resources"], list)
+    assert len(data["resources"]) == 1
+    assert data["resources"][0].endswith("/analyze")
+    assert isinstance(data["instructions"], str)
+    assert "risk score" in data["instructions"].lower()
+
+
+def test_wellknown_x402_not_behind_paywall(client_with_x402):
+    """/.well-known/x402 should NOT be behind x402 payment gate."""
+    resp = client_with_x402.get("/.well-known/x402")
+    assert resp.status_code == 200
+    assert resp.get_json()["version"] == 1
+
+
+def test_wellknown_x402_uses_public_url(app):
+    """/.well-known/x402 resources should use PUBLIC_URL when set."""
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/.well-known/x402")
+        data = resp.get_json()
+        assert data["resources"][0] == "https://risk-api.life.conway.tech/analyze"
+        assert "risk-api.life.conway.tech" in data["instructions"]
+
+
+# --- Landing page tests ---
+
+
+def test_landing_returns_html(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"Augur" in resp.data
+
+
+def test_landing_has_schema_org_json_ld(client):
+    resp = client.get("/")
+    assert b"application/ld+json" in resp.data
+    assert b'"@type": "WebAPI"' in resp.data
+    assert b'"priceCurrency": "USD"' in resp.data
+
+
+def test_landing_has_meta_tags(client):
+    resp = client.get("/")
+    assert b'<meta name="description"' in resp.data
+    assert b'<meta name="robots" content="index, follow"' in resp.data
+    assert b'og:title' in resp.data
+    assert b'og:image' in resp.data
+
+
+def test_landing_links_discovery_endpoints(client):
+    resp = client.get("/")
+    assert b"/openapi.json" in resp.data
+    assert b"/.well-known/agent-card.json" in resp.data
+    assert b"/.well-known/x402" in resp.data
+    assert b"/.well-known/ai-plugin.json" in resp.data
+    assert b"/.well-known/api-catalog" in resp.data
+    assert b"/agent-metadata.json" in resp.data
+
+
+def test_landing_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/")
+        assert b"https://risk-api.life.conway.tech/openapi.json" in resp.data
+        assert b"https://risk-api.life.conway.tech/avatar.png" in resp.data
+
+
+def test_landing_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+
+
+# --- robots.txt tests ---
+
+
+def test_robots_txt_returns_text(client):
+    resp = client.get("/robots.txt")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+    text = resp.data.decode()
+    assert "User-agent: *" in text
+    assert "Allow: /" in text
+    assert "Disallow: /dashboard" in text
+
+
+def test_robots_txt_includes_sitemap(client):
+    resp = client.get("/robots.txt")
+    text = resp.data.decode()
+    assert "Sitemap:" in text
+    assert "/sitemap.xml" in text
+
+
+def test_robots_txt_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/robots.txt")
+        text = resp.data.decode()
+        assert "https://risk-api.life.conway.tech/sitemap.xml" in text
+
+
+def test_robots_txt_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/robots.txt")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+
+
+# --- sitemap.xml tests ---
+
+
+def test_sitemap_returns_xml(client):
+    resp = client.get("/sitemap.xml")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("application/xml")
+    text = resp.data.decode()
+    assert '<?xml version="1.0"' in text
+    assert "<urlset" in text
+
+
+def test_sitemap_lists_public_endpoints(client):
+    resp = client.get("/sitemap.xml")
+    text = resp.data.decode()
+    assert "/openapi.json" in text
+    assert "/agent-metadata.json" in text
+    assert "/.well-known/agent-card.json" in text
+    assert "/.well-known/api-catalog" in text
+    # Should NOT include private/gated endpoints
+    assert "/stats" not in text
+    assert "/dashboard" not in text
+    assert "/analyze" not in text
+
+
+def test_sitemap_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/sitemap.xml")
+        text = resp.data.decode()
+        assert "https://risk-api.life.conway.tech/" in text
+
+
+def test_sitemap_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/sitemap.xml")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("application/xml")
+
+
+# --- api-catalog tests ---
+
+
+def test_api_catalog_returns_linkset_json(client):
+    resp = client.get("/.well-known/api-catalog")
+    assert resp.status_code == 200
+    assert "application/linkset+json" in resp.content_type
+    assert "rfc9727" in resp.content_type
+    data = resp.get_json()
+    assert "linkset" in data
+
+
+def test_api_catalog_points_to_openapi(client):
+    resp = client.get("/.well-known/api-catalog")
+    data = resp.get_json()
+    linkset = data["linkset"][0]
+    assert linkset["service-desc"][0]["href"].endswith("/openapi.json")
+    assert linkset["service-desc"][0]["type"] == "application/json"
+
+
+def test_api_catalog_points_to_landing(client):
+    resp = client.get("/.well-known/api-catalog")
+    data = resp.get_json()
+    linkset = data["linkset"][0]
+    assert linkset["service-doc"][0]["href"].endswith("/")
+    assert linkset["service-doc"][0]["type"] == "text/html"
+
+
+def test_api_catalog_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    with app.test_client() as c:
+        resp = c.get("/.well-known/api-catalog")
+        data = resp.get_json()
+        linkset = data["linkset"][0]
+        assert linkset["anchor"] == "https://risk-api.life.conway.tech/.well-known/api-catalog"
+        assert linkset["service-desc"][0]["href"] == "https://risk-api.life.conway.tech/openapi.json"
+
+
+def test_api_catalog_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/.well-known/api-catalog")
+    assert resp.status_code == 200
+    assert "linkset" in resp.get_json()

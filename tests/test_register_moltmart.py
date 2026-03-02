@@ -85,7 +85,7 @@ class TestAgentMetadata:
     """Verify agent registration metadata."""
 
     def test_agent_name(self) -> None:
-        assert AGENT_NAME == "Smart Contract Risk Scorer"
+        assert AGENT_NAME == "Augur"
 
     def test_agent_description_mentions_x402(self) -> None:
         assert "x402" in AGENT_DESCRIPTION

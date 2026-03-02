@@ -34,7 +34,7 @@ import os
 API_BASE = "https://api.moltmart.app"
 WALLET_FILE = Path.home() / ".automaton" / "wallet.json"
 
-AGENT_NAME = "Smart Contract Risk Scorer"
+AGENT_NAME = "Augur"
 AGENT_DESCRIPTION = (
     "EVM smart contract risk scoring API on Base. "
     "Analyzes bytecode patterns (proxy detection, reentrancy, selfdestruct, "
@@ -44,7 +44,7 @@ AGENT_DESCRIPTION = (
 )
 
 SERVICE_LISTING = {
-    "name": "Smart Contract Risk Score",
+    "name": "Augur",
     "description": (
         "Analyzes EVM smart contract bytecode for security risks. "
         "Detects proxy patterns (EIP-1967/1822/OZ), reentrancy guards, "

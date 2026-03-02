@@ -1,4 +1,4 @@
-# risk-api — Smart Contract Risk Scoring API
+# risk-api — Augur: Smart Contract Risk Scoring API
 
 ## Stack
 - Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx
@@ -52,13 +52,18 @@
 - Proxy contracts auto-resolve implementation via `eth_getStorageAt` (max 1 hop). Impl findings get `impl_` prefixed detector names. Response includes nested `implementation` object. Graceful degradation if storage read or impl fetch fails.
 - Deployer reputation detector requires `BASESCAN_API_KEY`; silently skipped without it
 - `analyze_contract()` results are cached (TTL 5 min, max 512 entries, case-insensitive address keys). Use `clear_analysis_cache()` in test setup/teardown. RPC-level caching also exists via `@lru_cache` on `get_code()`/`get_storage_at()`.
+- `/` serves a landing page with Schema.org JSON-LD (`WebAPI` type), Open Graph tags, service description, pricing, detector list, and links to all discovery endpoints
+- `/robots.txt` serves crawler directives allowing public discovery endpoints, disallowing `/stats` and `/dashboard`, with `Sitemap:` directive
+- `/sitemap.xml` serves XML sitemap listing public discovery endpoints (excludes `/stats`, `/dashboard`, `/analyze`, `/avatar.png`, `/health`)
+- `/.well-known/api-catalog` serves RFC 9727 API Catalog (`application/linkset+json`) pointing to OpenAPI spec and landing page
 - `/dashboard` serves an inline HTML analytics page (Chart.js from CDN, auto-refreshes every 30s, not behind x402 paywall)
 - `/avatar.png` serves agent avatar image (loaded from `x402JobsAvatar.png` at module level, searches package dir then repo root)
 - `/openapi.json` serves OpenAPI 3.0.3 spec with dynamic `servers` array from `PUBLIC_URL`
 - `/.well-known/ai-plugin.json` serves AI plugin manifest for agent tool discovery
 - `/agent-metadata.json` includes `image`, `updatedAt`, `pricing`, `openapi_url`, `capabilities` fields for registry quality scoring
 - `/.well-known/agent.json` and `/.well-known/agent-card.json` both serve A2A (Agent-to-Agent) protocol agent card for discovery (8004scan expects `agent-card.json`)
-- All discovery endpoints (`/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/.well-known/agent-card.json`, `/agent-metadata.json`) are NOT behind x402 paywall
+- `/.well-known/x402` serves x402 discovery document for x402scan crawlers (version, resources array, instructions)
+- All discovery endpoints (`/`, `/robots.txt`, `/sitemap.xml`, `/avatar.png`, `/openapi.json`, `/.well-known/ai-plugin.json`, `/.well-known/agent.json`, `/.well-known/agent-card.json`, `/.well-known/x402`, `/.well-known/api-catalog`, `/agent-metadata.json`) are NOT behind x402 paywall
 - Agent metadata `services` array includes: web, A2A, OASF (skills=OASF taxonomy codes, domains=OASF taxonomy codes), agentWallet (CAIP-10 format)
-- OASF taxonomy codes: skills `1304` (Risk Classification), domains `109` (Blockchain), `10903` (Smart Contracts), `405` (Risk Management)
+- OASF taxonomy: skills `risk_classification`, `vulnerability_analysis`, `threat_detection`; domains `technology/blockchain` (slug format per OASF v0.8.0)
 - On-chain `agentURI` points to IPFS (`ipfs://{CID}`) for content-addressed metadata (fixes 8004scan WA040). HTTP endpoint stays live for other discovery. To update: `python scripts/pin_metadata_ipfs.py` → `python scripts/register_erc8004.py --update-uri ipfs://{CID}`

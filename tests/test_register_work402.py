@@ -109,7 +109,7 @@ class TestShow:
             json={
                 "agents": [
                     {
-                        "name": "Smart Contract Risk Scorer",
+                        "name": "Augur",
                         "did": "did:erc8004:19074",
                         "skills": ["risk-scoring", "security"],
                         "reputation_score": 0,

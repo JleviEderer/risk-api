@@ -1,7 +1,7 @@
 [project]
 name = "risk-api"
 version = "0.1.0"
-description = "Smart contract risk scoring API with x402 payments"
+description = "Augur — smart contract risk scoring API with x402 payments"
 requires-python = ">=3.10"
 dependencies = [
     "flask>=3.0,<4",
