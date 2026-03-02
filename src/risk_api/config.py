@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+CDP_KEY_FILE = Path.home() / ".config" / "risk-api" / "cdp_api_key.json"
 
 
 class ConfigError(Exception):
@@ -40,6 +44,17 @@ def load_config() -> Config:
     raw_agent_id = os.environ.get("ERC8004_AGENT_ID", "")
     erc8004_agent_id: int | None = int(raw_agent_id) if raw_agent_id else None
 
+    # CDP API key: env vars take precedence, fall back to key file
+    cdp_key_id = os.environ.get("CDP_API_KEY_ID", "")
+    cdp_key_secret = os.environ.get("CDP_API_KEY_SECRET", "")
+    if not cdp_key_id and CDP_KEY_FILE.is_file():
+        try:
+            data = json.loads(CDP_KEY_FILE.read_text())
+            cdp_key_id = data.get("id", "")
+            cdp_key_secret = data.get("privateKey", "")
+        except (json.JSONDecodeError, OSError):
+            pass  # Logged downstream when CDP auth fails
+
     return Config(
         wallet_address=wallet,
         base_rpc_url=os.environ.get("BASE_RPC_URL", "https://mainnet.base.org"),
@@ -52,6 +67,6 @@ def load_config() -> Config:
         erc8004_agent_id=erc8004_agent_id,
         basescan_api_key=os.environ.get("BASESCAN_API_KEY", ""),
         public_url=os.environ.get("PUBLIC_URL", ""),
-        cdp_api_key_id=os.environ.get("CDP_API_KEY_ID", ""),
-        cdp_api_key_secret=os.environ.get("CDP_API_KEY_SECRET", ""),
+        cdp_api_key_id=cdp_key_id,
+        cdp_api_key_secret=cdp_key_secret,
     )
