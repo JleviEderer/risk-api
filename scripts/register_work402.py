@@ -31,7 +31,7 @@ AGENT_PROFILE = {
         "EVM smart contract risk scoring API. Analyzes bytecode patterns "
         "(proxy detection, reentrancy, selfdestruct, honeypot, hidden mint, "
         "fee manipulation, delegatecall) and deployer reputation. Returns "
-        "a composite 0-100 risk score. Live at risk-api.life.conway.tech. "
+        "a composite 0-100 risk score. Live at augurrisk.com. "
         "Pay $0.10/call via x402 in USDC on Base."
     ),
     "role": "seller",

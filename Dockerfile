@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml .
 COPY src/ src/
+COPY x402JobsAvatar.png src/risk_api/
 
 RUN pip install --no-cache-dir .
 

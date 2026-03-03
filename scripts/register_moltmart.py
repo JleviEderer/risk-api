@@ -54,7 +54,7 @@ SERVICE_LISTING = {
         "per-detector findings and severity level (safe/low/medium/high/critical). "
         "Deployer reputation check via Basescan when API key is configured."
     ),
-    "endpoint_url": "https://risk-api.life.conway.tech/analyze",
+    "endpoint_url": "https://augurrisk.com/analyze",
     "price_usdc": 0.10,
     "category": "analysis",
     "usage_instructions": (
@@ -62,11 +62,11 @@ SERVICE_LISTING = {
         "Send a GET or POST request with a Base mainnet contract address.\n\n"
         "### GET\n"
         "```\n"
-        "GET https://risk-api.life.conway.tech/analyze?address=0x4200000000000000000000000000000000000006\n"
+        "GET https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006\n"
         "```\n\n"
         "### POST\n"
         "```json\n"
-        'POST https://risk-api.life.conway.tech/analyze\n'
+        'POST https://augurrisk.com/analyze\n'
         '{"address": "0x4200000000000000000000000000000000000006"}\n'
         "```\n\n"
         "### Payment\n"

@@ -26,7 +26,7 @@ import time
 import requests
 
 
-DEFAULT_URL = "https://risk-api.life.conway.tech/health"
+DEFAULT_URL = "https://augurrisk.com/health"
 TIMEOUT_SECONDS = 15
 
 

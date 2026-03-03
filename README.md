@@ -2,7 +2,7 @@
 
 Smart contract risk scoring API on Base, sold agent-to-agent via [x402](https://x402.org).
 
-**Live:** https://risk-api.life.conway.tech
+**Live:** https://augurrisk.com
 
 ## What it does
 
@@ -40,7 +40,7 @@ The `/analyze` endpoint is behind an [x402](https://x402.org) paywall. Agents pa
 
 ```bash
 # Without payment (returns 402 with payment requirements)
-curl https://risk-api.life.conway.tech/analyze?address=0x4200000000000000000000000000000000000006
+curl https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006
 ```
 
 ### Example response (200)
@@ -96,12 +96,12 @@ All free (no x402 payment required):
 
 | Endpoint | Description |
 |----------|-------------|
-| [`/health`](https://risk-api.life.conway.tech/health) | Health check |
-| [`/agent-metadata.json`](https://risk-api.life.conway.tech/agent-metadata.json) | ERC-8004 agent metadata |
-| [`/openapi.json`](https://risk-api.life.conway.tech/openapi.json) | OpenAPI 3.0 specification |
-| [`/.well-known/ai-plugin.json`](https://risk-api.life.conway.tech/.well-known/ai-plugin.json) | AI plugin manifest |
-| [`/avatar.png`](https://risk-api.life.conway.tech/avatar.png) | Agent avatar image |
-| [`/dashboard`](https://risk-api.life.conway.tech/dashboard) | Analytics dashboard |
+| [`/health`](https://augurrisk.com/health) | Health check |
+| [`/agent-metadata.json`](https://augurrisk.com/agent-metadata.json) | ERC-8004 agent metadata |
+| [`/openapi.json`](https://augurrisk.com/openapi.json) | OpenAPI 3.0 specification |
+| [`/.well-known/ai-plugin.json`](https://augurrisk.com/.well-known/ai-plugin.json) | AI plugin manifest |
+| [`/avatar.png`](https://augurrisk.com/avatar.png) | Agent avatar image |
+| [`/dashboard`](https://augurrisk.com/dashboard) | Analytics dashboard |
 
 ## Registry listings
 

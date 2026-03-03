@@ -14,7 +14,7 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | — | 2026-03-01 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | — | 2026-03-01 |
 | x402 Bazaar | Live | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | — | 2026-03-01 |
-| Coinbase Bazaar | Live | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`risk-api.life.conway.tech/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-02 |
+| Coinbase Bazaar | Live | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`augurrisk.com/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-02 |
 
 ### How to verify wallet on 8004scan
 
@@ -41,28 +41,30 @@ All endpoints are live and free (no x402 payment required):
 
 | Endpoint | Description |
 |----------|-------------|
-| [`/`](https://risk-api.life.conway.tech/) | Landing page (Schema.org JSON-LD, Open Graph) |
-| [`/health`](https://risk-api.life.conway.tech/health) | Health check |
-| [`/dashboard`](https://risk-api.life.conway.tech/dashboard) | Analytics dashboard (Chart.js, auto-refresh 30s) |
-| [`/stats`](https://risk-api.life.conway.tech/stats) | Stats JSON |
-| [`/avatar.png`](https://risk-api.life.conway.tech/avatar.png) | Agent avatar image |
-| [`/robots.txt`](https://risk-api.life.conway.tech/robots.txt) | Crawler directives + sitemap |
-| [`/sitemap.xml`](https://risk-api.life.conway.tech/sitemap.xml) | XML sitemap |
-| [`/openapi.json`](https://risk-api.life.conway.tech/openapi.json) | OpenAPI 3.0.3 spec |
-| [`/agent-metadata.json`](https://risk-api.life.conway.tech/agent-metadata.json) | ERC-8004 agent metadata |
-| [`/.well-known/ai-plugin.json`](https://risk-api.life.conway.tech/.well-known/ai-plugin.json) | AI plugin manifest |
-| [`/.well-known/agent.json`](https://risk-api.life.conway.tech/.well-known/agent.json) | A2A agent card |
-| [`/.well-known/agent-card.json`](https://risk-api.life.conway.tech/.well-known/agent-card.json) | A2A agent card (8004scan expects this path) |
-| [`/.well-known/x402`](https://risk-api.life.conway.tech/.well-known/x402) | x402 discovery document |
-| [`/.well-known/x402-verification.json`](https://risk-api.life.conway.tech/.well-known/x402-verification.json) | x402 verification |
-| [`/.well-known/api-catalog`](https://risk-api.life.conway.tech/.well-known/api-catalog) | RFC 9727 API Catalog (`application/linkset+json`) |
+| [`/`](https://augurrisk.com/) | Landing page (Schema.org JSON-LD, Open Graph) |
+| [`/health`](https://augurrisk.com/health) | Health check |
+| [`/dashboard`](https://augurrisk.com/dashboard) | Analytics dashboard (Chart.js, auto-refresh 30s) |
+| [`/stats`](https://augurrisk.com/stats) | Stats JSON |
+| [`/avatar.png`](https://augurrisk.com/avatar.png) | Agent avatar image |
+| [`/robots.txt`](https://augurrisk.com/robots.txt) | Crawler directives + sitemap |
+| [`/sitemap.xml`](https://augurrisk.com/sitemap.xml) | XML sitemap |
+| [`/openapi.json`](https://augurrisk.com/openapi.json) | OpenAPI 3.0.3 spec |
+| [`/agent-metadata.json`](https://augurrisk.com/agent-metadata.json) | ERC-8004 agent metadata |
+| [`/.well-known/ai-plugin.json`](https://augurrisk.com/.well-known/ai-plugin.json) | AI plugin manifest |
+| [`/.well-known/agent.json`](https://augurrisk.com/.well-known/agent.json) | A2A agent card |
+| [`/.well-known/agent-card.json`](https://augurrisk.com/.well-known/agent-card.json) | A2A agent card (8004scan expects this path) |
+| [`/.well-known/x402`](https://augurrisk.com/.well-known/x402) | x402 discovery document |
+| [`/.well-known/x402-verification.json`](https://augurrisk.com/.well-known/x402-verification.json) | x402 verification |
+| [`/.well-known/api-catalog`](https://augurrisk.com/.well-known/api-catalog) | RFC 9727 API Catalog (`application/linkset+json`) |
+| [`/llms.txt`](https://augurrisk.com/llms.txt) | LLM-optimized service documentation |
+| [`/llms-full.txt`](https://augurrisk.com/llms-full.txt) | Full LLM documentation (schema, detectors, examples) |
 
 ## IPFS Pinning Workflow
 
 When agent metadata changes (new endpoints, updated fields, etc.):
 
 1. Update the metadata in `app.py` (`/agent-metadata.json` route)
-2. Deploy to Conway (upload to both source and site-packages)
+2. Deploy to Fly.io (`fly deploy`)
 3. Pin updated metadata to IPFS:
    ```bash
    python scripts/pin_metadata_ipfs.py
@@ -73,11 +75,6 @@ When agent metadata changes (new endpoints, updated fields, etc.):
    ```
 5. Verify on [8004scan](https://8004scan.io/agents/base/19074) that metadata refreshes
 
-## Domain Strategy
+## Domain & Hosting
 
-Current domain `risk-api.life.conway.tech` ties branding to Conway. Not urgent to change (zero users care today), but worth planning:
-
-- Agent wallet and private key are self-custodied (not Conway-controlled)
-- ERC-8004 registration and IPFS CID are wallet-controlled (on-chain)
-- Changing domain later means updating: on-chain URI, all discovery endpoints, all registry listings (x402.jobs, MoltMart, Work402, x402scan, etc.)
-- **Recommendation:** Buy a domain (e.g. `augur-api.xyz`) and CNAME to Conway when ready to decouple. Not a blocker today.
+Domain `augurrisk.com` is hosted on Fly.io with Cloudflare DNS. Conway (`risk-api.life.conway.tech`) kept as historical fallback during transition.

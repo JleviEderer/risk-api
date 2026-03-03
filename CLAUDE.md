@@ -34,7 +34,7 @@
 - `PRICE` — defaults to $0.10
 - `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
 - `BASESCAN_API_KEY` — Basescan API key for deployer reputation checks (optional, degrades gracefully)
-- `PUBLIC_URL` — public base URL for agent metadata endpoint (optional, e.g. `https://risk-api.life.conway.tech`). Falls back to `request.url_root` if unset. Required behind reverse proxies that rewrite the origin.
+- `PUBLIC_URL` — public base URL for agent metadata endpoint (optional, e.g. `https://augurrisk.com`). Falls back to `request.url_root` if unset. Required behind reverse proxies that rewrite the origin.
 - `REQUEST_LOG_PATH` — path for structured JSON-lines request log (optional, e.g. `/root/risk-api-logs/requests.jsonl`)
 - `PINATA_JWT` — Pinata API JWT for IPFS pinning (optional, used by `scripts/pin_metadata_ipfs.py`)
 - `MOLTMART_API_KEY` — MoltMart marketplace API key (optional, used by `scripts/register_moltmart.py`)

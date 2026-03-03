@@ -36,23 +36,23 @@ METADATA = {
         "selfdestruct, honeypot, hidden mint, fee manipulation, "
         "delegatecall) and returns a composite 0-100 risk score. "
         "Pay $0.10/call via x402 in USDC. "
-        "Endpoint: GET https://risk-api.life.conway.tech/analyze?address={contract_address}"
+        "Endpoint: GET https://augurrisk.com/analyze?address={contract_address}"
     ),
     "services": [
         {
             "name": "web",
-            "endpoint": "https://risk-api.life.conway.tech/",
+            "endpoint": "https://augurrisk.com/",
         }
     ],
     "x402Support": True,
     "active": True,
     "supportedTrust": ["reputation"],
-    "image": "https://risk-api.life.conway.tech/avatar.png",
+    "image": "https://augurrisk.com/avatar.png",
     "updatedAt": 1740528000,  # 2025-02-26T00:00:00Z — update when re-registering
 }
 
 AGENT_ID = 19074
-AGENT_METADATA_URL = "https://risk-api.life.conway.tech/agent-metadata.json"
+AGENT_METADATA_URL = "https://augurrisk.com/agent-metadata.json"
 
 # ABI for register(string) and setAgentURI(uint256, string)
 REGISTRY_ABI = [

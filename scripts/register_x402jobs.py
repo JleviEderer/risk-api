@@ -38,7 +38,7 @@ RESOURCE = {
     ),
     # Include default address (WETH) so x402.jobs "Run" button works out of box.
     # Real agents construct their own URL with their target address.
-    "resourceUrl": "https://risk-api.life.conway.tech/analyze?address=0x4200000000000000000000000000000000000006",
+    "resourceUrl": "https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006",
     "network": "base",
     "payTo": "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891",
     "category": "api",
@@ -61,9 +61,9 @@ RESOURCE = {
         "security assessment",
     ],
     "server_name": "risk-api",
-    "documentation_url": "https://risk-api.life.conway.tech/openapi.json",
+    "documentation_url": "https://augurrisk.com/openapi.json",
     "price_usdc": "0.10",
-    "logo_url": "https://risk-api.life.conway.tech/avatar.png",
+    "logo_url": "https://augurrisk.com/avatar.png",
     "example_request": (
         "GET /analyze?address=0x4200000000000000000000000000000000000006"
     ),

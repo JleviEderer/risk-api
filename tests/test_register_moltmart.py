@@ -46,7 +46,7 @@ class TestServiceListing:
         assert SERVICE_LISTING["price_usdc"] == 0.10
 
     def test_endpoint_url_is_live(self) -> None:
-        assert SERVICE_LISTING["endpoint_url"] == "https://risk-api.life.conway.tech/analyze"
+        assert SERVICE_LISTING["endpoint_url"] == "https://augurrisk.com/analyze"
 
     def test_has_input_schema(self) -> None:
         schema = SERVICE_LISTING["input_schema"]

@@ -143,7 +143,7 @@ class TestRegisterErc8004UpdateUri:
         if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
             uri = args[idx + 1]
         else:
-            uri = "https://risk-api.life.conway.tech/agent-metadata.json"
+            uri = "https://augurrisk.com/agent-metadata.json"
         assert uri == "ipfs://QmTestCid123"
 
     def test_update_uri_falls_back_to_default(self) -> None:
@@ -153,8 +153,8 @@ class TestRegisterErc8004UpdateUri:
         if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
             uri = args[idx + 1]
         else:
-            uri = "https://risk-api.life.conway.tech/agent-metadata.json"
-        assert uri == "https://risk-api.life.conway.tech/agent-metadata.json"
+            uri = "https://augurrisk.com/agent-metadata.json"
+        assert uri == "https://augurrisk.com/agent-metadata.json"
 
     def test_update_uri_ignores_next_flag(self) -> None:
         """--update-uri followed by another flag should use default."""
@@ -163,5 +163,5 @@ class TestRegisterErc8004UpdateUri:
         if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
             uri = args[idx + 1]
         else:
-            uri = "https://risk-api.life.conway.tech/agent-metadata.json"
-        assert uri == "https://risk-api.life.conway.tech/agent-metadata.json"
+            uri = "https://augurrisk.com/agent-metadata.json"
+        assert uri == "https://augurrisk.com/agent-metadata.json"

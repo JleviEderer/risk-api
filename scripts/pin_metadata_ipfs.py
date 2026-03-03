@@ -27,7 +27,7 @@ import requests
 PINATA_PIN_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS"
 
 # Public base URL for the risk-api (used in metadata fields that need absolute URLs)
-BASE_URL = "https://risk-api.life.conway.tech"
+BASE_URL = "https://augurrisk.com"
 
 # ERC-8004 agent registration
 AGENT_ID = 19074

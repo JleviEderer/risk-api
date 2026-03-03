@@ -251,11 +251,11 @@ def test_agent_metadata_endpoint(client):
 
 
 def test_agent_metadata_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/agent-metadata.json")
         data = resp.get_json()
-        assert data["services"][0]["endpoint"] == "https://risk-api.life.conway.tech/"
+        assert data["services"][0]["endpoint"] == "https://augurrisk.com/"
 
 
 def test_agent_metadata_falls_back_to_request_url(client):
@@ -425,11 +425,11 @@ def test_openapi_returns_valid_json(client):
 
 
 def test_openapi_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/openapi.json")
         data = resp.get_json()
-        assert data["servers"][0]["url"] == "https://risk-api.life.conway.tech"
+        assert data["servers"][0]["url"] == "https://augurrisk.com"
 
 
 def test_openapi_not_behind_paywall(client_with_x402):
@@ -450,11 +450,11 @@ def test_ai_plugin_json_endpoint(client):
 
 
 def test_ai_plugin_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/.well-known/ai-plugin.json")
         data = resp.get_json()
-        assert data["api"]["url"] == "https://risk-api.life.conway.tech/openapi.json"
+        assert data["api"]["url"] == "https://augurrisk.com/openapi.json"
 
 
 def test_ai_plugin_not_behind_paywall(client_with_x402):
@@ -492,21 +492,21 @@ def test_a2a_agent_card_json_endpoint(client):
 
 
 def test_a2a_agent_card_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/.well-known/agent.json")
         data = resp.get_json()
-        assert data["url"] == "https://risk-api.life.conway.tech"
-        assert data["interfaces"][0]["baseUrl"] == "https://risk-api.life.conway.tech"
+        assert data["url"] == "https://augurrisk.com"
+        assert data["interfaces"][0]["baseUrl"] == "https://augurrisk.com"
 
 
 def test_a2a_agent_card_json_uses_public_url(app):
     """agent-card.json path also respects PUBLIC_URL."""
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/.well-known/agent-card.json")
         data = resp.get_json()
-        assert data["url"] == "https://risk-api.life.conway.tech"
+        assert data["url"] == "https://augurrisk.com"
 
 
 def test_a2a_agent_card_not_behind_paywall(client_with_x402):
@@ -571,12 +571,12 @@ def test_wellknown_x402_not_behind_paywall(client_with_x402):
 
 def test_wellknown_x402_uses_public_url(app):
     """/.well-known/x402 resources should use PUBLIC_URL when set."""
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/.well-known/x402")
         data = resp.get_json()
-        assert data["resources"][0] == "https://risk-api.life.conway.tech/analyze"
-        assert "risk-api.life.conway.tech" in data["instructions"]
+        assert data["resources"][0] == "https://augurrisk.com/analyze"
+        assert "augurrisk.com" in data["instructions"]
 
 
 # --- Landing page tests ---
@@ -615,11 +615,11 @@ def test_landing_links_discovery_endpoints(client):
 
 
 def test_landing_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/")
-        assert b"https://risk-api.life.conway.tech/openapi.json" in resp.data
-        assert b"https://risk-api.life.conway.tech/avatar.png" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
+        assert b"https://augurrisk.com/avatar.png" in resp.data
 
 
 def test_landing_not_behind_paywall(client_with_x402):
@@ -649,11 +649,11 @@ def test_robots_txt_includes_sitemap(client):
 
 
 def test_robots_txt_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/robots.txt")
         text = resp.data.decode()
-        assert "https://risk-api.life.conway.tech/sitemap.xml" in text
+        assert "https://augurrisk.com/sitemap.xml" in text
 
 
 def test_robots_txt_not_behind_paywall(client_with_x402):
@@ -688,11 +688,11 @@ def test_sitemap_lists_public_endpoints(client):
 
 
 def test_sitemap_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/sitemap.xml")
         text = resp.data.decode()
-        assert "https://risk-api.life.conway.tech/" in text
+        assert "https://augurrisk.com/" in text
 
 
 def test_sitemap_not_behind_paywall(client_with_x402):
@@ -730,13 +730,13 @@ def test_api_catalog_points_to_landing(client):
 
 
 def test_api_catalog_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/.well-known/api-catalog")
         data = resp.get_json()
         linkset = data["linkset"][0]
-        assert linkset["anchor"] == "https://risk-api.life.conway.tech/.well-known/api-catalog"
-        assert linkset["service-desc"][0]["href"] == "https://risk-api.life.conway.tech/openapi.json"
+        assert linkset["anchor"] == "https://augurrisk.com/.well-known/api-catalog"
+        assert linkset["service-desc"][0]["href"] == "https://augurrisk.com/openapi.json"
 
 
 def test_api_catalog_not_behind_paywall(client_with_x402):
@@ -767,12 +767,12 @@ def test_llms_txt_has_example_response(client):
 
 
 def test_llms_txt_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/llms.txt")
         text = resp.data.decode()
-        assert "https://risk-api.life.conway.tech/analyze" in text
-        assert "https://risk-api.life.conway.tech/openapi.json" in text
+        assert "https://augurrisk.com/analyze" in text
+        assert "https://augurrisk.com/openapi.json" in text
 
 
 def test_llms_txt_not_behind_paywall(client_with_x402):
@@ -802,11 +802,11 @@ def test_llms_full_txt_has_proxy_example(client):
 
 
 def test_llms_full_txt_uses_public_url(app):
-    app.config["PUBLIC_URL"] = "https://risk-api.life.conway.tech"
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/llms-full.txt")
         text = resp.data.decode()
-        assert "https://risk-api.life.conway.tech/analyze" in text
+        assert "https://augurrisk.com/analyze" in text
 
 
 def test_llms_full_txt_not_behind_paywall(client_with_x402):

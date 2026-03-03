@@ -81,7 +81,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Test x402 payment flow")
     parser.add_argument(
         "--url",
-        default="https://risk-api.life.conway.tech",
+        default="https://augurrisk.com",
         help="Base URL of the risk-api (default: live endpoint)",
     )
     parser.add_argument(
