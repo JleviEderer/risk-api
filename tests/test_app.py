@@ -180,6 +180,14 @@ def test_x402_402_response_has_bazaar_extension(client_with_x402):
     query_schema = input_schema.get("properties", {}).get("queryParams", {})
     assert "address" in query_schema.get("properties", {}), "Missing address in schema"
 
+    # Check output example is present
+    output_data = info.get("output", {})
+    assert "example" in output_data, "Missing output example in bazaar extension"
+    example = output_data["example"]
+    assert "score" in example
+    assert "level" in example
+    assert "findings" in example
+
 
 def test_x402_402_post_has_bazaar_body_extension(client_with_x402):
     """POST 402 response should include bazaar body discovery extension."""
@@ -550,6 +558,8 @@ def test_wellknown_x402_returns_discovery_doc(client):
     assert data["resources"][0].endswith("/analyze")
     assert isinstance(data["instructions"], str)
     assert "risk score" in data["instructions"].lower()
+    assert "8 detectors" in data["instructions"]
+    assert "delegatecall" in data["instructions"]
 
 
 def test_wellknown_x402_not_behind_paywall(client_with_x402):

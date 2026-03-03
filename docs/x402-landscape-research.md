@@ -1,6 +1,6 @@
 # Competitive Landscape: x402 Risk & Security Services
 
-> Last updated: 2026-03-02
+> Last updated: 2026-03-02 (Stripe platform threat added)
 
 ---
 
@@ -83,9 +83,29 @@ Six advertised capabilities: honeypot ID, token risk assessment, address threat 
 
 **Key difference:** They score *servers* (is this x402 provider trustworthy?). We score *contracts* (is this smart contract safe?). Complementary, not directly competing — except the `get_onchain_trust` endpoint which evaluates payment addresses for suspicious patterns.
 
+### 3. Emerging Competitors (risk search, March 2026)
+
+Discovered via `x402list.fun/?q=risk&network=base` on 2026-03-02. Several new entrants targeting the risk/security vertical:
+
+| Provider | Domain | Endpoints | Tx | Price | Notes |
+|----------|--------|-----------|-----|-------|-------|
+| **CyberCentry** | 5 Railway apps (`*.up.railway.app`) | 5 | 63 each | $0.02–$0.10 | Split-domain strategy: separate app per verification type (web, solidity, wallet, solana token, ERC-8004 agent). Each domain has identical 63 tx — likely self-generated. |
+| **cryptorugmunch** | `cryptorugmunch.app` | 4 | 35 | $0.04–$0.30 | Rug detection — closest to our use case. Multiple price tiers suggest depth levels. |
+| **BlockSec** | `x402.blocksec.ai` | 7 | 7 | $0.10–$1.00 | Legit security firm with real audit business. Premium pricing ($1.00 top tier). Low tx count suggests new listing. |
+| **Hexens** | `data-x402.hexens.io` | 1 | 9 | $0.90 | Real security auditor. Single premium endpoint. |
+| **smartanalyst / agentanalyst** | Railway apps | 1 each | 44 | $0.05 | Generic names, Railway-hosted. Low-effort entries. |
+
+**Takeaways:**
+- **CyberCentry's split-domain strategy is aggressive.** 5 separate Railway apps means 5 separate provider listings on x402list.fun, each appearing in different search results. The identical 63 tx across all endpoints confirms self-dealing, but the discovery surface multiplication is real.
+- **BlockSec and Hexens are legit threats.** Both are established security firms with real audit businesses. If they invest in their x402 listings, they bring brand credibility we can't match.
+- **cryptorugmunch is the closest direct competitor.** "Rug detection" overlaps heavily with our honeypot/hidden mint/fee-on-transfer detectors. Their lower price floor ($0.04) could attract price-sensitive agents.
+- **Railway hosting is the new default.** CyberCentry, smartanalyst, and agentanalyst all use Railway. Low barrier to entry = expect more entrants.
+
 ---
 
 ## Our Listing on x402list.fun
+
+> Updated 2026-03-02
 
 Source: `x402list.fun/provider/risk-api.life.conway.tech`
 
@@ -115,18 +135,17 @@ Source: `x402list.fun/provider/risk-api.life.conway.tech`
 
 ## Competitive Matrix
 
-| | **Augur (us)** | **GoPlus x402** | **x402-secure** |
-|---|---|---|---|
-| **What's scored** | Smart contract bytecode | Token security + address reputation | x402 server trust |
-| **Input** | Contract address | Token address OR wallet address | Server URL |
-| **Price** | $0.10 | $0.10–$0.20 | $0.01–$0.10 |
-| **Endpoints** | 1 | 2 (token + address) × 2 domains | 8 |
-| **Transactions** | 0 | 2,600 (shared across both domains) | 1.48M (suspect) |
-| **Output** | 0-100 score, 8 detectors, proxy resolution | Binary flags (scam/honeypot/rug) | 0-100 score, 4 sub-scores |
-| **Network** | Base | Base (chainId param = multi-chain ready) | Base + Solana |
-| **Domains** | Custom (conway.tech) | 2: Vercel prototype + gopluslabs.io | Custom (t54.ai) |
-| **Discovery** | ERC-8004, x402.jobs, Bazaar, llms.txt, A2A, OpenAPI | x402list.fun only (no agent cards) | x402list.fun, SDK |
-| **Status** | Active dev (March 2026) | Graduated to production domain | Active |
+| | **Augur (us)** | **GoPlus x402** | **x402-secure** | **BlockSec** | **CyberCentry** | **cryptorugmunch** |
+|---|---|---|---|---|---|---|
+| **What's scored** | Smart contract bytecode | Token security + address reputation | x402 server trust | Smart contract security | Multi-type verification | Rug detection |
+| **Input** | Contract address | Token address OR wallet address | Server URL | Contract address | Varies by type | Token/contract |
+| **Price** | $0.10 | $0.10–$0.20 | $0.01–$0.10 | $0.10–$1.00 | $0.02–$0.10 | $0.04–$0.30 |
+| **Endpoints** | 1 | 2 × 2 domains | 8 | 7 | 5 (separate domains) | 4 |
+| **Transactions** | 6 | 2,600 (shared) | 1.48M (suspect) | 7 | 63 (identical, suspect) | 35 |
+| **Output** | 0-100 score, 8 detectors, proxy resolution | Binary flags | 0-100 score, 4 sub-scores | Unknown | Unknown | Unknown |
+| **Network** | Base | Base | Base + Solana | Base | Base | Base |
+| **Discovery** | ERC-8004, x402.jobs, Bazaar, llms.txt, A2A, OpenAPI | x402list.fun only | x402list.fun, SDK | x402list.fun | x402list.fun (5 listings) | x402list.fun |
+| **Status** | Active dev (March 2026) | Graduated to production | Active | New (7 tx) | Active | Active |
 
 ---
 
@@ -147,6 +166,44 @@ Source: `x402list.fun/provider/risk-api.life.conway.tech`
 7. **Transaction count is a vanity metric.** x402-secure's 1.48M is almost certainly inflated (identical across all 8 endpoints). GoPlus's 2,600 is shared/identical across both domains. Don't chase it — focus on real usage and revenue.
 
 8. **Our analysis is deeper, not broader.** GoPlus `detect-address` is blacklist/reputation lookup — "is this address known-bad?" We do bytecode analysis — "is this contract's code dangerous?" Both answer "is this safe?" but from different angles. An agent could use both.
+
+9. **The scoring engine is the asset, not the payment rail.** Stripe, Google, and OpenAI are building competing agent payment protocols (see Platform-Level Threats below). If ACP or UCP wins over x402, Augur's bytecode analysis pipeline still works — swap the middleware layer. Build the scoring engine as protocol-portable; don't couple business logic to x402 primitives.
+
+---
+
+## Platform-Level Threats
+
+The direct competitors above are x402-native services competing for the same agent queries. The threats below are **protocol-level** — platforms building alternative agent payment rails that could make x402 itself irrelevant.
+
+### Stripe Agentic Commerce (Feb 2026)
+
+Stripe's 2025 annual letter (published Feb 24, 2026) reveals a comprehensive push into machine-to-machine payments that directly overlaps with x402's value proposition.
+
+**Scale context:** $1.9T payment volume in 2025, 5M+ businesses, 350+ product updates shipped in 2025. This is the largest payment processor in tech making agent commerce a strategic priority.
+
+**Key announcements:**
+
+| Initiative | What it does | x402 overlap |
+|---|---|---|
+| **Machine payments** | Stablecoin micropayments for API calls, MCP tool usage, and HTTP requests | This is literally x402's model — pay-per-request for machine services — but on Stripe rails instead of on-chain |
+| **ACP (Agentic Commerce Protocol)** | Open protocol co-developed with OpenAI for AI platforms to transact with businesses | Competing open standard to x402 for agent→service payments |
+| **Shared Payment Tokens** | Agents initiate payments without exposing user credentials | Solves the same trust problem as x402's facilitator-verified payment proofs |
+| **Google UCP support** | Stripe's Agentic Commerce Suite integrates Google's Universal Commerce Protocol | Another competing agent payment standard with Stripe distribution |
+| **Tempo blockchain** | Payments-optimized L1: sub-second finality, 1M+ TPS target. Visa, Nubank, Shopify testing. Mainnet "soon" | If Stripe moves stablecoin payments to Tempo, they own the full stack — rails + settlement |
+| **Privy acquisition** | 110M programmable wallets acquired | Instant wallet infrastructure for agent identity and payment, no web3 onboarding friction |
+
+**Why this matters for x402:**
+
+- **Distribution asymmetry.** x402 has ~94K payments/month across the entire ecosystem. Stripe processes $1.9T/year across 5M businesses. If Stripe offers "add one line to accept agent payments," most API providers will choose Stripe over x402 middleware.
+- **OpenAI alignment.** ACP is co-developed with OpenAI. If ChatGPT/GPT agents default to ACP for payments, that's the largest agent platform routing around x402.
+- **Stablecoin + Tempo.** Stripe already supports USDC. If Tempo launches with native stablecoin micropayments at sub-second finality, it undercuts x402's on-chain settlement advantage while adding Stripe's compliance and dispute resolution.
+- **"Mid-90s protocol wars."** Stripe's own framing — they see agent commerce protocols as unsettled. x402, ACP, UCP, and others are competing for the standard. Stripe is betting they can win by embedding payments into the platforms agents already use.
+
+**What this does NOT change:**
+
+- x402 is live today with real settlements. ACP, Tempo, and machine payments are announced but not yet generally available.
+- x402 is permissionless — no Stripe account, no KYC, no approval. That matters for autonomous agents.
+- Our scoring engine is independent of the payment rail. Bytecode analysis works regardless of whether the caller pays via x402, ACP, or Stripe checkout.
 
 ---
 
@@ -170,3 +227,9 @@ Source: `x402list.fun/provider/risk-api.life.conway.tech`
 - [x402list.fun — Our provider page](https://x402list.fun/provider/risk-api.life.conway.tech)
 - [x402secure.com — Product page](https://x402secure.com)
 - [x402 ecosystem directory](https://www.x402.org/ecosystem)
+- [Stripe 2025 Annual Letter — Agentic Commerce, Machine Payments, Tempo](https://x.com/patrickc/status/1894059030498349481)
+- [x402list.fun — risk search on Base](https://x402list.fun/?q=risk&network=base) (March 2026 competitor audit)
+- [x402list.fun — BlockSec provider page](https://x402list.fun/provider/x402.blocksec.ai)
+- [x402list.fun — Hexens provider page](https://x402list.fun/provider/data-x402.hexens.io)
+- [x402list.fun — cryptorugmunch provider page](https://x402list.fun/provider/cryptorugmunch.app)
+- [x402list.fun — CyberCentry (multiple Railway domains)](https://x402list.fun/?q=cybercentry)

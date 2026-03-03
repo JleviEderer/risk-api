@@ -910,7 +910,10 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
 
     # Register Bazaar discovery extension so 402 responses include input schema
     try:
-        from x402.extensions.bazaar.resource_service import declare_discovery_extension
+        from x402.extensions.bazaar.resource_service import (
+            OutputConfig,
+            declare_discovery_extension,
+        )
         from x402.extensions.bazaar.server import bazaar_resource_server_extension
 
         resource_server.register_extension(bazaar_resource_server_extension)
@@ -927,9 +930,33 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         }
         example_input = {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}
 
+        example_output = {
+            "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "score": 3,
+            "level": "safe",
+            "bytecode_size": 4632,
+            "findings": [
+                {
+                    "detector": "delegatecall",
+                    "severity": "low",
+                    "points": 3,
+                    "description": "Uses DELEGATECALL opcode",
+                },
+            ],
+            "category_scores": {
+                "proxy": 0,
+                "access_control": 0,
+                "reentrancy": 0,
+                "value_manipulation": 0,
+                "destructive": 0,
+                "deployer_reputation": 0,
+            },
+        }
+
         get_bazaar = declare_discovery_extension(
             input=example_input,
             input_schema=address_schema,
+            output=OutputConfig(example=example_output),
         )
         post_bazaar = declare_discovery_extension(
             input=example_input,
@@ -938,6 +965,7 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
                 **address_schema,
             },
             body_type="json",
+            output=OutputConfig(example=example_output),
         )
     except ImportError:
         logger.warning("Bazaar extension not available — 402 responses will lack input schema")
@@ -953,12 +981,22 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
     routes = {
         "GET /analyze": RouteConfig(
             accepts=payment_option,
-            description="Smart contract risk scoring",
+            description=(
+                "EVM smart contract security analysis — bytecode risk scoring "
+                "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
+                "selfdestruct, proxy, deployer reputation). "
+                "Returns 0-100 risk score with proxy resolution."
+            ),
             extensions=get_bazaar,
         ),
         "POST /analyze": RouteConfig(
             accepts=payment_option,
-            description="Smart contract risk scoring",
+            description=(
+                "EVM smart contract security analysis — bytecode risk scoring "
+                "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
+                "selfdestruct, proxy, deployer reputation). "
+                "Returns 0-100 risk score with proxy resolution."
+            ),
             extensions=post_bazaar,
         ),
     }
@@ -1490,10 +1528,23 @@ def create_app(
                 f"{base_url}/analyze",
             ],
             "instructions": (
-                "# Augur\n\n"
-                "EVM bytecode risk scoring. "
-                "GET /analyze?address={contract_address} returns a 0-100 risk score.\n\n"
-                "Pay $0.10/call via x402 (USDC). No API key needed.\n\n"
+                "# Augur — EVM Smart Contract Security Analysis\n\n"
+                "Bytecode-level risk scoring for EVM smart contracts on Base. "
+                "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
+                "selfdestruct, reentrancy guard, honeypot, proxy detection, "
+                "deployer reputation (Basescan). Returns a 0-100 composite "
+                "risk score with per-category breakdown.\n\n"
+                "## Usage\n\n"
+                "GET /analyze?address={contract_address}\n"
+                "POST /analyze with JSON body: {\"address\": \"0x...\"}\n\n"
+                "## Output\n\n"
+                "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
+                "high=56-75, critical=76-100)\n"
+                "- `findings`: array of detector results with severity and points\n"
+                "- `category_scores`: per-category breakdown\n"
+                "- `implementation`: proxy target analysis (when proxy detected)\n\n"
+                "## Pricing\n\n"
+                "$0.10/call via x402 (USDC on Base). No API key needed.\n\n"
                 f"Agent Card: {base_url}/.well-known/agent-card.json\n"
                 f"OpenAPI: {base_url}/openapi.json"
             ),
