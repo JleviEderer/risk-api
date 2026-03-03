@@ -6,7 +6,8 @@ COPY pyproject.toml .
 COPY src/ src/
 COPY x402JobsAvatar.png src/risk_api/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . \
+ && cp src/risk_api/x402JobsAvatar.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/"
 
 RUN useradd -r -s /bin/false appuser
 USER appuser
