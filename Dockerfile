@@ -14,4 +14,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "risk_api.app:create_app()", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "30"]
+CMD ["gunicorn", "risk_api.app:create_app()", "--bind", "0.0.0.0:8000", "--workers", "1", "--timeout", "30", "--max-requests", "500", "--max-requests-jitter", "50"]

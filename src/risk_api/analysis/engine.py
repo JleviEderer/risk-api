@@ -58,7 +58,7 @@ class AnalysisResult:
 # TTL cache for analysis results: (address, rpc_url, basescan_key) → (result, timestamp)
 _analysis_cache: dict[tuple[str, str, str], tuple[AnalysisResult, float]] = {}
 _CACHE_TTL_SECONDS = 300  # 5 minutes
-_CACHE_MAX_SIZE = 512
+_CACHE_MAX_SIZE = 128
 
 
 def _cache_get(

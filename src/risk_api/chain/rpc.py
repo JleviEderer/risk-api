@@ -15,7 +15,7 @@ class RPCError(Exception):
         self.code = code
 
 
-@functools.lru_cache(maxsize=256)
+@functools.lru_cache(maxsize=64)
 def get_code(address: str, rpc_url: str) -> str:
     """Fetch contract bytecode via eth_getCode.
 
@@ -54,7 +54,7 @@ def get_code(address: str, rpc_url: str) -> str:
     return result
 
 
-@functools.lru_cache(maxsize=256)
+@functools.lru_cache(maxsize=128)
 def get_storage_at(address: str, slot: str, rpc_url: str) -> str:
     """Fetch storage value via eth_getStorageAt.
 
