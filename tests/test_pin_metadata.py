@@ -33,8 +33,8 @@ class TestBuildMetadata:
         oasf = [s for s in meta["services"] if s["name"] == "OASF"][0]  # type: ignore[union-attr]
         assert oasf["endpoint"] == "https://github.com/agntcy/oasf/"  # type: ignore[index]
         assert oasf["version"] == "0.8.0"  # type: ignore[index]
-        assert oasf["skills"] == ["risk_classification", "vulnerability_analysis", "threat_detection"]  # type: ignore[index]
-        assert oasf["domains"] == ["technology/blockchain"]  # type: ignore[index]
+        assert oasf["skills"] == ["security_privacy"]  # type: ignore[index]
+        assert oasf["domains"] == ["technology"]  # type: ignore[index]
 
     def test_has_ipfs_specific_fields(self) -> None:
         """Metadata for IPFS should have fixed timestamps and absolute URLs."""

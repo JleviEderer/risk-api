@@ -473,8 +473,7 @@ def test_a2a_agent_card_endpoint(client):
     assert len(data["skills"]) == 1
     assert data["skills"][0]["id"] == "analyze-contract"
     assert data["skills"][0]["name"] == "Risk Classification (OASF 1304)"
-    assert "oasf:risk_classification" in data["skills"][0]["tags"]
-    assert "oasf:vulnerability_analysis" in data["skills"][0]["tags"]
+    assert "oasf:security_privacy" in data["skills"][0]["tags"]
     assert data["interfaces"][0]["type"] == "http"
     assert data["security"] == []
     assert data["defaultInputModes"] == ["application/json"]
@@ -488,7 +487,7 @@ def test_a2a_agent_card_json_endpoint(client):
     assert data["name"] == "Augur"
     assert data["version"] == "1.0.0"
     assert data["skills"][0]["id"] == "analyze-contract"
-    assert data["skills"][0]["tags"] == ["oasf:risk_classification", "oasf:vulnerability_analysis", "oasf:threat_detection"]
+    assert data["skills"][0]["tags"] == ["oasf:security_privacy"]
 
 
 def test_a2a_agent_card_uses_public_url(app):
@@ -536,8 +535,8 @@ def test_agent_metadata_has_oasf_service(client):
     oasf = next(s for s in data["services"] if s["name"] == "OASF")
     assert oasf["endpoint"] == "https://github.com/agntcy/oasf/"
     assert oasf["version"] == "0.8.0"
-    assert oasf["skills"] == ["risk_classification", "vulnerability_analysis", "threat_detection"]
-    assert oasf["domains"] == ["technology/blockchain"]
+    assert oasf["skills"] == ["security_privacy"]
+    assert oasf["domains"] == ["technology"]
 
 
 def test_agent_metadata_has_agent_wallet_service(client):

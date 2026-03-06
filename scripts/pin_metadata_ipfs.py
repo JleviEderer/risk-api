@@ -66,8 +66,8 @@ def build_metadata() -> dict[str, object]:
                 "name": "OASF",
                 "endpoint": "https://github.com/agntcy/oasf/",
                 "version": "0.8.0",
-                "skills": ["risk_classification", "vulnerability_analysis", "threat_detection"],
-                "domains": ["technology/blockchain"],
+                "skills": ["security_privacy"],
+                "domains": ["technology"],
             },
             {
                 "name": "agentWallet",

@@ -1497,7 +1497,7 @@ def create_app(
                         "Fetch on-chain bytecode for a contract address "
                         "and run 8 detectors to produce a 0-100 risk score."
                     ),
-                    "tags": ["oasf:risk_classification", "oasf:vulnerability_analysis", "oasf:threat_detection"],
+                    "tags": ["oasf:security_privacy"],
                 },
             ],
             "security": [],
@@ -1603,8 +1603,8 @@ def create_app(
                     "name": "OASF",
                     "endpoint": "https://github.com/agntcy/oasf/",
                     "version": "0.8.0",
-                    "skills": ["risk_classification", "vulnerability_analysis", "threat_detection"],
-                    "domains": ["technology/blockchain"],
+                    "skills": ["security_privacy"],
+                    "domains": ["technology"],
                 },
                 {
                     "name": "agentWallet",
