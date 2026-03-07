@@ -1,80 +1,101 @@
-# Augur — Business Planning
+# Augur - Business Planning
 
-> Last updated: 2026-03-02
+> Last updated: 2026-03-07
 
 ---
 
-## Listing Optimization (x402list.fun)
+## Document Boundaries
 
-### Problem
+Use this file for durable strategy:
+- market thesis
+- pricing logic
+- moat framing
+- major prioritization calls
 
-Our x402list.fun listing is weak:
-- **Category:** "Other" (invisible in filtered searches)
-- **Description:** "Smart contract risk scoring" (bare, no keywords)
-- **Transactions:** 6 (bottom of sort rankings)
-- **Endpoints:** 1 (vs competitors with 4-8)
-- **Output examples:** None (agents can't preview what they'd get)
+Do not use this file as the operating backlog.
 
-Competitors are gaming discovery surface — CyberCentry has 5 separate domains, x402-secure has 8 endpoints across 4 categories, and even cryptorugmunch has 4 endpoints.
+Execution lives in:
+- `docs/GrowthExecutionPlan.md` - current workstreams, priorities, metrics, and sequencing
+- `docs/DECISIONS.md` - major decisions and ADRs
+- `docs/REGISTRATIONS.md` - registry and marketplace state
 
-### Lever 1: Description Enrichment (DONE)
+---
 
-x402list.fun likely infers category from description text. The x402 SDK's `RouteConfig` has no `category` field, so the description IS the primary classification signal.
+## Conversion Funnel
 
-**Before:** `"Smart contract risk scoring"`
+**Current state:** 200+ visitors, 0 organic paying calls.
 
-**After:** `"EVM smart contract security analysis — bytecode risk scoring with 8 detectors (delegatecall, hidden mint, fee-on-transfer, selfdestruct, proxy, deployer reputation). Returns 0-100 risk score with proxy resolution."`
+**Diagnosis:** discoverability is partially working; conversion and trust are not.
 
-**Goal:** Trigger "Security" or "Data & Analytics" category instead of "Other." Keywords chosen to match category classifiers: "security analysis", "risk scoring", "detectors", "bytecode."
+People are finding Augur through directories, crawlers, and registries, but the first-use path still has too much friction:
+1. x402 client-side payment is unfamiliar
+2. trust breaks if examples, domains, or outputs are confusing
+3. buyers must decide to pay before they have enough proof
 
-### Lever 2: Output Examples in Bazaar Extension (DONE)
+**Strategic implication:** fix product trust and onboarding before expanding endpoint count.
 
-The Bazaar SDK's `declare_discovery_extension` supports `output=OutputConfig(example=...)`. We weren't using it. Now we include a representative response so agents can see the output shape before paying.
+### Current strategic priorities
 
-### Lever 3: Enriched /.well-known/x402 Instructions (DONE)
+| Priority | Action | Why |
+|---|---|---|
+| 1 | Product trust fixes | Hard-error non-contract/no-bytecode inputs, audit examples, remove Base/mainnet confusion |
+| 2 | Domain + registry hygiene | Make `augurrisk.com` the canonical surface across listings and crawlers |
+| 3 | MCP distribution | Put Augur directly into the emerging agent toolchain surface |
+| 4 | First-class client onboarding | Make the x402 payment flow easy to copy and verify |
+| 5 | Intent pages + public reports | Expand SEO/LLM surface without fragmenting the paid API |
+| 6 | Targeted community distribution | Push proof and integration assets into Base/x402 communities |
 
-The x402 discovery document's `instructions` field was generic. Now includes: all 8 detector names, scoring ranges, usage examples (GET + POST), output field descriptions, pricing.
+### What NOT to do first
 
-### Why NOT Endpoint Splitting (Yet)
+- **Endpoint splitting** - still deferred. `0 x 3 = 0`.
+- **Synthetic transaction inflation** - credibility loss is not worth vanity rankings.
+- **Second domain for ranking games** - only revisit after the core funnel converts.
+- **Multi-rail payment expansion** - watch Stripe/ACP/UCP, but do not fork effort before current demand exists.
 
-Splitting `/analyze` into sub-endpoints (e.g., `/bytecode-score`, `/deployer-score`, `/proxy-resolve`) would multiply our x402list.fun presence like x402-secure does. But:
+### Deferred
 
-1. **0 × 3 = 0.** Splitting doesn't solve the zero-transactions problem. Three endpoints with 0 tx each is worse than one endpoint with real usage.
-2. **Fragments revenue.** Each sub-endpoint at $0.02-$0.05 means agents make multiple calls for what's currently one $0.10 call. Net revenue per full analysis drops.
-3. **Complicates the codebase.** More routes, more middleware config, more tests, more deployment surface.
-4. **Save for later.** Once the basic listing is optimized and we have real traffic data, splitting can be a calculated growth tactic.
+- **Framework-specific tool wrappers** - useful later, but MCP is the cleaner initial packaging bet.
+- **Free demo endpoint** - consider after correctness, examples, MCP, and onboarding docs are fixed.
 
-### Why NOT Transaction Inflation
+---
 
-Several competitors show identical tx counts across all endpoints (x402-secure: 1.48M everywhere, CyberCentry: 63 everywhere). This is clearly self-dealing. We won't do this because:
+## Listing Optimization
 
-1. **Detectable.** Identical counts across endpoints is an obvious tell.
-2. **Credibility risk.** If x402list.fun adds fraud detection, inflated providers get flagged.
-3. **Real settlements are better.** 6 confirmed CDP settlements on the books. Each real transaction is worth more for credibility than 1000 self-dealt ones.
+Enrichment levers completed (2026-03-02):
+- Description updated with full keyword set: security analysis, bytecode, 8 detectors, proxy resolution
+- Bazaar extension now includes output examples via `OutputConfig(example=...)`
+- `/.well-known/x402` instructions enriched with detector names, scoring ranges, and usage examples
 
-### Future Considerations
+### Why NOT endpoint splitting
 
-- **Endpoint splitting** — after real traffic validates demand, split detectors into cheap sub-endpoints ($0.02-$0.05) to multiply discovery surface
-- **Second domain** — GoPlus's dual-domain tactic gives double x402list.fun presence for free. Could deploy a second domain (e.g., `augur-security.app`) pointing to the same backend.
-- **Richer Bazaar metadata** — as the SDK evolves, add output schemas, input validation hints, usage examples
-- **Category targeting** — if x402list.fun exposes category selection, explicitly set "Security" and "Data & Analytics"
+Splitting `/analyze` into sub-endpoints like `/bytecode-score`, `/deployer-score`, and `/proxy-resolve` would multiply x402list.fun presence. But:
+1. **0 x 3 = 0.** Three endpoints with 0 tx each is worse than one endpoint with real usage.
+2. **Fragments revenue.** Multiple cheap calls replace one $0.10 call. Net revenue per full analysis drops.
+3. **Complicates the codebase.** More routes, middleware, tests, and deployment surface.
+
+### Why NOT transaction inflation
+
+Competitors like x402-secure and CyberCentry show identical tx counts across all endpoints, which strongly suggests self-dealing. We should not do this:
+1. **Detectable.** Identical counts are an obvious tell.
+2. **Credibility risk.** If directories add fraud detection, inflated providers get flagged.
+3. **Real settlements matter more.** Each real CDP settlement is worth more than a large synthetic number.
 
 ---
 
 ## Pricing Strategy
 
-**Current:** Single tier, $0.10/call (USDC on Base)
+**Current:** single tier, $0.10/call (USDC on Base)
 
 **Rationale:**
 - Price parity with GoPlus `detect-address` ($0.10)
 - Half the price of GoPlus `detect-token` ($0.20)
 - Below BlockSec premium tier ($1.00) and Hexens ($0.90)
-- Above cryptorugmunch floor ($0.04) — we deliver more (8 detectors vs rug-only)
-- Break-even: ~50-80 calls/month (covers Conway sandbox + domain costs)
+- Above cryptorugmunch floor ($0.04) because we deliver more than rug-only checks
+- Break-even at roughly 50-80 calls/month, which covers Fly.io and domain costs
 
-**No free tier.** Free removes the differentiator vs GoPlus (717M free calls). If agents can get security data for free from GoPlus, paying us $0.10 is a harder sell. But GoPlus gives binary flags; we give scored risk with 8 detectors. The premium is justified.
+**No free tier.** Free removes the x402 differentiator. GoPlus already serves the free market with binary flags; our value is frictionless paid access plus richer scoring.
 
-**No tiered pricing.** Over-engineering for 6 transactions. Can add tiers (basic/detailed/full) after usage data shows what agents actually want.
+**No tiered pricing yet.** Tiering is premature at current volume. Add tiers only after usage data reveals distinct segments.
 
 See also: ADR-005 in `docs/DECISIONS.md`
 
@@ -82,15 +103,15 @@ See also: ADR-005 in `docs/DECISIONS.md`
 
 ## Competitive Moat
 
-**Moat is x402 frictionlessness, NOT analysis depth.**
+**Moat is x402 frictionlessness, not analysis depth alone.**
 
-GoPlus has 717M calls/month and 30+ chains but requires signup + API key. Autonomous agents can't use GoPlus without human onboarding. We're the only x402-native risk scoring option that works with zero setup.
+GoPlus has large-scale free usage and broad chain coverage, but requires signup and API keys. Autonomous agents cannot rely on that onboarding path. Augur is x402-native and immediately callable by any agent with a wallet.
 
-**Scored risk > binary flags.** Agents write `if score > 50: don't buy` (one line) vs parsing 20+ GoPlus booleans. Simpler integration = faster adoption.
+**Scored risk beats binary flags for agent workflows.** Agents can write `if score > 50: do not interact` instead of parsing many individual booleans.
 
-**No LLM in scoring pipeline.** Speed + reliability + margins all favor deterministic pattern matching. Sub-second response time, zero inference costs.
+**No LLM in the scoring pipeline.** Deterministic analysis preserves speed, reliability, and margins.
 
-**Moat is time-bounded:** 6-18 months. When GoPlus or BlockSec invest in their x402 listings, they bring brand credibility and chain coverage we can't match. Build usage now while the window is open.
+**Moat is time-bounded:** roughly 6-18 months. If incumbents invest seriously in x402 distribution, they bring credibility and brand reach we cannot match. The right move is to build real usage now while the market is still forming.
 
 See full competitive analysis: `docs/x402-landscape-research.md`
-See strategic ADRs 001-006: `docs/DECISIONS.md`
+See strategic ADRs: `docs/DECISIONS.md`
