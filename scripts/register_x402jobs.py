@@ -4,6 +4,7 @@ Usage:
     python scripts/register_x402jobs.py              # Create new resource
     python scripts/register_x402jobs.py --list       # List your resources (shows UUIDs)
     python scripts/register_x402jobs.py --update UUID # Update existing resource by UUID
+    python scripts/register_x402jobs.py --delete UUID # Delete resource by UUID
 
     API key is read from X402_JOBS_API_KEY in .env file,
     or pass as --key <KEY>.
@@ -153,6 +154,29 @@ def cmd_list(args: argparse.Namespace) -> None:
         print()
 
 
+def cmd_delete(args: argparse.Namespace) -> None:
+    api_key = get_api_key(args)
+    uuid = args.uuid
+    if not uuid:
+        print("ERROR: --delete requires a UUID. Run --list to find it.")
+        sys.exit(1)
+
+    print(f"Deleting resource {uuid} from x402.jobs...")
+
+    resp = httpx.delete(
+        f"{API_BASE}/resources/{uuid}",
+        headers={"x-api-key": api_key},
+        timeout=30,
+    )
+
+    if resp.status_code in (200, 204):
+        print(f"SUCCESS! Resource {uuid} deleted.")
+    else:
+        print(f"\nERROR: {resp.status_code}")
+        print(f"Response: {resp.text}")
+        sys.exit(1)
+
+
 def cmd_update(args: argparse.Namespace) -> None:
     api_key = get_api_key(args)
     uuid = args.uuid
@@ -191,6 +215,7 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--list", action="store_true", help="List your resources (shows UUIDs)")
     group.add_argument("--update", metavar="UUID", help="Update existing resource by UUID")
+    group.add_argument("--delete", metavar="UUID", help="Delete resource by UUID")
     # Legacy: positional API key for backwards compat
     parser.add_argument("api_key_pos", nargs="?", help=argparse.SUPPRESS)
 
@@ -205,6 +230,9 @@ def main() -> None:
     elif args.update:
         args.uuid = args.update
         cmd_update(args)
+    elif args.delete:
+        args.uuid = args.delete
+        cmd_delete(args)
     else:
         cmd_create(args)
 

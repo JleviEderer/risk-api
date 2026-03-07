@@ -99,6 +99,4 @@
 
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."
-- **CAIP-2 network format** — always use `eip155:CHAINID` not string names with x402 v2
 - **Context7 doesn't have x402.jobs docs** — use direct scraping for x402.jobs API reference
-- **Bash dollar-sign quoting** — when setting env vars with `$` in values (prices, paths), always use single quotes. Seen twice now (Conway restart + docs).
