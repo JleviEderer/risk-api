@@ -44,6 +44,13 @@
 - **Mocking x402 SDK internals to speed up tests** — `patch('x402HTTPServerBase.initialize')`, `patch('HTTPFacilitatorClientSync.get_supported')`, `patch('httpx.Client')` all fail because the hang is at import time (`from x402.mechanisms.evm` pulls ~60 packages), not at method call time. Mock can't prevent an import-level hang.
 - **Running `pip install` or `pyright` in background bash** — both trigger x402 EVM import chain which takes forever on Windows/MINGW (no `.pyc` write permission). Use `python -m pytest` directly (already installed), skip pyright locally.
 
+## Patterns That Don't Work
+- **`x402[flask,evm]>=2.2.0,<3` in pyproject.toml** — x402 2.3.0 broke `PaymentPayloadV1` API (`no attribute 'accepted'`). Docker builds will silently upgrade. Pin to `<2.3` until 2.3.x is validated.
+
+## Useful Scripts
+- **`scripts/test_x402_payment.py`** — makes a real on-chain x402 payment to `augurrisk.com/analyze` using the Conway wallet (`~/.conway/wallet.json`). Use to trigger on-chain indexing (x402list.fun, x402scan) or test payment flow end-to-end. Sends $0.10 USDC from Conway → agent wallet. Must use v2 proof format: `{"x402Version": 2, "payload": {...}, "accepted": <option from 402 response>}`.
+- **`scripts/register_x402jobs.py`** — manage x402.jobs listings. `--list` (shows UUIDs), `--delete UUID`, `--update UUID`, default = create. API key from `X402_JOBS_API_KEY` in `.env`.
+
 ## Domain Notes
 - **x402 EVM import chain is massive**: `x402.mechanisms.evm` → `web3`, `eth_account`, `eth_abi`, `aiohttp`, `pydantic`, ~60 packages total. On Linux with `.pyc` caches: ~1s. On Windows/MINGW without writable `__pycache__`: hangs indefinitely (recompiles from source). This affects tests, pyright, and any local tool that imports x402 EVM code.
 - **Fly.io 256MB is tight**: 1 gunicorn worker + x402 SDK import tree + caches. Reduced to 1 worker + smaller caches after OOM crash (2026-03-03). If OOM recurs: `fly scale memory 512 -a augurrisk`.
