@@ -45,7 +45,7 @@
 - **Running `pip install` or `pyright` in background bash** — both trigger x402 EVM import chain which takes forever on Windows/MINGW (no `.pyc` write permission). Use `python -m pytest` directly (already installed), skip pyright locally.
 
 ## Patterns That Don't Work
-- **`x402[flask,evm]>=2.2.0,<3` in pyproject.toml** — x402 2.3.0 broke `PaymentPayloadV1` API (`no attribute 'accepted'`). Docker builds will silently upgrade. Pin to `<2.3` until 2.3.x is validated.
+- **`x402[flask,evm]>=2.2.0,<3` in pyproject.toml** — x402 2.3.0 broke `PaymentPayloadV1` API (`no attribute 'accepted'`). Docker builds will silently upgrade. ~~Pin to `<2.3` until 2.3.x is validated.~~ **RESOLVED 2026-03-07**: 2.3.0 breaking changes are client-side only. Upgraded pin to `>=2.3.0,<2.4`. All 238 tests pass.
 
 ## Useful Scripts
 - **`scripts/test_x402_payment.py`** — makes a real on-chain x402 payment to `augurrisk.com/analyze` using the Conway wallet (`~/.conway/wallet.json`). Use to trigger on-chain indexing (x402list.fun, x402scan) or test payment flow end-to-end. Sends $0.10 USDC from Conway → agent wallet. Must use v2 proof format: `{"x402Version": 2, "payload": {...}, "accepted": <option from 402 response>}`.
@@ -103,6 +103,10 @@
 - **Oracle feedback score is automated** — the 1.5/5.0 (30/100) rating from `0xF653...` is the 8004scan reputation oracle, not a human. Flags `HIGH_RISK_SCORE` + `CONCENTRATED_FEEDBACK` are normal for new agents. Improves with real tx volume.
 - **OASF skills field = category slugs** — e.g. `security_privacy`, NOT sub-skill names like `threat_detection`. Sub-skills exist under categories but are not valid at the service level. Schema: `https://schema.oasf.outshift.com/skill_categories`
 - **OASF domains field = top-level slug** — `technology` not `technology/blockchain`. Slash format rejected.
+
+## Deploy Notes
+- **Auto-deploy is live** — pushing to `master` triggers `.github/workflows/fly-deploy.yml` → `flyctl deploy --remote-only`. `FLY_API_TOKEN` secret set 2026-03-07. No need to run `fly deploy` locally.
+- **`fly deploy` exit code 1 ≠ broken app** — if one machine was already stopped before the deploy, Fly leaves it stopped and exits 1 ("non-started state"). Check `augurrisk.com/health` and `fly status` to confirm the live machine updated correctly.
 
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."

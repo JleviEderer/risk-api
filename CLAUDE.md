@@ -1,7 +1,7 @@
 # risk-api — Augur: Smart Contract Risk Scoring API
 
 ## Stack
-- Python 3.10+, Flask, gunicorn, x402[flask,evm] v2.2.0, httpx, jsonschema, PyJWT, cryptography
+- Python 3.10+ package requirement (Python 3.13 in Docker), Flask, gunicorn, x402[flask,evm] >=2.3.0,<2.4, httpx, jsonschema, PyJWT, cryptography
 - requests (Base RPC), python-dotenv
 - pytest + responses (testing), pyright (type checking)
 - Docker + docker-compose (production deployment)
@@ -9,7 +9,7 @@
 ## Commands
 - Install: `pip install -e ".[dev]"`
 - Run (dev): `flask --app risk_api.app:create_app run`
-- Run (prod): `gunicorn "risk_api.app:create_app()" --bind 0.0.0.0:8000 --workers 2`
+- Run (prod): `gunicorn "risk_api.app:create_app()" --bind 0.0.0.0:8000 --workers 1 --timeout 30 --max-requests 500 --max-requests-jitter 50`
 - Docker: `docker compose up -d --build`
 - Test: `pytest tests/ -v`
 - Coverage: `pytest tests/ -v --cov=src/risk_api`
@@ -44,7 +44,7 @@
 ## Gotchas
 - No web3.py — we use raw JSON-RPC via requests
 - Bytecode analysis is pure pattern matching, no LLM inference
-- x402 SDK v2.2.0 has no `PaymentMiddleware` class — we build Flask middleware manually using `x402HTTPResourceServerSync` + `process_http_request`
+- Current x402[flask,evm] 2.3.x integration does not use a `PaymentMiddleware` class here — we build Flask middleware manually using `x402HTTPResourceServerSync` + `process_http_request`
 - x402 SDK v2 reads payment from `PAYMENT-SIGNATURE` header (not `X-PAYMENT`) via the adapter's `get_header()` — clients must send this header name
 - x402 SDK needs `httpx` at runtime (undeclared transitive dep)
 - Network must be CAIP-2 format: `eip155:84532` (sepolia), `eip155:8453` (mainnet)
