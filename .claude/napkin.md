@@ -34,13 +34,19 @@
 - `functools.lru_cache` on RPC calls with `clear_cache()` exposed for testing
 - `python -c "help(SomeClass)"` to discover actual SDK APIs when docs are wrong
 - Check facilitator `/supported` endpoint to see what scheme+network combos work
+- **Fake x402 gate for tests**: Patch `risk_api.app._setup_x402_middleware` with a lightweight `before_request` hook that returns 402 + proper `Payment-Required` headers (including Bazaar extensions). Avoids all x402 SDK imports. See `tests/conftest.py` for implementation.
+- **`python -m pytest` instead of `pytest`** — pytest is installed but not on PATH in MINGW. `python -m pytest` always works.
 
 ## Patterns That Don't Work
 - Trusting Context7 MCP docs for x402 SDK — they describe APIs that don't exist in v2.2.0
 - x402 `initialize()` in app startup without try/except — it hits the network and will crash if facilitator is down
 - Running `git push` in background bash on Windows — tends to hang (credential helper issue). First push via `gh repo create --push` works, subsequent pushes may need manual terminal
+- **Mocking x402 SDK internals to speed up tests** — `patch('x402HTTPServerBase.initialize')`, `patch('HTTPFacilitatorClientSync.get_supported')`, `patch('httpx.Client')` all fail because the hang is at import time (`from x402.mechanisms.evm` pulls ~60 packages), not at method call time. Mock can't prevent an import-level hang.
+- **Running `pip install` or `pyright` in background bash** — both trigger x402 EVM import chain which takes forever on Windows/MINGW (no `.pyc` write permission). Use `python -m pytest` directly (already installed), skip pyright locally.
 
 ## Domain Notes
+- **x402 EVM import chain is massive**: `x402.mechanisms.evm` → `web3`, `eth_account`, `eth_abi`, `aiohttp`, `pydantic`, ~60 packages total. On Linux with `.pyc` caches: ~1s. On Windows/MINGW without writable `__pycache__`: hangs indefinitely (recompiles from source). This affects tests, pyright, and any local tool that imports x402 EVM code.
+- **Fly.io 256MB is tight**: 1 gunicorn worker + x402 SDK import tree + caches. Reduced to 1 worker + smaller caches after OOM crash (2026-03-03). If OOM recurs: `fly scale memory 512 -a augurrisk`.
 - x402 SDK undeclared dependency: needs `httpx` at runtime, not listed in `x402[flask,evm]` extras
 - x402.org facilitator supports: `eip155:84532` (v2 exact), `base-sepolia` (v1 exact)
 - Coinbase mainnet facilitator: `https://api.cdp.coinbase.com/platform/v2/x402` — **requires CDP API key auth, returns 401 without it**
@@ -82,6 +88,14 @@
 - **API quirks:** POST (create) works with `x-api-key`. PUT/PATCH/DELETE by slug fail ("Missing authorization header"). DELETE by UUID works with `x-api-key`. Re-POST creates duplicate, not upsert.
 - **Visibility factors:** Verified badge (claim server) + avatar + call count matter. Input Schema config enables proper Run button UX with input fields.
 - **API key stored in:** `.env` (gitignored), read by `scripts/register_x402jobs.py` via `load_dotenv()`
+
+## 8004scan UI Notes (2026-03-06)
+- **Browser Wallet, not MetaMask** — clicking "MetaMask" in 8004scan connect modal triggers WalletConnect QR code flow. Use "Browser Wallet" to connect the extension directly.
+- **Edit Agent wizard defaults to Data URI storage** — always switch to "IPFS URL" tab in Step 4 and paste the CID. Data URI mode encodes everything as base64 on-chain and loses IPFS pin.
+- **Accessing Management tab = owner verified** — no separate "verify wallet" action on 8004scan. If you can see Management, you're authenticated as owner.
+- **Oracle feedback score is automated** — the 1.5/5.0 (30/100) rating from `0xF653...` is the 8004scan reputation oracle, not a human. Flags `HIGH_RISK_SCORE` + `CONCENTRATED_FEEDBACK` are normal for new agents. Improves with real tx volume.
+- **OASF skills field = category slugs** — e.g. `security_privacy`, NOT sub-skill names like `threat_detection`. Sub-skills exist under categories but are not valid at the service level. Schema: `https://schema.oasf.outshift.com/skill_categories`
+- **OASF domains field = top-level slug** — `technology` not `technology/blockchain`. Slash format rejected.
 
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."
