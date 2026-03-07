@@ -6,8 +6,7 @@
 - Branch: `master`
 - Status: yellow
 - Working tree:
-  - Modified: `HANDOVER.md`, `docs/BizPlanning.md`
-  - Untracked: `docs/GrowthExecutionPlan.md`
+  - Modified: `README.md`, `docs/REGISTRATIONS.md`
   - Untracked: `.claude/settings.local.json`, `.codex/`, `.playwright-mcp/`, `avatar.html`
 
 ## What We Worked On
@@ -17,6 +16,7 @@
   - proxy implementation scoring missed shared heuristics
   - deployer reputation conflated true "not found" with external API failure
 - Synced version/runtime docs with the actual package and container config.
+- Audited current monitoring and discovery surfaces after the domain migration.
 - Refreshed repo handoff and napkin guidance for future sessions.
 - Reorganized strategy and execution docs so business planning and active backlog are no longer mixed together.
 
@@ -124,6 +124,22 @@
   - instrument the funnel early enough to guide the next sprint
   - treat old-domain redirect work as conditional on the registry audit
 
+### 9) Audited monitoring and external directory state
+- Confirmed:
+  - Better Stack is the external uptime/health monitor for `https://augurrisk.com/health`
+  - Fly has `PUBLIC_URL` deployed for `augurrisk.com`
+  - the current `x402.jobs` listing already points to `augurrisk.com`
+- Confirmed remaining issue:
+  - `x402list.fun` still shows the legacy Conway hostname (`risk-api.life.conway.tech`)
+  - this persisted even after fresh paid settlements against `augurrisk.com`
+- Practical conclusion:
+  - treat Better Stack and `/health` as the uptime source of truth
+  - treat `/dashboard` and `/stats` as per-instance request-log views only
+  - treat the x402list.fun hostname drift as an external directory/indexing issue, not a repo-side config bug
+- Documentation update:
+  - added monitoring notes to `README.md`
+  - added monitoring/x402list state notes to `docs/REGISTRATIONS.md`
+
 ## What Worked
 - Reading `docs/DECISIONS.md` was the right strategic constraint; it prevented an over-engineered refactor path.
 - Both correctness fixes were small, local, and easy to regression test.
@@ -146,6 +162,8 @@
   - implementation scoring gap
   - reputation error/not-found conflation
 - Prefer low-cost correctness and documentation fixes before structural cleanup.
+- Do **not** keep chasing x402list.fun hostname drift via repo code changes once `PUBLIC_URL`, app scripts, and primary listings already point at `augurrisk.com`.
+  - Reason: current evidence points to an external directory state problem, not an app/runtime bug.
 
 ## Recommended Next Steps
 1. `G-001` Hard-error no-bytecode inputs in `/analyze`
@@ -153,7 +171,7 @@
 2. `G-002` Standardize all public example addresses
    - Replace any lingering Base/mainnet-confusing examples in landing page, OpenAPI, Bazaar metadata, and `llms.txt`.
 3. `G-004` Audit registry and directory listings
-   - Verify which surfaces still point at old domains before changing redirect/canonical behavior.
+   - Narrow the remaining discovery audit to x402list.fun and other external directories; `x402.jobs` and Fly `PUBLIC_URL` are already confirmed healthy.
 4. `G-016` Instrument the funnel baseline
    - At minimum: landing page views, valid unpaid `402` attempts, invalid addresses, no-bytecode requests, paid requests.
 5. Optionally assess `/stats` behavior in `src/risk_api/app.py`
@@ -169,11 +187,13 @@
 - `tests/test_reputation.py`
   - Updated tests for the new reputation semantics.
 - `README.md`
-  - Synced version/runtime docs with actual package/runtime config.
+  - Synced version/runtime docs with actual package/runtime config and documented Better Stack plus the role of `/health` vs `/dashboard`.
+- `docs/REGISTRATIONS.md`
+  - Added monitoring notes and recorded that x402list.fun still shows the legacy Conway hostname as of 2026-03-07.
 - `CLAUDE.md`
   - Synced stack and production command docs with `pyproject.toml` and `Dockerfile`.
 - `.codex/napkin.md`
-  - Added reusable repo guidance for future sessions.
+  - Added reusable repo guidance for request-log interpretation, Better Stack uptime checks, and x402list.fun host drift.
 - `docs/BizPlanning.md`
   - Rewritten to hold durable strategy instead of mixed strategy/backlog content.
 - `docs/GrowthExecutionPlan.md`
@@ -201,6 +221,11 @@
 - Best immediate follow-up is the top of the growth checklist:
   - `G-001`
   - `G-002`
-  - `G-004`
+  - `G-004` with emphasis on x402list.fun and other external directories, not repo-side domain config
   - `G-016` in parallel once `G-001` is defined
+- Current operational read:
+  - Better Stack is the uptime source of truth
+  - `x402.jobs` is already on `augurrisk.com`
+  - `x402list.fun` still shows the Conway hostname despite fresh new-domain settlements
+  - further x402list.fun work likely requires external directory intervention or waiting on their indexing behavior
 - Keep the strategy constraint in mind: prefer bug fixes and low-cost cleanup over structural churn unless real usage pain justifies it.

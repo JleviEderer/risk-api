@@ -78,3 +78,15 @@ When agent metadata changes (new endpoints, updated fields, etc.):
 ## Domain & Hosting
 
 Domain `augurrisk.com` is hosted on Fly.io with Cloudflare DNS. Conway (`risk-api.life.conway.tech`) kept as historical fallback during transition.
+
+## Monitoring & Health
+
+- Better Stack is the external uptime monitor for `https://augurrisk.com/health`.
+- `scripts/health_check.py` is the matching manual probe for that public health check.
+- Treat `/dashboard` and `/stats` as per-instance request-log views, not the authoritative monitoring surface.
+
+## x402list.fun Note
+
+- As of 2026-03-07, x402list.fun is still showing the legacy Conway hostname (`risk-api.life.conway.tech`) rather than `augurrisk.com`.
+- This appears to be an external directory/indexing state issue, not an app-route or `PUBLIC_URL` issue in this repo.
+- Do not assume code changes alone will update the x402list.fun provider page; verify directory state separately after any settlement or registration changes.

@@ -198,7 +198,7 @@ risk-api/
 |   |-- register_x402jobs.py    # List on x402.jobs marketplace
 |   |-- register_moltmart.py    # List on MoltMart marketplace
 |   |-- register_work402.py     # Onboard on Work402 (testnet)
-|   |-- health_check.py         # External health check script
+|   |-- health_check.py         # External health check script (Better Stack / uptime monitors)
 |   `-- test_x402_client.py     # Manual x402 payment flow test
 |-- docs/
 |   |-- DECISIONS.md            # ADRs (ADR-001 through ADR-006)
@@ -271,6 +271,9 @@ fly logs -a augurrisk               # tail production logs
 fly status -a augurrisk             # machine status
 fly scale memory 512 -a augurrisk   # increase memory if OOM
 
+# External uptime probe
+python scripts/health_check.py      # check the public /health endpoint
+
 # Load .env in bash
 set -a && source .env && set +a
 
@@ -280,6 +283,14 @@ python scripts/pin_metadata_ipfs.py
 # Update on-chain agent URI after re-pinning
 python scripts/register_erc8004.py --update-uri ipfs://<NEW_CID>
 ```
+
+---
+
+## Monitoring
+
+- Better Stack is the external uptime monitor for `https://augurrisk.com/health`.
+- `scripts/health_check.py` mirrors that public health probe for manual checks and simple alert integrations.
+- `/dashboard` and `/stats` are per-deployment request-log views, not the canonical uptime source of truth.
 
 ---
 
