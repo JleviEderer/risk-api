@@ -7,6 +7,7 @@ import responses
 from risk_api.analysis.patterns import Severity
 from risk_api.analysis.reputation import (
     BASESCAN_API,
+    CreatorLookupStatus,
     clear_reputation_cache,
     detect_deployer_reputation,
     get_contract_creator,
@@ -46,7 +47,9 @@ def test_get_contract_creator_success():
         },
     )
     result = get_contract_creator(FAKE_ADDRESS, API_KEY)
-    assert result == (FAKE_DEPLOYER, FAKE_TX_HASH)
+    assert result.status == CreatorLookupStatus.FOUND
+    assert result.deployer == FAKE_DEPLOYER
+    assert result.tx_hash == FAKE_TX_HASH
 
 
 @responses.activate
@@ -55,13 +58,15 @@ def test_get_contract_creator_not_found():
         BASESCAN_API,
         json={"status": "0", "result": []},
     )
-    assert get_contract_creator(FAKE_ADDRESS, API_KEY) is None
+    result = get_contract_creator(FAKE_ADDRESS, API_KEY)
+    assert result.status == CreatorLookupStatus.NOT_FOUND
 
 
 @responses.activate
 def test_get_contract_creator_api_error():
     responses.get(BASESCAN_API, status=500)
-    assert get_contract_creator(FAKE_ADDRESS, API_KEY) is None
+    result = get_contract_creator(FAKE_ADDRESS, API_KEY)
+    assert result.status == CreatorLookupStatus.ERROR
 
 
 # --- get_first_tx_timestamp ---
@@ -209,9 +214,7 @@ def test_api_failure_graceful():
     responses.get(BASESCAN_API, status=500)
 
     findings = detect_deployer_reputation(FAKE_ADDRESS, API_KEY)
-    # Contract creator lookup fails → "not found" finding
-    assert len(findings) == 1
-    assert findings[0].points == 3
+    assert findings == []
 
 
 @responses.activate

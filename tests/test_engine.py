@@ -41,6 +41,16 @@ def _risky_impl_bytecode() -> str:
     return "0x" + "ff" + "00" * 200
 
 
+def _suspicious_impl_bytecode() -> str:
+    """Implementation with a suspicious selector and no other findings."""
+    return "0x63a22cb465" + "00" * 200
+
+
+def _tiny_impl_bytecode() -> str:
+    """Tiny non-proxy implementation bytecode."""
+    return "0x6000"
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches():
     clear_cache()
@@ -204,6 +214,40 @@ def test_analyze_proxy_clean_implementation():
     assert result.implementation.findings == []
     # Score is just proxy + delegatecall = 20
     assert result.score == 20
+    assert result.level == RiskLevel.LOW
+
+
+@responses.activate
+def test_analyze_proxy_impl_includes_suspicious_selector_score():
+    """Implementation scoring reuses top-level heuristics like suspicious selectors."""
+    proxy_addr = "0x" + "12" * 20
+    responses.post(RPC_URL, json=_rpc_response(_proxy_bytecode()))
+    responses.post(RPC_URL, json=_rpc_response(IMPL_ADDR_PADDED))
+    responses.post(RPC_URL, json=_rpc_response(_suspicious_impl_bytecode()))
+
+    result = analyze_contract(proxy_addr, RPC_URL)
+
+    assert result.implementation is not None
+    assert result.implementation.category_scores["suspicious_selector"] == 5
+    assert result.category_scores["impl_suspicious_selector"] == 5
+    assert result.score == 25
+    assert result.level == RiskLevel.LOW
+
+
+@responses.activate
+def test_analyze_proxy_impl_includes_tiny_bytecode_score():
+    """Implementation scoring reuses top-level heuristics like tiny bytecode."""
+    proxy_addr = "0x" + "13" * 20
+    responses.post(RPC_URL, json=_rpc_response(_proxy_bytecode()))
+    responses.post(RPC_URL, json=_rpc_response(IMPL_ADDR_PADDED))
+    responses.post(RPC_URL, json=_rpc_response(_tiny_impl_bytecode()))
+
+    result = analyze_contract(proxy_addr, RPC_URL)
+
+    assert result.implementation is not None
+    assert result.implementation.category_scores["tiny_bytecode"] == 10
+    assert result.category_scores["impl_tiny_bytecode"] == 10
+    assert result.score == 30
     assert result.level == RiskLevel.LOW
 
 

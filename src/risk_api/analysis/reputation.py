@@ -11,6 +11,8 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from dataclasses import dataclass
+from enum import Enum
 
 import requests
 
@@ -25,13 +27,27 @@ YOUNG_WALLET_DAYS = 7
 LOW_TX_COUNT = 5
 
 
+class CreatorLookupStatus(str, Enum):
+    FOUND = "found"
+    NOT_FOUND = "not_found"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class CreatorLookupResult:
+    status: CreatorLookupStatus
+    deployer: str = ""
+    tx_hash: str = ""
+
+
 @functools.lru_cache(maxsize=256)
 def get_contract_creator(
     address: str, api_key: str
-) -> tuple[str, str] | None:
+) -> CreatorLookupResult:
     """Get contract deployer address and creation tx hash from Basescan.
 
-    Returns (deployer_address, tx_hash) or None on failure.
+    Returns a structured result that distinguishes success, not-found, and
+    external error conditions.
     """
     params = {
         "module": "contract",
@@ -45,13 +61,17 @@ def get_contract_creator(
         data = resp.json()
     except (requests.RequestException, ValueError) as e:
         logger.debug("Basescan contract creator lookup failed: %s", e)
-        return None
+        return CreatorLookupResult(CreatorLookupStatus.ERROR)
 
     if data.get("status") != "1" or not data.get("result"):
-        return None
+        return CreatorLookupResult(CreatorLookupStatus.NOT_FOUND)
 
     entry = data["result"][0]
-    return (entry["contractCreator"], entry["txHash"])
+    return CreatorLookupResult(
+        status=CreatorLookupStatus.FOUND,
+        deployer=entry["contractCreator"],
+        tx_hash=entry["txHash"],
+    )
 
 
 @functools.lru_cache(maxsize=256)
@@ -129,7 +149,10 @@ def detect_deployer_reputation(
         return []
 
     creator_info = get_contract_creator(address, api_key)
-    if creator_info is None:
+    if creator_info.status == CreatorLookupStatus.ERROR:
+        return []
+
+    if creator_info.status == CreatorLookupStatus.NOT_FOUND:
         return [
             Finding(
                 detector="deployer_reputation",
@@ -143,7 +166,7 @@ def detect_deployer_reputation(
             )
         ]
 
-    deployer, _tx_hash = creator_info
+    deployer = creator_info.deployer
     findings: list[Finding] = []
 
     # Check wallet age

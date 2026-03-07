@@ -16,7 +16,6 @@ from risk_api.analysis.patterns import (
 )
 from risk_api.analysis.reputation import detect_deployer_reputation
 from risk_api.analysis.scoring import (
-    CATEGORY_CAPS,
     RiskLevel,
     ScoreResult,
     compute_score,
@@ -167,19 +166,13 @@ def _analyze_implementation(
         for f in findings
     ]
 
-    # Score the implementation findings using standard category caps
-    category_points: dict[str, int] = {}
-    for finding in findings:
-        cat = finding.detector
-        current = category_points.get(cat, 0)
-        cap = CATEGORY_CAPS.get(cat, 100)
-        category_points[cat] = min(cap, current + finding.points)
+    score_result = compute_score(findings, instructions, bytecode_hex)
 
     return ImplementationResult(
         address=impl_address,
         bytecode_size=bytecode_size,
         findings=prefixed_findings,
-        category_scores=category_points,
+        category_scores=score_result.category_scores,
     )
 
 
