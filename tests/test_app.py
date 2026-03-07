@@ -29,13 +29,13 @@ def test_health_endpoint(client):
 def test_x402_verification_endpoint(client):
     resp = client.get("/.well-known/x402-verification.json")
     assert resp.status_code == 200
-    assert resp.get_json() == {"x402": "64cb3a6a29bb"}
+    assert resp.get_json() == {"x402": "dccd5db92bc9"}
 
 
 def test_x402_verification_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/.well-known/x402-verification.json")
     assert resp.status_code == 200
-    assert resp.get_json()["x402"] == "64cb3a6a29bb"
+    assert resp.get_json()["x402"] == "dccd5db92bc9"
 
 
 def test_missing_address(client):
