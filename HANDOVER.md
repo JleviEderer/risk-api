@@ -17,6 +17,7 @@
   - deployer reputation conflated true "not found" with external API failure
 - Synced version/runtime docs with the actual package and container config.
 - Audited current monitoring and discovery surfaces after the domain migration.
+- Added a repo-level `AGENTS.md` so future agent sessions share the same startup and source-of-truth rules.
 - Refreshed repo handoff and napkin guidance for future sessions.
 - Reorganized strategy and execution docs so business planning and active backlog are no longer mixed together.
 
@@ -140,6 +141,17 @@
   - added monitoring notes to `README.md`
   - added monitoring/x402list state notes to `docs/REGISTRATIONS.md`
 
+### 10) Added repo-level agent startup rules
+- Added `AGENTS.md` at the repo root.
+- Purpose:
+  - tell future agents to read `HANDOVER.md` and `.codex/napkin.md` first
+  - define code/runtime config as the source of truth over docs
+  - preserve the current monitoring and discovery rules around Better Stack, `/dashboard`, and x402list.fun
+- Rule of thumb:
+  - keep `AGENTS.md` short and durable
+  - put session state in `HANDOVER.md`
+  - put recurring execution guidance in `.codex/napkin.md`
+
 ## What Worked
 - Reading `docs/DECISIONS.md` was the right strategic constraint; it prevented an over-engineered refactor path.
 - Both correctness fixes were small, local, and easy to regression test.
@@ -190,6 +202,8 @@
   - Synced version/runtime docs with actual package/runtime config and documented Better Stack plus the role of `/health` vs `/dashboard`.
 - `docs/REGISTRATIONS.md`
   - Added monitoring notes and recorded that x402list.fun still shows the legacy Conway hostname as of 2026-03-07.
+- `AGENTS.md`
+  - Added repo-level startup, source-of-truth, monitoring, and documentation hygiene rules for future agent sessions.
 - `CLAUDE.md`
   - Synced stack and production command docs with `pyproject.toml` and `Dockerfile`.
 - `.codex/napkin.md`

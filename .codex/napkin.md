@@ -33,3 +33,7 @@
 ## User Directives
 1. **[2026-03-06] Give opinionated codebase recommendations**
    Do instead: review the local repo first, use the GitHub mirror only if needed, and return concrete strengths, risks, and next-step suggestions.
+
+## Repo Workflow
+1. **[2026-03-07] Keep `AGENTS.md` stable and use it for startup rules only**
+   Do instead: put durable repo-wide agent instructions in `AGENTS.md`, and keep session state in `HANDOVER.md` plus recurring runbook knowledge in `.codex/napkin.md`.
