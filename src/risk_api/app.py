@@ -1185,7 +1185,7 @@ def create_app(
 
     @app.route("/.well-known/x402-verification.json")
     def x402_verification():
-        return jsonify({"x402": "64cb3a6a29bb"})
+        return jsonify({"x402": "dccd5db92bc9"})
 
     @app.route("/health")
     def health():
