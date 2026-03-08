@@ -1,6 +1,6 @@
 # Competitive Landscape: x402 Risk & Security Services
 
-> Last updated: 2026-03-02 (Stripe platform threat added)
+> Last updated: 2026-03-08 (Stripe annual letter source refreshed; Conway wallet paid call reconfirmed)
 
 ---
 
@@ -205,6 +205,12 @@ Stripe's 2025 annual letter (published Feb 24, 2026) reveals a comprehensive pus
 - x402 is permissionless — no Stripe account, no KYC, no approval. That matters for autonomous agents.
 - Our scoring engine is independent of the payment rail. Bytecode analysis works regardless of whether the caller pays via x402, ACP, or Stripe checkout.
 
+**Augur-specific interpretation:**
+
+- Stripe should be treated as an active agent-commerce platform contender, not just a generic enterprise billing provider.
+- But the current Augur distribution model still aligns better with x402 because Augur already sells open, accountless HTTP access without merchant onboarding.
+- If Stripe's ACP, Shared Payment Tokens, machine payments, and ChatGPT or Copilot integrations gain real buyer distribution, that strengthens the case for keeping Augur's scoring engine portable behind multiple payment surfaces.
+
 ---
 
 ## x402 Ecosystem Context
@@ -227,7 +233,7 @@ Stripe's 2025 annual letter (published Feb 24, 2026) reveals a comprehensive pus
 - [x402list.fun — Our provider page](https://x402list.fun/provider/risk-api.life.conway.tech)
 - [x402secure.com — Product page](https://x402secure.com)
 - [x402 ecosystem directory](https://www.x402.org/ecosystem)
-- [Stripe 2025 Annual Letter — Agentic Commerce, Machine Payments, Tempo](https://x.com/patrickc/status/1894059030498349481)
+- [Stripe 2025 Annual Letter — Agentic Commerce, Machine Payments, Tempo](https://x.com/stripe/status/2026294241450979364)
 - [x402list.fun — risk search on Base](https://x402list.fun/?q=risk&network=base) (March 2026 competitor audit)
 - [x402list.fun — BlockSec provider page](https://x402list.fun/provider/x402.blocksec.ai)
 - [x402list.fun — Hexens provider page](https://x402list.fun/provider/data-x402.hexens.io)

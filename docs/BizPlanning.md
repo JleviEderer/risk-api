@@ -1,6 +1,6 @@
 # Augur - Business Planning
 
-> Last updated: 2026-03-07
+> Last updated: 2026-03-08
 
 ---
 
@@ -33,6 +33,17 @@ People are finding Augur through directories, crawlers, and registries, but the 
 3. buyers must decide to pay before they have enough proof
 
 **Strategic implication:** fix product trust and onboarding before expanding endpoint count.
+
+**Important distinction:** x402 is the payment layer, not the discovery layer.
+
+Agents do not find Augur just because `/analyze` supports x402. Discovery comes from the surrounding surfaces:
+- MCP packaging
+- A2A agent card
+- OpenAPI schema
+- registry and directory listings
+- public docs and examples
+
+Strategic implication: treat payment support and discovery support as separate workstreams.
 
 ### Current strategic priorities
 
@@ -115,3 +126,156 @@ GoPlus has large-scale free usage and broad chain coverage, but requires signup 
 
 See full competitive analysis: `docs/x402-landscape-research.md`
 See strategic ADRs: `docs/DECISIONS.md`
+
+---
+
+## Product Scope
+
+### What Augur should be
+
+Augur should be built as **security infrastructure for agentic and onchain decision-making**.
+
+That means:
+- agents call Augur before interacting with contracts or submitting risky transactions
+- wallets, trading systems, and automation tools can embed Augur as a risk-check layer
+- the core asset is the scoring engine, not the website alone and not x402 alone
+
+The right mental model is:
+- `x402` is the current payment and distribution wedge
+- the bytecode and risk engine is the durable product
+- future delivery surfaces can include x402, MCP, direct API plans, and other payment rails if buyer demand justifies them
+
+Just as important: Augur should be **embedded into tools and workflows**, not only exposed as a standalone endpoint.
+
+Best case:
+- a trading or treasury agent checks Augur before interacting with a contract
+- an MCP client calls Augur as part of a larger flow
+- a wallet, executor, or automation framework treats Augur as a guardrail step
+
+This is a better position than relying on users to discover one endpoint and call it manually.
+
+### What Augur should NOT be
+
+Do not turn Augur into a general "agent economy infrastructure" platform.
+
+For a solo founder, that spreads too wide across:
+- orchestration
+- wallets and payments
+- generic agent security
+- protocol tooling
+- monitoring for everything
+
+The market is already crowded in broad agent tooling. Augur is more differentiated when it stays close to a narrow, high-consequence decision: **should this agent interact with this onchain target or transaction?**
+
+---
+
+## Adjacent Security Services
+
+There are more security services to sell to agents than smart contract risk. The key question is not "what else exists?" but "what shares the same buyer, the same workflow, and the same trust story?"
+
+### Best-fit adjacent services
+
+These fit Augur's current wedge and can reuse the same product story.
+
+1. **Smart contract bytecode risk**
+   Current core product. Keep improving this first.
+
+2. **Transaction preflight risk**
+   Evaluate a pending transaction before an agent signs or submits it.
+   Examples:
+   - suspicious approvals
+   - risky swap routes
+   - bridge interactions
+   - proxy upgrade calls
+   - unusual calldata patterns
+
+3. **Approval / allowance risk**
+   Tell an agent whether it is about to grant dangerous token permissions.
+   This is especially good because it is close to the same "should I proceed?" moment as contract scoring.
+
+4. **Continuous monitoring and alerts**
+   Watch a contract or allowlist for upgrades, ownership changes, proxy implementation swaps, or risk-score changes.
+   This can turn one-off scans into recurring usage.
+
+### Possible later, but not now
+
+- counterparty or endpoint trust for paid agent services
+- x402 provider trust scoring
+- registry reputation enrichment
+
+These are strategically related, but they are a different trust surface than bytecode analysis. Do not expand here until the core onchain wedge has clear demand.
+
+### Too broad for current scope
+
+- generic prompt-injection defense
+- browser security
+- full wallet security platform
+- generalized "agent security" across every modality
+- broad security scoring for all APIs and agents
+
+These may be valid markets, but they do not reuse Augur's core differentiation tightly enough for a solo founder.
+
+---
+
+## Expansion Rule
+
+Only build adjacent services that satisfy all three conditions:
+
+1. **Same buyer**
+   The user already wants onchain risk help for an autonomous or semi-autonomous workflow.
+
+2. **Same decision point**
+   The service answers the same class of question:
+   `Should I interact, sign, approve, pay, or proceed?`
+
+3. **Same trust story**
+   The output can still be explained as deterministic, machine-readable risk signal rather than a vague LLM opinion.
+
+If a proposed service fails one of those tests, it is probably a separate product, not an Augur extension.
+
+---
+
+## Solo Founder View
+
+### Is this a reasonable business to build?
+
+Yes, with the right scope.
+
+Augur is more plausible as:
+- narrow security infrastructure for agents
+- sold through machine-payable and developer-friendly surfaces
+- expanded carefully into adjacent onchain risk products
+
+Augur is less plausible as:
+- a one-endpoint x402 business by itself
+- a broad "agent economy platform"
+- a generic security company for every agent threat category
+
+### Why it can work
+
+- the product sits near money movement, which raises willingness to pay
+- the risk check can happen before value leaves a wallet
+- autonomous systems increase the need for automated guardrails
+- the current engine is specific enough to integrate into real workflows
+
+### Why focus matters
+
+- x402 is still early and not enough distribution on its own
+- broad agent infrastructure is highly saturated
+- security products require trust, repeated usage, and workflow fit
+- solo-founder advantage comes from clarity and speed, not surface-area breadth
+
+### Current recommendation
+
+Stay inside **onchain decision security for agents**.
+
+Priority order:
+1. make smart contract scoring trustworthy and easy to consume
+2. add transaction preflight or approval-risk checks if real users ask for the adjacent step
+3. add recurring monitoring only after one-off paid usage exists
+
+Do not branch into broad parallel infrastructure unless it directly increases usage of the current risk engine.
+
+Distribution priority within that scope:
+- improve machine-readable discovery and integration surfaces first
+- prefer MCP, registries, and workflow embeddings over building more generic standalone infrastructure
