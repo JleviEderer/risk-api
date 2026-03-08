@@ -1,4 +1,4 @@
-﻿# Codex Napkin Runbook
+# Codex Napkin Runbook
 
 ## Curation Rules
 - Re-prioritize on every read.
@@ -16,25 +16,25 @@
 
 ## Repo-Specific Gotchas
 1. **[2026-03-06] Treat `pyproject.toml` as the runtime source of truth**
-   Do instead: verify Python and dependency versions in `pyproject.toml` before trusting `README.md` or `CLAUDE.md`, which currently drift on x402/Python details.
+   Do instead: verify Python and dependency versions in `pyproject.toml` before trusting `README.md` or `CLAUDE.md`, which currently drift on x402 and Python details.
 2. **[2026-03-07] Reject no-bytecode addresses before the x402 paywall**
-   Do instead: run a pre-paywall Base `eth_getCode` check for `GET`/`POST` `/analyze` requests and return `422` for EOAs or undeployed addresses so they are not billed or shown as `safe`.
+   Do instead: run a pre-paywall Base `eth_getCode` check for `GET` and `POST` `/analyze` requests and return `422` for EOAs or undeployed addresses so they are not billed or shown as `safe`.
 3. **[2026-03-07] Use `funnel_stage` rather than raw status codes for conversion reads**
-   Do instead: read `/stats.funnel` and per-entry `funnel_stage` values from the request log when diagnosing drop-off; `paid` plus `422/402` totals alone are now too coarse.
+   Do instead: read `/stats.funnel` and per-entry `funnel_stage` values from the request log when diagnosing drop-off; `paid` plus `422` or `402` totals alone are too coarse.
 4. **[2026-03-06] Discovery metadata is duplicated in multiple places**
    Do instead: when changing agent metadata or discovery behavior, update `src/risk_api/app.py`, `scripts/pin_metadata_ipfs.py`, and registry scripts together to prevent drift.
 5. **[2026-03-06] Reuse `compute_score()` for all analysis paths**
    Do instead: route proxy implementation scoring through `src/risk_api/analysis/scoring.py` so heuristic categories like `suspicious_selector` and `tiny_bytecode` stay consistent with top-level analysis.
 6. **[2026-03-06] Keep Basescan failure distinct from "not found"**
-   Do instead: model creator lookups with explicit success/not-found/error states so external API failures degrade gracefully and do not add false risk points.
+   Do instead: model creator lookups with explicit success, not-found, and error states so external API failures degrade gracefully and do not add false risk points.
 7. **[2026-03-07] Treat `/dashboard` and `/stats` as per-instance logs, not canonical analytics**
-   Do instead: use them only to inspect the local `REQUEST_LOG_PATH` stream for that deployment and rely on registry/edge analytics or durable storage when comparing traffic across domains or hosts.
+   Do instead: use them only to inspect the local `REQUEST_LOG_PATH` stream for that deployment and rely on registry, edge analytics, or durable storage when comparing traffic across domains or hosts.
 8. **[2026-03-07] Use Better Stack as the uptime source of truth**
    Do instead: verify service health against Better Stack and the public `/health` probe before inferring availability from the dashboard or request-log volume.
-9. **[2026-03-07] Treat x402list.fun host drift as an external directory problem**
-   Do instead: once app config, scripts, and `PUBLIC_URL` all point to `augurrisk.com`, stop chasing repo-side fixes and verify x402list.fun separately after real settlements or manual directory intervention.
+9. **[2026-03-08] Treat x402list.fun stale-host drift as external directory state**
+   Do instead: once app config, scripts, and `PUBLIC_URL` all point to `augurrisk.com`, assume the live `risk-api.life.conway.tech` provider page and `augurrisk.com` `404` on x402list.fun need directory-side intervention, not more repo-side edits.
 10. **[2026-03-07] x402.jobs public listing checks can be inconclusive**
-   Do instead: if the public route is wrapped in a `MaintenanceGate` shell or only exposes the legacy slug, use a manual/authenticated browser check before deciding the listing metadata is stale.
+   Do instead: if the public route is wrapped in a `MaintenanceGate` shell, treat the slug as verified but keep rendered-content checks as browser-only follow-up.
 
 ## User Directives
 1. **[2026-03-06] Give opinionated codebase recommendations**

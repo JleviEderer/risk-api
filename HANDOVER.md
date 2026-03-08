@@ -1,19 +1,19 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-07
+- Date: 2026-03-08
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
 - Status: yellow
 - Working tree:
-  - Modified: `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `src/risk_api/app.py`, `tests/conftest.py`, `tests/test_app.py`, `tests/test_logging.py`
+  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`
   - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`
 
 ## What We Worked On
 - Executed the first pass of the growth backlog in priority order:
   - `G-001` hard-error no-bytecode inputs
   - `G-002` standardize public example addresses
-  - `G-004` continue directory audit
+  - `G-004` audit registry and directory state
   - `G-016` lightweight funnel instrumentation on the existing request-log `/stats` path
 
 ## What Got Done
@@ -68,42 +68,44 @@
   - recent table shows event stage
   - it still uses the same `/stats` endpoint and is still a per-instance log view, not durable analytics
 
-### 4) `G-004` directory audit continued and was documented
-- Added a fresh audit table to `docs/REGISTRATIONS.md` for 2026-03-07.
-- Current audit state captured there:
-  - `8004scan` / ERC-8004 page: correct, canonical domain visible
-  - `x402.jobs`: public listing route returns `200` but the page is wrapped in a `MaintenanceGate`; old Conway slug still appears in the path, so manual/authenticated verification is still needed
-  - `x402list.fun`: still not trustworthy as a repo-side signal; static HTML did not expose the Augur listing in this pass
-  - `x402.org/ecosystem`: missing
-  - Coinbase public x402 discovery feed: responds, but no `Augur` / `augurrisk.com` item is present
+### 4) `G-004` is now closed as an audit
+- Rechecked the public surfaces on 2026-03-08 and updated `docs/REGISTRATIONS.md`:
+  - `8004scan`: still correct
+  - `x402.jobs`: canonical route is live, but public HTML still only exposes a `MaintenanceGate` shell
+  - `x402list.fun`: stale legacy provider page is still live at `risk-api.life.conway.tech`, while `augurrisk.com` returns `404`
+  - legacy `x402 Bazaar` ID is now treated as historical or unverified until it can be tied to a public surface
+  - Coinbase public x402 discovery feed still does not expose Augur
+  - `x402.org/ecosystem` still does not list Augur
 - Practical result:
-  - `G-004` advanced, but I would not mark it fully closed until the remaining manual/dynamic-directory checks are done
+  - `G-004` is complete as a current-state audit
+  - the next follow-up is `G-005`, not more audit work
 
 ### 5) Growth plan docs were updated to reflect progress
 - `docs/GrowthExecutionPlan.md`
-  - marked `G-001`, `G-002`, and `G-016` complete
-- `README.md`
-  - now documents the explicit no-bytecode `422`
-  - example response matches the canonical Base proxy example
+  - marked `G-001`, `G-002`, `G-004`, and `G-016` complete
+- `docs/REGISTRATIONS.md`
+  - now records the confirmed stale x402list legacy page and canonical `404`
 
 ## Validation
-- Ran:
+- Previously ran:
   - `cmd /c python -m pytest tests\test_app.py tests\test_logging.py -q`
 - Result:
-  - `97 passed in 3.24s`
+  - `97 passed in 0.92s`
+- No code changed in this audit-only follow-up, so no additional test run was needed.
 
 ## What Worked
 - Doing the no-bytecode check before the paywall was the right product behavior.
   - Because `risk_api.chain.rpc.get_code()` is cached, the later analysis path can reuse the same lookup instead of paying for a second live RPC roundtrip.
 - Extending the existing request-log flow was enough for `G-016`.
   - No new analytics service or schema migration was needed.
-- Targeted route/logging tests were sufficient and fast.
+- Static CLI fetches were enough to confirm the most important discovery facts this time.
+  - `x402list.fun/provider/risk-api.life.conway.tech` is live
+  - `x402list.fun/provider/augurrisk.com` is `404`
 
-## What Didn’t / Gotchas
-- Dynamic/public directory pages are still awkward to audit from static HTML alone.
-  - `x402.jobs` exposed a `MaintenanceGate` shell instead of a clean public listing payload.
-  - `x402list.fun` did not expose the relevant listing details in prerendered HTML.
-- The Coinbase public discovery feed endpoint currently responds with JSON, but Augur is not present there.
+## What Didn't / Gotchas
+- Dynamic public directory pages are still awkward to audit from static HTML alone.
+  - `x402.jobs` exposes a `MaintenanceGate` shell instead of a clean rendered listing payload.
+- The Coinbase public discovery feed responds with JSON, but Augur is not present there.
   - Do not assume facilitator settlements alone have indexed the service.
 - `/stats` still scans the full request log on each request.
   - Acceptable for now, but worth revisiting if traffic grows.
@@ -115,47 +117,35 @@
   - Reason: it preserves the current payment-preflight behavior without forcing an RPC lookup on every HEAD request.
 - Treat the new funnel instrumentation as log enrichment, not a dashboard project.
   - Reason: this satisfies `G-016` without introducing a heavier analytics dependency.
-- Treat the remaining directory issues as external/manual verification work unless a live surface clearly exposes stale repo-controlled metadata.
+- Treat `x402list.fun` as confirmed stale external directory state for now.
+  - Reason: the live old-host provider page still exists and the canonical host page is `404`, even though repo-side metadata already points at `augurrisk.com`.
 
 ## Recommended Next Steps
-1. Finish `G-004`.
-   - Manually verify `x402.jobs` from an authenticated browser session.
-   - Recheck `x402list.fun` in a live browser and capture whether it still shows the Conway host.
-   - Decide whether the legacy `x402 Bazaar` ID in `docs/REGISTRATIONS.md` still maps to a real public surface or should be downgraded to historical.
+1. Start `G-005`.
+   - Treat `x402list.fun` as the main stale Conway-domain follow-up.
+   - If there is no self-service update path, document it as directory-side blockage rather than a repo bug.
 2. Start `G-003`.
    - Now that examples are standardized, audit wording across landing page, docs, and machine-readable metadata for any remaining trust leaks or chain ambiguity.
 3. Consider a small `/dashboard` follow-up only if needed.
    - The data is now in `/stats`; only do more UI work if the current dashboard makes the funnel hard to read.
-4. If Augur is still absent from the public CDP feed, treat that as follow-up work for discovery/distribution, not an app bug.
+4. If Augur is still absent from the public CDP feed, treat that as follow-up work for discovery or distribution, not an app bug.
 
 ## Important Files Modified
-- `src/risk_api/app.py`
-  - pre-paywall no-bytecode validation
-  - canonical example constants
-  - funnel-stage request logging
-  - richer `/stats`
-  - minor `/dashboard` stage display tweak
-- `tests/test_app.py`
-  - route coverage for the new no-bytecode `422`
-  - OpenAPI coverage for the new `422` examples
-- `tests/test_logging.py`
-  - landing-view logging coverage
-  - no-bytecode logging coverage
-  - `/stats` funnel coverage
-- `tests/conftest.py`
-  - canonical Bazaar fixture examples
-  - default mocked bytecode for x402-gated tests
-- `README.md`
-  - documented no-bytecode `422`
-  - canonicalized example response
 - `docs/GrowthExecutionPlan.md`
-  - checked off `G-001`, `G-002`, `G-016`
+  - checked off `G-004`
 - `docs/REGISTRATIONS.md`
-  - added the 2026-03-07 current-state audit table
+  - updated the 2026-03-08 current-state audit table
+  - marked x402list.fun as confirmed stale on the legacy Conway host
+  - downgraded the old manual `x402 Bazaar` ID to historical or unverified
+- `.codex/napkin.md`
+  - tightened the x402list.fun runbook note with the confirmed live stale provider page and canonical `404`
 
 ## Suggested Restart Context For Next Agent
 - `G-001`, `G-002`, and `G-016` are implemented and tested.
-- `G-004` is partially completed in docs, but still needs manual/dynamic verification for `x402.jobs` and `x402list.fun`.
+- `G-004` is complete as an audit and documented in `docs/REGISTRATIONS.md`.
+- The highest-signal external discovery finding is:
+  - `x402list.fun/provider/risk-api.life.conway.tech` still serves the old provider page
+  - `x402list.fun/provider/augurrisk.com` returns `404`
 - The most important runtime behavior change is:
   - `/analyze` now rejects empty-bytecode Base addresses with `422` before payment
 - The most important analytics change is:

@@ -182,7 +182,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P0 - Canonical Surface
 
-- [ ] `G-004` Audit all registry and directory listings
+- [x] `G-004` Audit all registry and directory listings
   Output: current-state table for x402.jobs, x402list.fun, ERC-8004, Bazaar, x402 ecosystem, and any other meaningful directory.
   Why now: you need a verified source of truth before editing registry metadata.
   Depends on: none.
