@@ -1,0 +1,42 @@
+#!/bin/sh
+
+set -eu
+
+remote_name="${1:-origin}"
+
+current_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+if [ -z "$current_branch" ]; then
+  exit 0
+fi
+
+upstream_ref="$(git for-each-ref --format='%(upstream:short)' "refs/heads/$current_branch")"
+if [ -z "$upstream_ref" ]; then
+  exit 0
+fi
+
+if ! git fetch --quiet "$remote_name"; then
+  echo "pre-push: failed to fetch '$remote_name'; refusing push until remote state is known." >&2
+  exit 1
+fi
+
+local_sha="$(git rev-parse @)"
+upstream_sha="$(git rev-parse "$upstream_ref")"
+base_sha="$(git merge-base @ "$upstream_ref")"
+
+if [ "$local_sha" = "$upstream_sha" ]; then
+  exit 0
+fi
+
+if [ "$local_sha" = "$base_sha" ]; then
+  echo "pre-push: remote branch '$upstream_ref' has commits you do not have." >&2
+  echo "pre-push: run 'git fetch $remote_name' and rebase or merge '$upstream_ref' before pushing." >&2
+  exit 1
+fi
+
+if [ "$upstream_sha" != "$base_sha" ]; then
+  echo "pre-push: local branch '$current_branch' has diverged from '$upstream_ref'." >&2
+  echo "pre-push: integrate remote commits first, then push." >&2
+  exit 1
+fi
+
+exit 0

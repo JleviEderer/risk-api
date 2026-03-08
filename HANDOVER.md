@@ -17,6 +17,7 @@
 - Logged three additional successful Conway-wallet paid calls against the live CDP facilitator path.
 - Completed `G-008` and `G-009` with a working local Node stdio MCP wrapper example for Augur.
 - Tightened the MCP wrapper so Augur API errors become MCP errors, wallet addresses are not exposed in tool output, and the x402 client is pinned to Base mainnet.
+- Added repo-local git guardrails for parallel-session safety.
 
 ## What Got Done
 
@@ -167,6 +168,19 @@
   - happy path still works via `npm run smoke -- --paid`
   - no-bytecode path now returns a clean MCP error for `0x000000000000000000000000000000000000dEaD` with HTTP `422`
 
+### 15) Added repo-local git guardrails
+- Added `.githooks/pre-push`:
+  - fetches the remote before push
+  - blocks push if the upstream branch is ahead or diverged
+  - tells the operator to fetch/rebase or merge first
+- Added `.githooks/pre-commit`:
+  - warns when committing directly on `master` or `main`
+- Added the setup command to `README.md`:
+  - `git config core.hooksPath .githooks`
+- Intended scope:
+  - lightweight guardrails only
+  - no automatic pull, stash, or push mutation
+
 ## Validation
 - Ran:
   - `python -m pytest tests\test_app.py -q`
@@ -207,3 +221,4 @@
 - The public GitHub repository homepage now matches the canonical site: `https://augurrisk.com`.
 - `G-008` and `G-009` are done via `docs/MCP_PACKAGING_PLAN.md` and `examples/javascript/augur-mcp`.
 - MCP wrapper guardrails: keep payer wallet addresses out of model-visible output and return explicit MCP errors for Augur `422` / API failures.
+- Git guardrails: use `.githooks/pre-push` to block pushes when remote history has moved, rather than trying to auto-rebase in hooks.

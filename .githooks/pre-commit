@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -eu
+
+current_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+
+case "$current_branch" in
+  master|main)
+    echo "pre-commit: warning - committing directly on '$current_branch'." >&2
+    echo "pre-commit: if this is parallel-session work, confirm you meant to skip a topic branch or worktree." >&2
+    ;;
+esac
+
+exit 0

@@ -377,6 +377,9 @@ npm install
 npm run smoke
 npm run smoke -- --paid
 
+# Enable repo-local git guardrails for this clone
+git config core.hooksPath .githooks
+
 # Load .env in bash
 set -a && source .env && set +a
 
