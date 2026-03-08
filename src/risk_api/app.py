@@ -707,6 +707,16 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 </div>
 
 <div class="section">
+<h2>Use Augur For</h2>
+<p style="color:#718096;font-size:.85rem">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
+<div class="links">
+  <a href="__BASE_URL__/honeypot-detection-api">Honeypot Detection API <div class="path">/honeypot-detection-api</div></a>
+  <a href="__BASE_URL__/proxy-risk-api">Proxy Risk API <div class="path">/proxy-risk-api</div></a>
+  <a href="__BASE_URL__/deployer-reputation-api">Deployer Reputation API <div class="path">/deployer-reputation-api</div></a>
+</div>
+</div>
+
+<div class="section">
 <h2>Discovery &amp; Integration</h2>
 <div class="links">
   <a href="__BASE_URL__/openapi.json">OpenAPI Spec <div class="path">/openapi.json</div></a>
@@ -789,6 +799,210 @@ PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;</pre>
   <li><a href="__BASE_URL__/openapi.json">OpenAPI spec</a></li>
   <li><a href="https://github.com/JleviEderer/risk-api">GitHub repository</a> for Python and JavaScript example code</li>
  </ul>
+</div>
+</body>
+</html>"""
+
+
+INTENT_PAGES: dict[str, dict[str, object]] = {
+    "/honeypot-detection-api": {
+        "title": "Base Honeypot Detection API",
+        "meta_description": (
+            "Base mainnet honeypot detection API for agents. Screen contract bytecode "
+            "for transfer restrictions, fee traps, proxy risk, and related signals."
+        ),
+        "eyebrow": "Buyer Intent",
+        "summary": (
+            "Use Augur when an agent needs a fast Base token screen before buying, "
+            "routing, or surfacing a token to a user. Honeypot patterns are checked "
+            "alongside the rest of Augur's bytecode risk model."
+        ),
+        "problem_points": [
+            "Catch transfer restriction patterns before a trading agent routes funds.",
+            "Avoid treating a token as clean just because a swap quote succeeds.",
+            "Pair honeypot checks with proxy, fee manipulation, and deployer signals.",
+        ],
+        "check_points": [
+            "Honeypot bytecode patterns that can trap exits or restrict transfers.",
+            "Fee manipulation and hidden mint signals that often travel with scam tokens.",
+            "Proxy and delegatecall behavior that can hide mutable token logic.",
+            "Deployer reputation context from Basescan-backed history checks.",
+        ],
+    },
+    "/proxy-risk-api": {
+        "title": "Base Proxy Risk API",
+        "meta_description": (
+            "Base mainnet proxy risk API for agents. Detect proxy contracts, inspect "
+            "implementation bytecode, and score upgrade-related risk."
+        ),
+        "eyebrow": "Buyer Intent",
+        "summary": (
+            "Use Augur when your workflow needs to know whether a Base contract is a "
+            "proxy, whether upgradeable logic exists behind it, and what the "
+            "implementation bytecode looks like."
+        ),
+        "problem_points": [
+            "Identify upgradeable contracts before an agent assumes logic is immutable.",
+            "Inspect implementation risk without building custom proxy resolution logic.",
+            "Surface proxy-specific findings in the same JSON response as the top-level score.",
+        ],
+        "check_points": [
+            "EIP-1967, EIP-1822, and related proxy storage slot patterns.",
+            "Delegatecall and other upgrade-surface indicators in the proxy.",
+            "Implementation address resolution and implementation-level findings when present.",
+            "Composite scoring that reuses the same engine across proxy and implementation paths.",
+        ],
+    },
+    "/deployer-reputation-api": {
+        "title": "Base Deployer Reputation API",
+        "meta_description": (
+            "Base mainnet deployer reputation API for agents. Add deployer-history "
+            "context to contract screening before interacting or listing."
+        ),
+        "eyebrow": "Buyer Intent",
+        "summary": (
+            "Use Augur when contract triage needs more than raw bytecode. The deployer "
+            "reputation detector adds Basescan-backed context so an agent can weigh "
+            "who deployed a contract, not just what the bytecode contains."
+        ),
+        "problem_points": [
+            "Flag contracts tied to deployers with suspicious or low-trust history.",
+            "Add deployer context to listing, routing, and monitoring workflows.",
+            "Keep reputation in the same response shape as the rest of Augur's findings.",
+        ],
+        "check_points": [
+            "Deployer reputation signals gathered through the existing Basescan-backed path.",
+            "Bytecode findings that combine with reputation instead of replacing it.",
+            "A single 0-100 score plus category scores for downstream agent policies.",
+            "The same paid /analyze endpoint used by the landing page, OpenAPI, and MCP wrapper.",
+        ],
+    },
+}
+
+
+def _render_intent_page(base_url: str, path: str) -> str:
+    page = INTENT_PAGES[path]
+    title = str(page["title"])
+    meta_description = str(page["meta_description"])
+    summary = str(page["summary"])
+    eyebrow = str(page["eyebrow"])
+    problem_points = "\n".join(
+        f"<li>{item}</li>" for item in page["problem_points"]
+    )
+    check_points = "\n".join(
+        f"<li>{item}</li>" for item in page["check_points"]
+    )
+    related_links = "\n".join(
+        (
+            f'<a href="{base_url}{other_path}">{other_page["title"]}'
+            f'<div class="path">{other_path}</div></a>'
+        )
+        for other_path, other_page in INTENT_PAGES.items()
+        if other_path != path
+    )
+    json_ld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": title,
+        "description": meta_description,
+        "url": f"{base_url}{path}",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "Augur",
+            "url": base_url,
+        },
+        "about": [
+            "Base mainnet smart contract risk scoring",
+            "x402-paid API",
+            title,
+        ],
+    })
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} | Augur</title>
+<meta name="description" content="{meta_description}">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{meta_description}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{base_url}{path}">
+<meta property="og:image" content="{base_url}/avatar.png">
+<script type="application/ld+json">{json_ld}</script>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0f1117;color:#e0e0e0;padding:24px;max-width:900px;margin:0 auto;line-height:1.65}}
+.topnav{{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:18px}}
+.topnav a{{display:inline-block;background:#1a1d29;border:1px solid #2d3148;border-radius:999px;
+  padding:6px 12px;color:#90cdf4;text-decoration:none;font-size:.82rem;transition:border-color .2s}}
+.topnav a:hover{{border-color:#63b3ed}}
+.eyebrow{{display:inline-block;background:#1a365d;color:#63b3ed;padding:4px 12px;border-radius:6px;font-size:.85rem;margin-bottom:16px}}
+h1{{font-size:1.9rem;color:#e2e8f0;margin-bottom:8px;font-weight:600}}
+h2{{font-size:1.08rem;color:#a0aec0;margin:24px 0 10px;font-weight:500}}
+p{{margin-bottom:10px}}
+.section{{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}}
+code{{background:#0f1117;border:1px solid #2d3148;border-radius:4px;padding:2px 6px}}
+pre{{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.84rem;color:#68d391;margin-top:8px}}
+ul{{margin:8px 0 0 18px}}
+.links{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}}
+.links a{{display:block;background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;
+  color:#90cdf4;text-decoration:none;font-size:.85rem;transition:border-color .2s}}
+.links a:hover{{border-color:#63b3ed}}
+.links a .path{{color:#68d391;font-family:monospace;font-size:.8rem}}
+a{{color:#90cdf4}}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="{base_url}/">Augur Home</a>
+  <a href="{base_url}/how-payment-works">How Payment Works</a>
+  <a href="{base_url}/openapi.json">OpenAPI</a>
+</nav>
+<span class="eyebrow">{eyebrow}</span>
+<h1>{title}</h1>
+<p>{summary}</p>
+<p style="color:#718096;font-size:.88rem">Augur scores Base mainnet contract bytecode for agents. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan, not a full audit or guarantee.</p>
+
+<div class="section">
+<h2>Why teams look for this API</h2>
+<ul>
+{problem_points}
+</ul>
+</div>
+
+<div class="section">
+<h2>What Augur checks on the same request</h2>
+<ul>
+{check_points}
+</ul>
+</div>
+
+<div class="section">
+<h2>Call the canonical endpoint</h2>
+<p>All buyer-intent pages map back to the same paid API: <code>GET {base_url}/analyze?address=0x4200000000000000000000000000000000000006</code></p>
+<pre>curl -s "{base_url}/analyze?address=0x4200000000000000000000000000000000000006" \\
+  -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
+<p>x402 payment is per-call, using USDC on Base. For the 402 flow details, see <a href="{base_url}/how-payment-works">How Augur payment works</a>.</p>
+</div>
+
+<div class="section">
+<h2>Integration links</h2>
+<div class="links">
+  <a href="{base_url}/openapi.json">OpenAPI Spec<div class="path">/openapi.json</div></a>
+  <a href="{base_url}/llms.txt">LLM Documentation<div class="path">/llms.txt</div></a>
+  <a href="{base_url}/.well-known/x402">x402 Discovery<div class="path">/.well-known/x402</div></a>
+  <a href="{base_url}/agent-metadata.json">Agent Metadata<div class="path">/agent-metadata.json</div></a>
+</div>
+</div>
+
+<div class="section">
+<h2>Related intent pages</h2>
+<div class="links">
+{related_links}
+</div>
 </div>
 </body>
 </html>"""
@@ -1553,6 +1767,7 @@ def create_app(
         paths = [
             "/",
             "/how-payment-works",
+            *INTENT_PAGES.keys(),
             "/openapi.json",
             "/agent-metadata.json",
             "/.well-known/ai-plugin.json",
@@ -1578,6 +1793,16 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         html = PAYMENT_GUIDE_HTML.replace("__BASE_URL__", base_url)
         return Response(html, content_type="text/html")
+
+    @app.route("/honeypot-detection-api")
+    @app.route("/proxy-risk-api")
+    @app.route("/deployer-reputation-api")
+    def buyer_intent_page():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        return Response(
+            _render_intent_page(base_url, request.path),
+            content_type="text/html",
+        )
 
     @app.route("/dashboard")
     def dashboard():

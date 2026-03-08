@@ -256,11 +256,12 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P2 - Intent Surface and Proof
 
-- [ ] `G-013` Ship the first buyer-intent pages
+- [x] `G-013` Ship the first buyer-intent pages
   Output: a small set of static pages aimed at specific contract-security intents.
   Why now: multiplies SEO and LLM surface without splitting the paid API.
   Depends on: `G-003`.
   Done means: at least three intent pages are live with clear internal links to Augur.
+  Status: live public pages now exist at `/honeypot-detection-api`, `/proxy-risk-api`, and `/deployer-reputation-api`, each linking back to the canonical paid `/analyze` endpoint and the core discovery docs. The landing page and sitemap include all three.
 
 - [ ] `G-014` Publish one proof-of-work report
   Output: one high-quality report on notable Base contracts using Augur's scoring output.

@@ -32,7 +32,7 @@
 8. **[2026-03-08] The official `x402.org/ecosystem` listing is an upstream PR, not app config**
    Do instead: use `docs/X402_ECOSYSTEM_SUBMISSION.md` and `docs/submissions/x402-ecosystem/metadata.json`, then open a PR against `coinbase/x402` under `typescript/site/app/ecosystem/partners-data/<slug>` with a logo in `typescript/site/public/logos/`.
 9. **[2026-03-08] Keep trust-language copy explicit about Base and non-guarantees**
-   Do instead: whenever editing landing/docs/metadata/registry descriptions, say `Base mainnet`, say the product scores bytecode for agents, and clarify that `safe` is a heuristic bucket rather than an audit or guarantee across `src/risk_api/app.py`, `scripts/pin_metadata_ipfs.py`, and registration scripts together.
+   Do instead: whenever editing landing/docs/metadata/registry descriptions or buyer-intent pages, say `Base mainnet`, say the product scores bytecode for agents, and clarify that `safe` is a heuristic bucket rather than an audit or guarantee across `src/risk_api/app.py`, `scripts/pin_metadata_ipfs.py`, and registration scripts together.
 10. **[2026-03-07] Reject no-bytecode addresses before the x402 paywall**
    Do instead: run a pre-paywall Base `eth_getCode` check for `GET` and `POST` `/analyze` requests and return `422` for EOAs or undeployed addresses so they are not billed or shown as `safe`.
 

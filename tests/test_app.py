@@ -705,12 +705,20 @@ def test_landing_links_discovery_endpoints(client):
     assert b"/agent-metadata.json" in resp.data
 
 
+def test_landing_links_intent_pages(client):
+    resp = client.get("/")
+    assert b"/honeypot-detection-api" in resp.data
+    assert b"/proxy-risk-api" in resp.data
+    assert b"/deployer-reputation-api" in resp.data
+
+
 def test_landing_uses_public_url(app):
     app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/")
         assert b"https://augurrisk.com/openapi.json" in resp.data
         assert b"https://augurrisk.com/how-payment-works" in resp.data
+        assert b"https://augurrisk.com/honeypot-detection-api" in resp.data
         assert b"https://augurrisk.com/avatar.png" in resp.data
 
 
@@ -742,6 +750,55 @@ def test_how_payment_works_uses_public_url(app):
 
 def test_how_payment_works_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/how-payment-works")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+
+
+@pytest.mark.parametrize(
+    ("path", "title"),
+    [
+        ("/honeypot-detection-api", b"Base Honeypot Detection API"),
+        ("/proxy-risk-api", b"Base Proxy Risk API"),
+        ("/deployer-reputation-api", b"Base Deployer Reputation API"),
+    ],
+)
+def test_buyer_intent_pages_return_html(client, path, title):
+    resp = client.get(path)
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert title in resp.data
+    assert b"/analyze?address=0x4200000000000000000000000000000000000006" in resp.data
+    assert b"/how-payment-works" in resp.data
+    assert b"/openapi.json" in resp.data
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/honeypot-detection-api",
+        "/proxy-risk-api",
+        "/deployer-reputation-api",
+    ],
+)
+def test_buyer_intent_pages_use_public_url(app, path):
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    with app.test_client() as c:
+        resp = c.get(path)
+        assert b"https://augurrisk.com/" in resp.data
+        assert b"https://augurrisk.com/how-payment-works" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/honeypot-detection-api",
+        "/proxy-risk-api",
+        "/deployer-reputation-api",
+    ],
+)
+def test_buyer_intent_pages_not_behind_paywall(client_with_x402, path):
+    resp = client_with_x402.get(path)
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
 
@@ -796,6 +853,9 @@ def test_sitemap_lists_public_endpoints(client):
     resp = client.get("/sitemap.xml")
     text = resp.data.decode()
     assert "/how-payment-works" in text
+    assert "/honeypot-detection-api" in text
+    assert "/proxy-risk-api" in text
+    assert "/deployer-reputation-api" in text
     assert "/openapi.json" in text
     assert "/agent-metadata.json" in text
     assert "/.well-known/agent-card.json" in text

@@ -6,7 +6,7 @@
 - Branch: `master`
 - Status: green
 - Working tree:
-  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `docs/x402-landscape-research.md`
+  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `docs/x402-landscape-research.md`, `src/risk_api/app.py`, `tests/test_app.py`
   - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `docs/MCP_PACKAGING_PLAN.md`, `docs/agent-economy-primer.md`, `examples/javascript/augur-mcp/`, `scripts/check_cdp_discovery.py`
 
 ## What We Worked On
@@ -18,6 +18,7 @@
 - Completed `G-008` and `G-009` with a working local Node stdio MCP wrapper example for Augur.
 - Tightened the MCP wrapper so Augur API errors become MCP errors, wallet addresses are not exposed in tool output, and the x402 client is pinned to Base mainnet.
 - Added repo-local git guardrails for parallel-session safety.
+- Completed `G-013` with the first three buyer-intent pages and linked them from the landing page plus sitemap.
 
 ## What Got Done
 
@@ -181,11 +182,25 @@
   - lightweight guardrails only
   - no automatic pull, stash, or push mutation
 
+### 16) Shipped the first buyer-intent pages (`G-013`)
+- Added three live public pages in `src/risk_api/app.py`:
+  - `/honeypot-detection-api`
+  - `/proxy-risk-api`
+  - `/deployer-reputation-api`
+- Kept them mapped to the same canonical paid endpoint:
+  - `https://augurrisk.com/analyze`
+- Linked the new pages from the landing page and included them in `/sitemap.xml` so they are crawlable public entry points.
+- Kept trust language explicit on every page:
+  - `Base mainnet`
+  - bytecode-level heuristics for agents
+  - `safe` is not an audit or guarantee
+- Added route and sitemap coverage in `tests/test_app.py`.
+
 ## Validation
 - Ran:
   - `python -m pytest tests\test_app.py -q`
 - Result:
-  - `91 passed in 2.29s`
+  - `105 passed in 1.58s`
 - Verified current upstream listing/submission path against:
   - `https://www.x402.org/ecosystem`
   - `https://github.com/coinbase/x402`
@@ -203,7 +218,7 @@
 1. Keep `G-005` and `G-006` marked done unless new evidence shows an editable external listing still points at Conway.
 2. Monitor [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515) and verify `https://www.x402.org/ecosystem` after merge.
    Current blocker: Coinbase-side review/deploy gate clearance shown in the 2026-03-08 email thread.
-3. Move to `G-008` to decide the MCP packaging path, or skip ahead to `G-013` if you want more buyer-intent surface area before packaging work.
+3. Move to `G-014` and publish one proof-of-work report that can reuse the new buyer-intent pages as internal-link targets.
 4. If external directories are refreshed manually, use the repo scripts and `docs/REGISTRATIONS.md` rather than old notes.
 
 ## Suggested Restart Context For Next Agent
@@ -218,6 +233,7 @@
 - `G-010` is done via the new Python quickstart in `README.md` and `docs/PYTHON_PAYMENT_QUICKSTART.md`.
 - `G-011` is done via `examples/javascript/augur-paid-call` and the README link near the top.
 - `G-012` is done via the live `/how-payment-works` route linked from the landing page and README.
+- `G-013` is done via the live `/honeypot-detection-api`, `/proxy-risk-api`, and `/deployer-reputation-api` pages, each internally linked from the landing page and sitemap.
 - The public GitHub repository homepage now matches the canonical site: `https://augurrisk.com`.
 - `G-008` and `G-009` are done via `docs/MCP_PACKAGING_PLAN.md` and `examples/javascript/augur-mcp`.
 - MCP wrapper guardrails: keep payer wallet addresses out of model-visible output and return explicit MCP errors for Augur `422` / API failures.
