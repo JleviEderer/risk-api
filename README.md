@@ -19,6 +19,60 @@ Canonical message: Augur scores Base mainnet smart contract bytecode for agents 
 
 ---
 
+## Fastest Paid Call (Python)
+
+Use the existing Python x402 client flow. The full guide is in [`docs/PYTHON_PAYMENT_QUICKSTART.md`](docs/PYTHON_PAYMENT_QUICKSTART.md).
+
+```bash
+pip install -e ".[dev]"
+export CLIENT_PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
+python scripts/test_x402_client.py --dry-run
+python scripts/test_x402_client.py
+```
+
+On PowerShell, set the key with:
+
+```powershell
+$env:CLIENT_PRIVATE_KEY = "0xYOUR_PRIVATE_KEY"
+```
+
+What happens:
+
+1. The first request returns `402 Payment Required`
+2. The client signs the payment payload from your wallet
+3. The script retries with `PAYMENT-SIGNATURE`
+4. Augur returns the scored JSON response
+
+Defaults:
+
+- URL: `https://augurrisk.com`
+- Contract: `0x4200000000000000000000000000000000000006` (Base WETH)
+- Script: `scripts/test_x402_client.py`
+
+Use `--dry-run` first if you want to inspect the payment requirements without spending funds.
+
+## JavaScript / Node Example
+
+A matching Node example now lives in [`examples/javascript/augur-paid-call`](examples/javascript/augur-paid-call).
+
+```bash
+cd examples/javascript/augur-paid-call
+npm install
+npm run dry-run
+```
+
+For a real paid call:
+
+```bash
+cp .env.example .env
+# set CLIENT_PRIVATE_KEY in .env
+npm start
+```
+
+Need the protocol steps without code first? Read the live explainer at [`/how-payment-works`](https://augurrisk.com/how-payment-works).
+
+---
+
 ## API
 
 ### `GET /analyze?address={base_contract_address}`
@@ -203,10 +257,13 @@ risk-api/
 |   |-- register_moltmart.py    # List on MoltMart marketplace
 |   |-- register_work402.py     # Onboard on Work402 (testnet)
 |   |-- health_check.py         # External health check script (Better Stack / uptime monitors)
-|   `-- test_x402_client.py     # Manual x402 payment flow test
+|   `-- test_x402_client.py     # First paid-call Python quickstart / manual x402 payment flow
+|-- examples/
+|   `-- javascript/augur-paid-call/ # Node x402 client example for Augur
 |-- docs/
 |   |-- DECISIONS.md            # ADRs (ADR-001 through ADR-006)
 |   |-- BizPlanning.md          # Strategy, moat thesis, pricing rationale
+|   |-- PYTHON_PAYMENT_QUICKSTART.md # Fastest path to a successful paid Python call
 |   `-- REGISTRATIONS.md        # Registry tracker + IPFS workflow
 |-- .github/workflows/
 |   `-- fly-deploy.yml          # Auto-deploy to Fly.io on push to master
@@ -277,6 +334,15 @@ fly scale memory 512 -a augurrisk   # increase memory if OOM
 
 # External uptime probe
 python scripts/health_check.py      # check the public /health endpoint
+
+# Fastest live paid-call test (Python)
+python scripts/test_x402_client.py --dry-run
+python scripts/test_x402_client.py
+
+# Fastest live paid-call test (JavaScript / Node)
+cd examples/javascript/augur-paid-call
+npm install
+npm run dry-run
 
 # Load .env in bash
 set -a && source .env && set +a

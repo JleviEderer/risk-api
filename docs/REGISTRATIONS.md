@@ -26,7 +26,7 @@ Use this table as the current `G-004` source of truth. The list above still incl
 | [x402.jobs listing route](https://www.x402.jobs/resources/augurrisk-com/augur-base) | Correct | Public route returns `200` on 2026-03-08, uses the canonical `augurrisk-com/augur-base` slug, and browser verification on 2026-03-08 showed the correct `augurrisk.com` endpoint, Base network, and $0.10 price. Static CLI fetches still only expose a `MaintenanceGate` shell. | Treat x402.jobs as verified and done unless the listing content changes later. |
 | [x402list.fun legacy provider page](https://x402list.fun/provider/risk-api.life.conway.tech) | Stale | Public provider page still returns `200` on 2026-03-08, while `https://x402list.fun/provider/augurrisk.com` returns `404`. Embedded endpoint data still points at `https://risk-api.life.conway.tech/analyze`. | This is confirmed stale directory state, not just a search-index blind spot. Repo-side metadata already points at `augurrisk.com`. |
 | x402 Bazaar legacy manual ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | Blocked / historical | Current repo notes still have the manual registration ID, but this audit did not find a matching public page or public API response tied back to that ID. | Treat this as historical until a public surface can be linked to it. |
-| [x402.org ecosystem](https://www.x402.org/ecosystem) | Missing | Public ecosystem page HTML did not include `Augur`, `augurrisk`, or `risk-api`. | `G-007` remains valid: submit Augur here rather than assuming secondary listings are enough. |
+| [x402.org ecosystem](https://www.x402.org/ecosystem) | PR pending | Public ecosystem page HTML did not include `Augur`, `augurrisk`, or `risk-api` on 2026-03-08. Submission PR is now open as [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515). | Wait for merge, then verify the live ecosystem page and update this row to live. |
 | [Coinbase public x402 discovery feed](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) | Missing from public feed | Live JSON feed responded successfully on 2026-03-08, but no item matched `Augur`, `augurrisk.com`, `risk-api`, or `/analyze`. On the same date, a real Conway-wallet paid call to `https://augurrisk.com/analyze` succeeded, and Fly production confirmed `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402` with deployed CDP credentials. | This means public feed absence is not explained by Mogami fallback or missing CDP config. Treat it as CDP-side indexing lag or separate discovery behavior unless new evidence says otherwise. |
 
 ### CDP Facilitator Verification (2026-03-08)
@@ -55,6 +55,7 @@ Free points on publisher score. Go to https://8004scan.io, connect agent wallet 
 | a2a-directory | PR pending | [GitHub PR #17](https://github.com/nicholascpark/a2a-directory/pull/17) |
 | e2b | PR pending | [GitHub PR #327](https://github.com/e2b-dev/awesome-ai-agents/pull/327) |
 | kyrolabs | PR pending | [GitHub PR #150](https://github.com/kyrolabs/awesome-ai-agents/pull/150) |
+| x402.org ecosystem | PR pending | [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515) |
 | slavakurilyak PR | Not started | Open manually via compare URL |
 | a2aregistry.org | Blocked | Monitoring for SSL fix |
 | Swarms | Not started | - |
@@ -104,7 +105,12 @@ When agent metadata changes (new endpoints, updated fields, etc.):
 
 ## Domain & Hosting
 
-Domain `augurrisk.com` is hosted on Fly.io with Cloudflare DNS. Conway (`risk-api.life.conway.tech`) is historical fallback state during the transition.
+Domain `augurrisk.com` is hosted on Fly.io with Cloudflare DNS. Conway (`risk-api.life.conway.tech`) is historical fallback state.
+
+Canonical host policy:
+- `PUBLIC_URL=https://augurrisk.com` is the source of truth for public metadata and discovery links.
+- The Flask app now issues a `308` redirect to the matching `augurrisk.com` URL when a request arrives on a different host.
+- `TESTING` bypasses that redirect so local pytest fixtures can keep using the default Flask host.
 
 ## Monitoring & Health
 

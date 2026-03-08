@@ -4,6 +4,7 @@ import pytest
 import responses
 from unittest.mock import patch
 
+from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
 
@@ -25,6 +26,61 @@ def test_health_endpoint(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.get_json() == {"status": "ok"}
+
+
+def test_non_canonical_host_redirects_to_public_url(test_config):
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+
+    resp = app.test_client().get(
+        "/",
+        base_url="https://risk-api.life.conway.tech",
+    )
+
+    assert resp.status_code == 308
+    assert resp.headers["Location"] == "https://augurrisk.com/"
+
+
+def test_non_canonical_host_redirect_preserves_query_string(test_config):
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    addr = "0x" + "ab" * 20
+
+    resp = app.test_client().get(
+        f"/analyze?address={addr}",
+        base_url="https://risk-api.life.conway.tech",
+    )
+
+    assert resp.status_code == 308
+    assert (
+        resp.headers["Location"]
+        == f"https://augurrisk.com/analyze?address={addr}"
+    )
+
+
+def test_testing_mode_skips_canonical_host_redirect(test_config):
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    app.config["TESTING"] = True
+
+    resp = app.test_client().get(
+        "/health",
+        base_url="https://risk-api.life.conway.tech",
+    )
+
+    assert resp.status_code == 200
+
+
+def test_health_skips_canonical_host_redirect(test_config):
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+
+    resp = app.test_client().get(
+        "/health",
+        base_url="https://risk-api.life.conway.tech",
+    )
+
+    assert resp.status_code == 200
 
 
 def test_x402_verification_endpoint(client):
@@ -638,6 +694,9 @@ def test_landing_has_meta_tags(client):
 
 def test_landing_links_discovery_endpoints(client):
     resp = client.get("/")
+    assert b">OpenAPI<" in resp.data
+    assert b">x402<" in resp.data
+    assert b">How Payment Works<" in resp.data
     assert b"/openapi.json" in resp.data
     assert b"/.well-known/agent-card.json" in resp.data
     assert b"/.well-known/x402" in resp.data
@@ -651,11 +710,38 @@ def test_landing_uses_public_url(app):
     with app.test_client() as c:
         resp = c.get("/")
         assert b"https://augurrisk.com/openapi.json" in resp.data
+        assert b"https://augurrisk.com/how-payment-works" in resp.data
         assert b"https://augurrisk.com/avatar.png" in resp.data
 
 
 def test_landing_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+
+
+def test_how_payment_works_page(client):
+    resp = client.get("/how-payment-works")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"402 Payment Required" in resp.data
+    assert b"PAYMENT-SIGNATURE" in resp.data
+    assert b"/analyze?address=0x4200000000000000000000000000000000000006" in resp.data
+    assert b"github.com/JleviEderer/risk-api/blob/master" not in resp.data
+    assert b"github.com/JleviEderer/risk-api/tree/master" not in resp.data
+
+
+def test_how_payment_works_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    with app.test_client() as c:
+        resp = c.get("/how-payment-works")
+        assert b"https://augurrisk.com/.well-known/x402" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
+        assert b"https://github.com/JleviEderer/risk-api" in resp.data
+
+
+def test_how_payment_works_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/how-payment-works")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
 
@@ -709,6 +795,7 @@ def test_sitemap_returns_xml(client):
 def test_sitemap_lists_public_endpoints(client):
     resp = client.get("/sitemap.xml")
     text = resp.data.decode()
+    assert "/how-payment-works" in text
     assert "/openapi.json" in text
     assert "/agent-metadata.json" in text
     assert "/.well-known/agent-card.json" in text

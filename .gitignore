@@ -15,3 +15,4 @@ htmlcov/
 .mypy_cache/
 cdp_api_key.json
 .env.production
+node_modules/

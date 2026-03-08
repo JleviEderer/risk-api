@@ -1,6 +1,6 @@
 # Augur - Growth Execution Plan
 
-> Last updated: 2026-03-07
+> Last updated: 2026-03-08
 
 This document is the operating backlog for traffic, conversion, and revenue growth.
 
@@ -53,8 +53,8 @@ Goal:
 
 Now:
 - Audit x402.jobs, x402list.fun, ERC-8004 metadata, Bazaar entries, and any public references
-- Update any remaining Conway-domain listings
-- If old domains are still live or indexable, ensure they do not compete with the canonical host
+- Keep all editable listings and metadata on `augurrisk.com`
+- If old domains are still live or indexable, ensure they redirect to the canonical host
 
 Success criteria:
 - all important registries point to `augurrisk.com`
@@ -188,13 +188,13 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Depends on: none.
   Done means: every listing is marked as correct, stale, missing, or blocked.
 
-- [ ] `G-005` Update stale Conway-domain references
+- [x] `G-005` Update stale Conway-domain references
   Output: all editable listings and metadata point to `augurrisk.com`.
   Why now: duplicate hosts split trust and discoverability.
   Depends on: `G-004`.
   Done means: no important listing intentionally points at the Conway domain.
 
-- [ ] `G-006` Enforce canonical host behavior
+- [x] `G-006` Enforce canonical host behavior
   Output: if old domains are still live or indexable, they redirect or otherwise stop competing with the canonical domain in public discovery.
   Why now: registry cleanup is weaker if an old host still looks active and indexable.
   Depends on: `G-004`.
@@ -210,11 +210,12 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P1 - Distribution and Packaging
 
-- [ ] `G-007` Submit Augur to `x402.org/ecosystem`
+- [x] `G-007` Submit Augur to `x402.org/ecosystem`
   Output: Augur appears on the official ecosystem surface, not just secondary directories.
   Why now: higher-signal placement than another directory-clone optimization.
   Depends on: `G-004`.
   Done means: submission is live or blocked with a documented follow-up.
+  Status: upstream PR is open as `coinbase/x402` PR #1515; wait for merge and live listing verification.
 
 - [ ] `G-008` Define the MCP packaging approach
   Output: choose the minimum viable MCP surface: wrapper, server, or adapter.
@@ -230,23 +231,26 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P1 - Conversion and Onboarding
 
-- [ ] `G-010` Promote the existing Python payment flow into first-class docs
+- [x] `G-010` Promote the existing Python payment flow into first-class docs
   Output: visible, polished docs based on the existing real-client flow.
   Why now: the integration barrier is likely larger than the pricing barrier.
   Depends on: `G-001`, `G-002`.
   Done means: the fastest path from homepage to first successful paid call is documented.
+  Status: README now links a first-class Python paid-call path and `docs/PYTHON_PAYMENT_QUICKSTART.md` documents the successful flow around `scripts/test_x402_client.py`.
 
-- [ ] `G-011` Add a JavaScript x402 client example
+- [x] `G-011` Add a JavaScript x402 client example
   Output: one browser or Node-oriented payment example that mirrors the Python path.
   Why now: not every buyer will test from Python.
   Depends on: `G-010`.
   Done means: both Python and JavaScript examples are available and tested enough to trust.
+  Status: `examples/javascript/augur-paid-call` now provides a Node example using `@x402/fetch` and `@x402/evm`, with a dry-run mode and README entry.
 
-- [ ] `G-012` Publish a short "How Augur payment works" page
+- [x] `G-012` Publish a short "How Augur payment works" page
   Output: concise explanation of `402 -> sign payment -> retry with PAYMENT-SIGNATURE -> receive JSON`.
   Why now: buyers should not need to reverse-engineer the payment flow from scripts.
   Depends on: `G-010`.
   Done means: homepage and docs link directly to this explanation.
+  Status: live `/how-payment-works` page is published in the app, linked from the homepage, and referenced from the README quickstart section.
 
 ### P2 - Intent Surface and Proof
 

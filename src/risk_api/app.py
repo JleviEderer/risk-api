@@ -8,8 +8,9 @@ import re
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
-from flask import Flask, Response, current_app, jsonify, request
+from flask import Flask, Response, current_app, jsonify, redirect, request
 
 from risk_api.analysis.engine import analyze_contract
 from risk_api.chain.rpc import RPCError, get_code
@@ -48,6 +49,27 @@ def _bytecode_size(bytecode_hex: str) -> int:
 
 def _no_bytecode_error(address: str) -> str:
     return NO_BYTECODE_ERROR_TEMPLATE.format(address=address)
+
+
+def _canonical_redirect_target(public_url: str) -> str | None:
+    parsed = urlsplit(public_url)
+    canonical_host = (parsed.hostname or "").lower()
+    if not canonical_host:
+        return None
+
+    request_host = request.host.split(":", 1)[0].lower()
+    if request_host == canonical_host:
+        return None
+
+    return urlunsplit(
+        (
+            parsed.scheme or request.scheme,
+            parsed.netloc,
+            request.path,
+            request.query_string.decode(),
+            "",
+        )
+    )
 
 
 # Load avatar image bytes at module level
@@ -617,6 +639,10 @@ LANDING_HTML = """<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   background:#0f1117;color:#e0e0e0;padding:24px;max-width:900px;margin:0 auto;line-height:1.6}
+.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.topnav a{display:inline-block;background:#1a1d29;border:1px solid #2d3148;border-radius:999px;
+  padding:6px 12px;color:#90cdf4;text-decoration:none;font-size:.82rem;transition:border-color .2s}
+.topnav a:hover{border-color:#63b3ed}
 h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:4px;font-weight:600}
 h2{font-size:1.1rem;color:#a0aec0;margin:28px 0 12px;font-weight:500}
 .subtitle{color:#718096;font-size:1rem;margin-bottom:16px}
@@ -638,6 +664,11 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 </style>
 </head>
 <body>
+<nav class="topnav">
+  <a href="__BASE_URL__/openapi.json">OpenAPI</a>
+  <a href="__BASE_URL__/.well-known/x402">x402</a>
+  <a href="__BASE_URL__/how-payment-works">How Payment Works</a>
+</nav>
 <h1>Augur</h1>
 <p class="subtitle">Score Base contract bytecode before your agent interacts with it.</p>
 <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
@@ -672,6 +703,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <div class="price">$0.10 <span style="font-size:1rem;color:#a0aec0;font-weight:400">per call</span></div>
 <p class="price-note">USDC &middot; Settled via x402 protocol &middot; No API key, no signup</p>
 <p style="margin-top:10px;color:#718096;font-size:.82rem">x402 is an HTTP-native payment protocol - your agent pays per call automatically, no API key or signup needed.</p>
+<p style="margin-top:10px"><a href="__BASE_URL__/how-payment-works" style="color:#90cdf4">How Augur payment works</a></p>
 </div>
 
 <div class="section">
@@ -691,6 +723,73 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <footer>
 Augur &middot; ERC-8004 Agent #19074 &middot; Powered by x402
 </footer>
+</body>
+</html>"""
+
+PAYMENT_GUIDE_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Augur Payment Works</title>
+<meta name="description" content="How to pay for Augur via x402: request, receive 402, sign payment, retry with PAYMENT-SIGNATURE, receive JSON.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0f1117;color:#e0e0e0;padding:24px;max-width:820px;margin:0 auto;line-height:1.65}
+h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:8px;font-weight:600}
+h2{font-size:1.05rem;color:#a0aec0;margin:24px 0 10px;font-weight:500}
+p{margin-bottom:10px}
+.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}
+.step{margin-bottom:14px}
+.step strong{color:#90cdf4}
+code{background:#0f1117;border:1px solid #2d3148;border-radius:4px;padding:2px 6px}
+pre{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.84rem;color:#68d391;margin-top:8px}
+a{color:#90cdf4}
+ul{margin:8px 0 0 18px}
+</style>
+</head>
+<body>
+<h1>How Augur Payment Works</h1>
+<p>Augur uses x402 for per-call payment. The flow is HTTP-native: request the resource, receive payment requirements, sign the payment, retry the same request, receive JSON.</p>
+
+<div class="section">
+<h2>The 4-step flow</h2>
+<div class="step"><strong>1. Request analysis</strong><br>Call <code>GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006</code>.</div>
+<div class="step"><strong>2. Receive a 402</strong><br>Augur returns <code>402 Payment Required</code> with a base64-encoded <code>Payment-Required</code> header describing the exact USDC payment on Base.</div>
+<div class="step"><strong>3. Sign and attach payment</strong><br>Your x402 client signs the payment authorization from your wallet and retries the same request with a <code>PAYMENT-SIGNATURE</code> header.</div>
+<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the contract score, level, findings, and proxy details if present.</div>
+</div>
+
+<div class="section">
+<h2>What you do not need</h2>
+<ul>
+  <li>No API key</li>
+  <li>No signup</li>
+  <li>No subscription</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>What can fail before payment</h2>
+<p>If the address is missing, malformed, or has no bytecode on Base mainnet, Augur returns <code>422</code> before the x402 paywall. That prevents paying for EOAs or undeployed contracts.</p>
+</div>
+
+<div class="section">
+<h2>Quick examples</h2>
+<pre># First request
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
+
+# Retry after signing payment
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
+PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;</pre>
+<p>Integration references:</p>
+<ul>
+  <li><a href="__BASE_URL__/.well-known/x402">Live x402 discovery document</a></li>
+  <li><a href="__BASE_URL__/openapi.json">OpenAPI spec</a></li>
+  <li><a href="https://github.com/JleviEderer/risk-api">GitHub repository</a> for Python and JavaScript example code</li>
+ </ul>
+</div>
 </body>
 </html>"""
 
@@ -1177,6 +1276,8 @@ def _setup_request_logging(app: Flask) -> None:
 
     @app.after_request
     def _log_request(response: Response) -> Response:
+        if request.environ.get("skip_request_log"):
+            return response
         if request.path not in {"/", "/analyze"}:
             return response
         if request.path == "/" and request.method != "GET":
@@ -1238,6 +1339,21 @@ def create_app(
         app.config["ERC8004_AGENT_ID"] = config.erc8004_agent_id
     if config.public_url:
         app.config["PUBLIC_URL"] = config.public_url
+
+    @app.before_request
+    def enforce_canonical_host():
+        public_url = app.config.get("PUBLIC_URL", "")
+        if not public_url or app.config.get("TESTING"):
+            return None
+        if request.path == "/health":
+            return None
+
+        redirect_target = _canonical_redirect_target(public_url)
+        if redirect_target is None:
+            return None
+
+        request.environ["skip_request_log"] = True
+        return redirect(redirect_target, code=308)
 
     _setup_request_logging(app)
     _configure_request_log_file(app)
@@ -1436,6 +1552,7 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         paths = [
             "/",
+            "/how-payment-works",
             "/openapi.json",
             "/agent-metadata.json",
             "/.well-known/ai-plugin.json",
@@ -1455,6 +1572,12 @@ def create_app(
             "</urlset>\n"
         )
         return Response(xml, content_type="application/xml")
+
+    @app.route("/how-payment-works")
+    def how_payment_works():
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        html = PAYMENT_GUIDE_HTML.replace("__BASE_URL__", base_url)
+        return Response(html, content_type="text/html")
 
     @app.route("/dashboard")
     def dashboard():
