@@ -16,6 +16,8 @@ class TestBuildMetadata:
         meta = build_metadata()
         assert meta["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
         assert meta["name"] == "Augur"
+        assert "Base mainnet" in str(meta["description"])
+        assert "not a guarantee or audit" in str(meta["description"])
         assert meta["x402Support"] is True
         assert meta["active"] is True
         assert isinstance(meta["services"], list)

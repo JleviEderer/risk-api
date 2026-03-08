@@ -28,10 +28,11 @@ WALLET_ADDRESS = "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891"
 AGENT_PROFILE = {
     "name": "Augur",
     "bio": (
-        "EVM smart contract risk scoring API. Analyzes bytecode patterns "
-        "(proxy detection, reentrancy, selfdestruct, honeypot, hidden mint, "
-        "fee manipulation, delegatecall) and deployer reputation. Returns "
-        "a composite 0-100 risk score. Live at augurrisk.com. "
+        "Base mainnet smart contract bytecode risk scoring API for agents. "
+        "Analyzes bytecode patterns (proxy detection, reentrancy, selfdestruct, "
+        "honeypot, hidden mint, fee manipulation, delegatecall) and deployer "
+        'reputation. Returns a composite 0-100 risk score with findings. '
+        '"safe" is not a guarantee or audit. Live at augurrisk.com. '
         "Pay $0.10/call via x402 in USDC on Base."
     ),
     "role": "seller",

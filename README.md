@@ -1,6 +1,6 @@
 # Augur - Smart Contract Risk Scoring API
 
-> EVM bytecode risk analysis, sold agent-to-agent via [x402](https://x402.org) at $0.10/call in USDC on Base.
+> Base mainnet smart contract bytecode risk analysis for agents and the developers building them, sold via [x402](https://x402.org) at $0.10/call in USDC on Base.
 
 **Live:** https://augurrisk.com
 **Agent registry:** [ERC-8004 #19074 on Base](https://8004scan.io/agents/base/19074)
@@ -11,7 +11,9 @@
 
 ## What It Does
 
-Augur accepts an EVM contract address and returns a composite 0-100 risk score derived from deterministic bytecode pattern analysis - no LLM inference, no external oracles. A paying agent sends one HTTP request, gets a structured risk assessment back.
+Augur accepts a Base mainnet contract address and returns a composite 0-100 risk score derived from deterministic bytecode pattern analysis - no LLM inference, no external oracles. A paying agent sends one HTTP request, gets a structured risk assessment back.
+
+Canonical message: Augur scores Base mainnet smart contract bytecode for agents and the developers building them. It is a fast deterministic screen, not a full security audit or guarantee.
 
 **Why x402?** GoPlus has 717M calls/month but requires API key signup - autonomous agents can't use it. Augur is the only x402-native risk scoring option: pay with USDC, get a result, no account needed.
 
@@ -19,7 +21,7 @@ Augur accepts an EVM contract address and returns a composite 0-100 risk score d
 
 ## API
 
-### `GET /analyze?address={contract_address}`
+### `GET /analyze?address={base_contract_address}`
 
 **Requires x402 payment: $0.10 USDC on Base (eip155:8453)**
 
@@ -77,6 +79,8 @@ Wallet, EOA, or undeployed addresses return `422` with an explicit `No contract 
 | 36-55 | medium |
 | 56-75 | high |
 | 76-100 | critical |
+
+`safe` means no major bytecode-level risk signals were detected in that scan. It does not guarantee the contract is safe.
 
 ### Free Endpoints (no payment required)
 

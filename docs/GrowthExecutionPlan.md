@@ -174,7 +174,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Depends on: none.
   Done means: no public examples use mismatched or ambiguous addresses.
 
-- [ ] `G-003` Audit public output and wording for trust leaks
+- [x] `G-003` Audit public output and wording for trust leaks
   Output: pass through homepage, docs, examples, and machine-readable metadata for wording that could confuse buyers.
   Why now: trust breaks before payment if examples, labels, or chain references feel inconsistent.
   Depends on: `G-002`.

@@ -4,176 +4,118 @@
 - Date: 2026-03-08
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Status: yellow
+- Status: green
 - Working tree:
-  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/REGISTRATIONS.md`
+  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `scripts/pin_metadata_ipfs.py`, `scripts/register_erc8004.py`, `scripts/register_moltmart.py`, `scripts/register_work402.py`, `scripts/register_x402jobs.py`, `src/risk_api/app.py`, `tests/test_app.py`, `tests/test_pin_metadata.py`
   - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`
 
 ## What We Worked On
-- Executed the first pass of the growth backlog in priority order:
-  - `G-001` hard-error no-bytecode inputs
-  - `G-002` standardize public example addresses
-  - `G-004` audit registry and directory state
-  - `G-016` lightweight funnel instrumentation on the existing request-log `/stats` path
+- Completed `G-003` from `docs/GrowthExecutionPlan.md`: audit public output and wording for trust leaks.
 
 ## What Got Done
 
-### 1) `G-001` no-bytecode inputs now fail before payment
-- Problem:
-  - `/analyze` only validated address shape before the x402 gate.
-  - EOA, wallet, or undeployed Base addresses could still reach analysis and look `safe`, which is misleading.
-- Fix:
-  - `src/risk_api/app.py`
-    - added a pre-paywall `get_code()` check for `GET` and `POST`
-    - returns `422` with `No contract bytecode found at Base address: ...` when bytecode is empty
-    - keeps `HEAD` lightweight and syntax-only so payment preflight behavior is unchanged
-    - returns `502` before payment if the Base RPC lookup itself fails
-- Result:
-  - wrong-address and wallet-address inputs no longer look analyzable or billable
+### 1) Canonical public message is now consistent
+- Updated the runtime public surfaces in `src/risk_api/app.py`:
+  - landing page meta, subtitle, and explanatory copy
+  - OpenAPI descriptions and parameter wording
+  - `llms.txt` and `llms-full.txt`
+  - Schema.org JSON-LD + FAQ copy
+  - AI plugin manifest, A2A agent card, x402 discovery doc, and ERC-8004 metadata
+- Canonical message now consistently says:
+  - Base mainnet contract addresses only
+  - Augur scores bytecode for agents and the developers building them
+  - `safe` is a heuristic bucket, not a security audit or guarantee
 
-### 2) `G-002` public examples now use one Base example set
-- Canonical examples now used across public app surfaces:
-  - safe example: Base WETH `0x4200000000000000000000000000000000000006`
-  - proxy example: Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
-  - implementation example: `0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779`
-- Updated in:
-  - OpenAPI examples
-  - landing-page curl example
-  - Bazaar/x402 discovery examples
-  - `llms.txt` / `llms-full.txt`
-  - `README.md`
-  - x402 test fixtures
+### 2) Duplicated registry and marketplace metadata was brought back into sync
+- Updated matching descriptions in:
+  - `scripts/pin_metadata_ipfs.py`
+  - `scripts/register_erc8004.py`
+  - `scripts/register_x402jobs.py`
+  - `scripts/register_moltmart.py`
+  - `scripts/register_work402.py`
+- This keeps future re-registration flows aligned with the live app copy instead of reintroducing generic `EVM` wording or implied guarantees.
 
-### 3) `G-016` funnel instrumentation is now in the request log and `/stats`
-- `src/risk_api/app.py`
-  - request logging now tracks both `/` and `/analyze`
-  - each logged event can carry `funnel_stage`
-  - current stages in use:
-    - `landing_view`
-    - `unpaid_402`
-    - `invalid_address`
-    - `no_bytecode`
-    - `paid_request`
-    - `analyze_success`
-    - `rpc_error`
-- `/stats` now returns:
-  - `funnel.landing_views`
-  - `funnel.valid_unpaid_402_attempts`
-  - `funnel.invalid_address_requests`
-  - `funnel.no_bytecode_requests`
-  - `funnel.paid_requests`
-  - hourly buckets with the same breakdown
-- `/dashboard` was only lightly adjusted:
-  - labels now say "Tracked Events"
-  - recent table shows event stage
-  - it still uses the same `/stats` endpoint and is still a per-instance log view, not durable analytics
-
-### 4) `G-004` is now closed as an audit
-- Rechecked the public surfaces on 2026-03-08 and updated `docs/REGISTRATIONS.md`:
-  - `8004scan`: still correct
-  - `x402.jobs`: browser verification showed the canonical listing is correct
-  - `x402list.fun`: stale legacy provider page is still live at `risk-api.life.conway.tech`, while `augurrisk.com` returns `404`
-  - legacy `x402 Bazaar` ID is now treated as historical or unverified until it can be tied to a public surface
-  - Coinbase public x402 discovery feed still does not expose Augur, even though production is on CDP
-  - `x402.org/ecosystem` still does not list Augur
-- Practical result:
-  - `G-004` is complete as a current-state audit
-  - the next follow-up is `G-005`, not more audit work
-
-### 5) Growth plan docs were updated to reflect progress
+### 3) Repo docs now reflect `G-003` completion
+- `README.md`
+  - intro now says Base mainnet explicitly
+  - added a short canonical-message sentence
+  - clarified that `safe` does not guarantee a contract is safe
 - `docs/GrowthExecutionPlan.md`
-  - marked `G-001`, `G-002`, `G-004`, and `G-016` complete
-- `docs/REGISTRATIONS.md`
-  - now records the confirmed stale x402list legacy page and canonical `404`
-  - now records that production is using the CDP facilitator and that a real Conway-wallet paid call succeeded on 2026-03-08
+  - marked `G-003` complete
 
-### 6) CDP facilitator usage is now explicitly verified
-- Ran `python scripts/test_x402_payment.py` with Conway wallet `0x79301Cf19Aaea29fbe40F0F5B78F73e2c3b0a2b8`.
-- Result:
-  - real paid call to `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`
-  - `402` then `200`
-  - response score `3` / `safe`
-- Verified live Fly production config from machine `e2861d10f1e928`:
-  - `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`
-  - `PUBLIC_URL=https://augurrisk.com`
-  - `CDP_API_KEY_ID` is present
-- Practical result:
-  - production is definitely using CDP, not Mogami
-  - Coinbase public discovery-feed absence is not caused by wrong facilitator config
+### 4) Tests were tightened around the new trust language
+- `tests/test_app.py`
+  - now asserts Base-mainnet wording and non-guarantee copy across landing, metadata, plugin, x402, and LLM surfaces
+- `tests/test_pin_metadata.py`
+  - now asserts the pinned ERC-8004 metadata uses the same Base/non-guarantee language
 
 ## Validation
-- Previously ran:
-  - `cmd /c python -m pytest tests\test_app.py tests\test_logging.py -q`
+- Ran:
+  - `cmd /c python -m pytest tests\test_app.py tests\test_pin_metadata.py tests\test_register_moltmart.py tests\test_register_work402.py -q`
 - Result:
-  - `97 passed in 0.92s`
-- No code changed in this audit-only follow-up, so no additional test run was needed.
+  - `134 passed in 3.43s`
 
 ## What Worked
-- Doing the no-bytecode check before the paywall was the right product behavior.
-  - Because `risk_api.chain.rpc.get_code()` is cached, the later analysis path can reuse the same lookup instead of paying for a second live RPC roundtrip.
-- Extending the existing request-log flow was enough for `G-016`.
-  - No new analytics service or schema migration was needed.
-- Static CLI fetches were enough to confirm the most important discovery facts this time.
-  - `x402list.fun/provider/risk-api.life.conway.tech` is live
-  - `x402list.fun/provider/augurrisk.com` is `404`
-- The real Conway-wallet paid call plus Fly machine env check settled the CDP question decisively.
+- Treating copy drift as duplicated state was the right approach.
+  - Updating runtime output alone would have left the registration scripts ready to reintroduce stale wording later.
+- Small targeted tests were enough.
+  - The new assertions pin the important trust-language guarantees without snapshotting huge blobs of HTML/JSON.
 
 ## What Didn't / Gotchas
-- Dynamic public directory pages are still awkward to audit from static HTML alone.
-  - `x402.jobs` exposes a `MaintenanceGate` shell instead of a clean rendered listing payload.
-- The Coinbase public discovery feed responds with JSON, but Augur is not present there.
-  - Even confirmed CDP production config plus a fresh paid settlement do not guarantee public-feed indexing.
-- `/stats` still scans the full request log on each request.
-  - Acceptable for now, but worth revisiting if traffic grows.
+- `src/risk_api/app.py` still contains a lot of duplicated static string content.
+  - It is easy for future wording drift to reappear if edits only touch one surface.
+- Some static text blocks still contain older Unicode punctuation in untouched lines.
+  - Not a functional bug, but worth cleaning if someone is already revisiting those strings.
 
 ## Key Decisions
-- Keep the no-bytecode rejection before x402 payment.
-  - Reason: users should not pay for EOAs or undeployed addresses, and those inputs should never look `safe`.
-- Keep `HEAD /analyze` cheap.
-  - Reason: it preserves the current payment-preflight behavior without forcing an RPC lookup on every HEAD request.
-- Treat the new funnel instrumentation as log enrichment, not a dashboard project.
-  - Reason: this satisfies `G-016` without introducing a heavier analytics dependency.
-- Treat `x402list.fun` as confirmed stale external directory state for now.
-  - Reason: the live old-host provider page still exists and the canonical host page is `404`, even though repo-side metadata already points at `augurrisk.com`.
-- Treat Coinbase public-feed absence as external indexing behavior unless CDP changes or new evidence appears.
-  - Reason: production `FACILITATOR_URL` is confirmed CDP and a real paid settlement succeeded on 2026-03-08.
+- Use `Base mainnet` everywhere public instead of generic `EVM` when the surface is describing the actual API input.
+  - Reason: `G-002` standardized examples; `G-003` needed the wording to match the runtime reality.
+- Explicitly state that `safe` is not a guarantee or audit.
+  - Reason: the previous landing-page subtitle and some metadata implied stronger safety claims than the product actually provides.
+- Update marketplace/registry registration scripts in the same pass.
+  - Reason: those scripts are duplicated discovery metadata and would otherwise drift back out of sync.
 
 ## Recommended Next Steps
 1. Start `G-005`.
-   - Treat `x402list.fun` as the main stale Conway-domain follow-up.
-   - If there is no self-service update path, document it as directory-side blockage rather than a repo bug.
-2. Start `G-003`.
-   - Now that examples are standardized, audit wording across landing page, docs, and machine-readable metadata for any remaining trust leaks or chain ambiguity.
-3. Consider a small `/dashboard` follow-up only if needed.
-   - The data is now in `/stats`; only do more UI work if the current dashboard makes the funnel hard to read.
-4. If Augur is still absent from the public CDP feed, treat that as follow-up work for discovery or distribution, not an app bug.
-   - Do not reopen the "maybe production is still on Mogami" question unless Fly config changes.
+   - Repo-side copy and metadata are now aligned; the next remaining canonical-surface issue is stale Conway-domain references in editable external listings.
+2. If any public directory is refreshed manually, rerun the updated registration scripts rather than copying old payload text from notes.
+3. If someone touches `src/risk_api/app.py` public copy again, keep the same three-message rule:
+   - Base mainnet
+   - bytecode scoring for agents
+   - `safe` is not a guarantee
 
 ## Important Files Modified
-- `docs/GrowthExecutionPlan.md`
-  - checked off `G-004`
-- `docs/REGISTRATIONS.md`
-  - updated the 2026-03-08 current-state audit table
-  - marked x402list.fun as confirmed stale on the legacy Conway host
-  - downgraded the old manual `x402 Bazaar` ID to historical or unverified
-  - recorded the successful Conway-wallet paid call and confirmed CDP facilitator config
+- `src/risk_api/app.py`
+  - canonicalized public runtime copy across landing/docs/metadata/discovery endpoints
 - `README.md`
-  - fixed the stale x402.jobs discovery note
-  - corrected Coinbase Bazaar wording to match the current verified state
+  - added canonical message and `safe` disclaimer
+- `docs/GrowthExecutionPlan.md`
+  - checked off `G-003`
+- `scripts/pin_metadata_ipfs.py`
+  - aligned pinned ERC-8004 metadata wording
+- `scripts/register_erc8004.py`
+  - aligned on-chain registration payload wording
+- `scripts/register_x402jobs.py`
+  - aligned x402.jobs listing copy
+- `scripts/register_moltmart.py`
+  - aligned MoltMart copy
+- `scripts/register_work402.py`
+  - aligned Work402 copy
+- `tests/test_app.py`
+  - added trust-language assertions
+- `tests/test_pin_metadata.py`
+  - added metadata wording assertions
 - `.codex/napkin.md`
-  - tightened the x402list.fun runbook note with the confirmed live stale provider page and canonical `404`
+  - added the recurring rule about keeping Base/non-guarantee copy synchronized
 
 ## Suggested Restart Context For Next Agent
-- `G-001`, `G-002`, and `G-016` are implemented and tested.
-- `G-004` is complete as an audit and documented in `docs/REGISTRATIONS.md`.
-- The highest-signal external discovery finding is:
-  - `x402list.fun/provider/risk-api.life.conway.tech` still serves the old provider page
-  - `x402list.fun/provider/augurrisk.com` returns `404`
-- The CDP facilitator question is settled:
-  - production Fly config points at `https://api.cdp.coinbase.com/platform/v2/x402`
-  - a real Conway-wallet paid call succeeded on 2026-03-08
-  - Coinbase public feed still does not list Augur
-- The most important runtime behavior change is:
-  - `/analyze` now rejects empty-bytecode Base addresses with `422` before payment
-- The most important analytics change is:
-  - `/stats` now exposes funnel counts and recent events via `funnel_stage`
+- `G-001`, `G-002`, `G-003`, `G-004`, and `G-016` are done.
+- The live public message is now:
+  - Base mainnet only
+  - bytecode risk scoring for agents and their developers
+  - `safe` is a heuristic label, not a guarantee
+- The next highest-priority backlog item is still `G-005`.
+- Existing unrelated untracked files remain in the repo:
+  - `.claude/settings.local.json`
+  - `.playwright-mcp/`
+  - `avatar.html`

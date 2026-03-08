@@ -253,6 +253,8 @@ def test_agent_metadata_endpoint(client):
     data = resp.get_json()
     assert data["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
     assert data["name"] == "Augur"
+    assert "Base mainnet" in data["description"]
+    assert "not a guarantee or audit" in data["description"]
     assert data["x402Support"] is True
     assert data["active"] is True
     assert len(data["services"]) == 4
@@ -468,6 +470,8 @@ def test_ai_plugin_json_endpoint(client):
     data = resp.get_json()
     assert data["schema_version"] == "v1"
     assert data["name_for_model"] == "augur"
+    assert "Base mainnet" in data["description_for_human"]
+    assert "Base mainnet" in data["description_for_model"]
     assert data["auth"] == {"type": "none"}
     assert data["api"]["type"] == "openapi"
     assert "/openapi.json" in data["api"]["url"]
@@ -492,6 +496,7 @@ def test_a2a_agent_card_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["name"] == "Augur"
+    assert "Base mainnet" in data["description"]
     assert data["version"] == "1.0.0"
     assert data["capabilities"]["streaming"] is False
     assert len(data["skills"]) == 1
@@ -583,6 +588,8 @@ def test_wellknown_x402_returns_discovery_doc(client):
     assert "risk score" in data["instructions"].lower()
     assert "8 detectors" in data["instructions"]
     assert "delegatecall" in data["instructions"]
+    assert "Base mainnet" in data["instructions"]
+    assert "not a guarantee" in data["instructions"]
 
 
 def test_wellknown_x402_not_behind_paywall(client_with_x402):
@@ -610,6 +617,8 @@ def test_landing_returns_html(client):
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
     assert b"Augur" in resp.data
+    assert b"Score Base contract bytecode" in resp.data
+    assert b"not a full audit or guarantee" in resp.data
 
 
 def test_landing_has_schema_org_json_ld(client):
@@ -780,6 +789,8 @@ def test_llms_txt_returns_markdown(client):
     assert "/analyze" in text
     assert "$0.10" in text
     assert "x402" in text
+    assert "Base mainnet" in text
+    assert "not that the contract is audited or guaranteed safe" in text
 
 
 def test_llms_txt_has_example_response(client):
@@ -814,6 +825,8 @@ def test_llms_full_txt_returns_markdown(client):
     assert "Proxy Detection" in text
     assert "Reentrancy" in text
     assert "Response Schema" in text
+    assert "Base mainnet contract address" in text
+    assert "not a full security audit or guarantee" in text
 
 
 def test_llms_full_txt_has_proxy_example(client):
@@ -883,6 +896,7 @@ def test_openapi_schemas_have_descriptions(client):
     level = schemas["AnalysisResult"]["properties"]["level"]
     assert "safe (0-15)" in level["description"]
     assert "critical (76-100)" in level["description"]
+    assert "not an audit or guarantee" in level["description"]
     # category_scores has description
     assert "description" in schemas["AnalysisResult"]["properties"]["category_scores"]
 
@@ -897,6 +911,7 @@ def test_landing_has_faqpage_schema(client):
     assert "FAQPage" in text
     assert "What does Augur do?" in text
     assert "How much does it cost?" in text
+    assert "Does a safe score mean the contract is guaranteed safe?" in text
     assert "Do I need an API key?" in text
 
 

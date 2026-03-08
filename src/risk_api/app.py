@@ -28,6 +28,7 @@ SAFE_EXAMPLE_ADDRESS = "0x4200000000000000000000000000000000000006"
 PROXY_EXAMPLE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS = "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779"
 NO_BYTECODE_ERROR_TEMPLATE = "No contract bytecode found at Base address: {address}"
+BASE_ADDRESS_DESCRIPTION = "Base mainnet contract address (0x-prefixed, 40 hex chars)"
 
 
 def _extract_requested_address() -> str:
@@ -66,11 +67,14 @@ OPENAPI_SPEC: dict[str, object] = {
         "title": "Augur",
         "version": "1.0.0",
         "description": (
-            "EVM smart contract risk scoring API. "
-            "Analyzes bytecode patterns (proxy detection, reentrancy, "
+            "Base mainnet smart contract bytecode risk scoring API for agents "
+            "and the developers building them. "
+            "Analyzes Base bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
-            "delegatecall) and returns a composite 0-100 risk score. "
-            "Pay $0.10/call via x402 in USDC."
+            "delegatecall, deployer reputation) and returns a composite 0-100 "
+            "risk score with findings. Pay $0.10/call via x402 in USDC on Base. "
+            '"safe" means no major bytecode-level risk signals detected in this '
+            "scan, not a security audit or guarantee."
         ),
         "contact": {
             "url": "https://github.com/JleviEderer/risk-api",
@@ -80,12 +84,14 @@ OPENAPI_SPEC: dict[str, object] = {
         "/analyze": {
             "get": {
                 "operationId": "analyzeContract",
-                "summary": "Analyze a smart contract for risk",
+                "summary": "Analyze a Base smart contract for bytecode risk",
                 "description": (
-                    "Fetches on-chain bytecode for the given contract address "
-                    "and runs 8 detectors (proxy, reentrancy, selfdestruct, "
+                    "Fetches on-chain bytecode for the given Base mainnet "
+                    "contract address and runs 8 detectors (proxy, reentrancy, selfdestruct, "
                     "honeypot, hidden mint, fee manipulation, delegatecall, "
-                    "deployer reputation). Returns a composite 0-100 risk score."
+                    "deployer reputation). Returns a composite 0-100 risk score "
+                    'with findings. "safe" is a low-risk bytecode bucket, not a '
+                    "security guarantee."
                 ),
                 "parameters": [
                     {
@@ -96,7 +102,7 @@ OPENAPI_SPEC: dict[str, object] = {
                             "type": "string",
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
-                        "description": "EVM contract address (0x-prefixed, 40 hex chars)",
+                        "description": BASE_ADDRESS_DESCRIPTION,
                     }
                 ],
                 "responses": {
@@ -107,7 +113,9 @@ OPENAPI_SPEC: dict[str, object] = {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
                                 "examples": {
                                     "safe_contract": {
-                                        "summary": "Simple contract — no risks detected",
+                                        "summary": (
+                                            "Simple Base contract - no risk findings in this scan"
+                                        ),
                                         "value": {
                                             "address": SAFE_EXAMPLE_ADDRESS,
                                             "score": 0,
@@ -118,7 +126,9 @@ OPENAPI_SPEC: dict[str, object] = {
                                         },
                                     },
                                     "proxy_contract": {
-                                        "summary": "Proxy contract — high risk with implementation analysis",
+                                        "summary": (
+                                            "Proxy contract - high risk with implementation analysis"
+                                        ),
                                         "value": {
                                             "address": PROXY_EXAMPLE_ADDRESS,
                                             "score": 60,
@@ -177,10 +187,10 @@ OPENAPI_SPEC: dict[str, object] = {
                         },
                     },
                     "402": {
-                        "description": "Payment required — send x402 payment and retry",
+                        "description": "Payment required - send x402 payment and retry",
                     },
                     "422": {
-                        "description": "Invalid, missing, or non-contract Base address",
+                        "description": "Invalid, missing, or non-contract Base mainnet address",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -230,8 +240,10 @@ OPENAPI_SPEC: dict[str, object] = {
             },
             "post": {
                 "operationId": "analyzeContractPost",
-                "summary": "Analyze a smart contract for risk (POST)",
-                "description": "Same as GET but accepts address in JSON body.",
+                "summary": "Analyze a Base smart contract for bytecode risk (POST)",
+                "description": (
+                    "Same as GET but accepts a Base mainnet contract address in the JSON body."
+                ),
                 "parameters": [
                     {
                         "name": "address",
@@ -241,6 +253,7 @@ OPENAPI_SPEC: dict[str, object] = {
                             "type": "string",
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
+                        "description": BASE_ADDRESS_DESCRIPTION,
                     }
                 ],
                 "requestBody": {
@@ -252,6 +265,7 @@ OPENAPI_SPEC: dict[str, object] = {
                                     "address": {
                                         "type": "string",
                                         "pattern": "^0x[0-9a-fA-F]{40}$",
+                                        "description": BASE_ADDRESS_DESCRIPTION,
                                     },
                                 },
                             },
@@ -276,10 +290,10 @@ OPENAPI_SPEC: dict[str, object] = {
                         },
                     },
                     "402": {
-                        "description": "Payment required — send x402 payment and retry",
+                        "description": "Payment required - send x402 payment and retry",
                     },
                     "422": {
-                        "description": "Invalid, missing, or non-contract Base address",
+                        "description": "Invalid, missing, or non-contract Base mainnet address",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -391,7 +405,7 @@ OPENAPI_SPEC: dict[str, object] = {
                         "type": "string",
                         "enum": ["safe", "low", "medium", "high", "critical"],
                         "description": (
-                            "Risk level derived from score: "
+                            "Risk level derived from score, not an audit or guarantee: "
                             "safe (0-15), low (16-35), medium (36-55), "
                             "high (56-75), critical (76-100)."
                         ),
@@ -589,11 +603,11 @@ LANDING_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Augur - EVM Risk Scoring API</title>
-<meta name="description" content="EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns and returns a 0-100 score. Pay $0.10/call via x402 in USDC.">
+<title>Augur - Base Contract Risk Scoring API</title>
+<meta name="description" content="Base mainnet smart contract bytecode risk scoring API for agents. 8 deterministic detectors, 0-100 score, $0.10/call via x402 in USDC on Base.">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Augur">
-<meta property="og:description" content="EVM smart contract risk scoring API. 8 detectors, 0-100 risk score. Pay $0.10/call via x402.">
+<meta property="og:description" content="Base mainnet smart contract bytecode risk scoring API. 8 deterministic detectors, 0-100 risk score, $0.10/call via x402 on Base.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
@@ -625,12 +639,13 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 </head>
 <body>
 <h1>Augur</h1>
-<p class="subtitle">Know if a smart contract is safe before your agent interacts with it.</p>
+<p class="subtitle">Score Base contract bytecode before your agent interacts with it.</p>
 <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
 
 <div class="section">
 <h2>What it does</h2>
-<p>Fetches on-chain bytecode for any EVM contract and runs 8 detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
+<p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
+<p style="margin-top:8px;color:#718096;font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
   <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
   <div class="detector"><div class="name">Reentrancy</div><div class="desc">CALL before state update patterns</div></div>
@@ -648,7 +663,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p style="margin-top:8px;color:#718096;font-size:.82rem">
-Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores.
+Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores for a Base mainnet contract.
 </p>
 </div>
 
@@ -683,13 +698,14 @@ Augur &middot; ERC-8004 Agent #19074 &middot; Powered by x402
 LLMS_TXT = """\
 # Augur
 
-> EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns \
-and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base. No API key needed.
+> Base mainnet smart contract bytecode risk scoring API for agents and the developers \
+building them. Returns a 0-100 risk score with findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## What It Does
 
-Augur fetches on-chain bytecode for any EVM smart contract on Base (EIP-155:8453) \
-and runs 8 detectors to produce a composite risk score from 0 (safe) to 100 (critical).
+Augur fetches on-chain bytecode for a Base mainnet smart contract (EIP-155:8453) \
+and runs 8 deterministic detectors to produce a composite risk score from 0 (safe) to 100 (critical).
+A `safe` result means no major bytecode-level risk signals were detected in this scan, not that the contract is audited or guaranteed safe.
 
 ## How to Call
 
@@ -715,8 +731,8 @@ Any x402-compatible HTTP client handles this automatically.
 
 ## Risk Levels
 
-- **safe** (0-15): No significant risks detected
-- **low** (16-35): Minor concerns, generally safe
+- **safe** (0-15): No major bytecode-level risk signals detected in this scan; not a guarantee
+- **low** (16-35): Limited bytecode-level concerns detected; review context
 - **medium** (36-55): Notable risks, review before interacting
 - **high** (56-75): Significant risks detected
 - **critical** (76-100): Severe risks, avoid interaction
@@ -732,22 +748,23 @@ Any x402-compatible HTTP client handles this automatically.
 """
 
 LLMS_FULL_TXT = """\
-# Augur — Full Documentation
+# Augur - Full Documentation
 
-> EVM smart contract risk scoring API. Analyzes bytecode for 8 risk patterns \
-and returns a 0-100 score. Pay $0.10/call via x402 in USDC on Base. No API key needed.
+> Base mainnet smart contract bytecode risk scoring API for agents and the developers \
+building them. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## Overview
 
 Augur is an agent-to-agent API that scores smart contract risk on Base (EIP-155:8453). \
 It uses deterministic bytecode pattern matching (no LLM) for fast, reliable results. \
-Payment is via the x402 HTTP payment protocol — no API key, no signup, no subscription.
+It is a fast bytecode screen, not a full security audit or guarantee. \
+Payment is via the x402 HTTP payment protocol - no API key, no signup, no subscription.
 
 ## Endpoint
 
 ```
-GET __BASE_URL__/analyze?address={contract_address}
-POST __BASE_URL__/analyze  (body: {"address": "{contract_address}"})
+GET __BASE_URL__/analyze?address={base_contract_address}
+POST __BASE_URL__/analyze  (body: {"address": "{base_contract_address}"})
 ```
 
 **Payment:** $0.10 USDC on Base via x402. Send a request, receive 402 with payment \
@@ -757,7 +774,7 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 
 | Parameter | Type   | Required | Description |
 |-----------|--------|----------|-------------|
-| address   | string | Yes      | EVM contract address, 0x-prefixed, 40 hex chars |
+| address   | string | Yes      | Base mainnet contract address, 0x-prefixed, 40 hex chars |
 
 ## Example: Safe Contract
 
@@ -833,7 +850,7 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 |------------------|---------|-------------|
 | address          | string  | The analyzed contract address |
 | score            | integer | Composite risk score, 0-100 |
-| level            | string  | Risk level: safe, low, medium, high, critical |
+| level            | string  | Risk bucket: safe, low, medium, high, critical (`safe` is not a guarantee) |
 | bytecode_size    | integer | Contract bytecode size in bytes |
 | findings         | array   | List of risk findings from detectors |
 | category_scores  | object  | Risk points by detector category |
@@ -853,37 +870,37 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 
 | Level    | Score Range | Meaning |
 |----------|-------------|---------|
-| safe     | 0-15        | No significant risks detected |
-| low      | 16-35       | Minor concerns, generally safe |
+| safe     | 0-15        | No major bytecode-level risk signals detected in this scan; not a guarantee |
+| low      | 16-35       | Limited bytecode-level concerns detected; review context |
 | medium   | 36-55       | Notable risks, review before interacting |
 | high     | 56-75       | Significant risks detected |
 | critical | 76-100      | Severe risks, avoid interaction |
 
 ## Detectors
 
-1. **Proxy Detection** — EIP-1967, EIP-1822, and OpenZeppelin proxy slots. \
+1. **Proxy Detection** - EIP-1967, EIP-1822, and OpenZeppelin proxy slots. \
 Proxy contracts auto-resolve implementation (max 1 hop).
-2. **Reentrancy** — CALL before state update patterns that enable reentrancy attacks.
-3. **Selfdestruct** — Contract contains SELFDESTRUCT opcode, allowing destruction.
-4. **Honeypot** — Transfer restriction patterns that prevent token selling.
-5. **Hidden Mint** — Unauthorized token creation functions not visible in the ABI.
-6. **Fee Manipulation** — Dynamic fee extraction patterns that can drain value.
-7. **Delegatecall** — External code execution that can change contract state.
-8. **Deployer Reputation** — Basescan deployer wallet history analysis.
+2. **Reentrancy** - CALL before state update patterns that enable reentrancy attacks.
+3. **Selfdestruct** - Contract contains SELFDESTRUCT opcode, allowing destruction.
+4. **Honeypot** - Transfer restriction patterns that prevent token selling.
+5. **Hidden Mint** - Unauthorized token creation functions not visible in the ABI.
+6. **Fee Manipulation** - Dynamic fee extraction patterns that can drain value.
+7. **Delegatecall** - External code execution that can change contract state.
+8. **Deployer Reputation** - Basescan deployer wallet history analysis.
 
 ## Error Responses
 
-**422 — Invalid request:**
+**422 - Invalid request:**
 ```json
 {"error": "Missing 'address' query parameter"}
 {"error": "Invalid Ethereum address: 0x1234"}
 {"error": "No contract bytecode found at Base address: 0x4200000000000000000000000000000000000006"}
 ```
 
-**402 — Payment required:** Returned with x402 payment instructions. \
+**402 - Payment required:** Returned with x402 payment instructions. \
 Use an x402-compatible client to handle payment automatically.
 
-**502 — RPC error:** Upstream Base RPC node error. Retry after a moment.
+**502 - RPC error:** Upstream Base RPC node error. Retry after a moment.
 
 ## Integration
 
@@ -1001,7 +1018,7 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
                 "address": {
                     "type": "string",
                     "pattern": "^0x[0-9a-fA-F]{40}$",
-                    "description": "EVM contract address (0x-prefixed, 40 hex chars)",
+                    "description": BASE_ADDRESS_DESCRIPTION,
                 },
             },
             "required": ["address"],
@@ -1046,20 +1063,20 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         "GET /analyze": RouteConfig(
             accepts=payment_option,
             description=(
-                "EVM smart contract security analysis — bytecode risk scoring "
+                "Base smart contract security analysis - bytecode risk scoring "
                 "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
-                "selfdestruct, proxy, deployer reputation). "
-                "Returns 0-100 risk score with proxy resolution."
+                "selfdestruct, proxy, deployer reputation). Returns a 0-100 "
+                'risk score with proxy resolution. "safe" is not a guarantee.'
             ),
             extensions=get_bazaar,
         ),
         "POST /analyze": RouteConfig(
             accepts=payment_option,
             description=(
-                "EVM smart contract security analysis — bytecode risk scoring "
+                "Base smart contract security analysis - bytecode risk scoring "
                 "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
-                "selfdestruct, proxy, deployer reputation). "
-                "Returns 0-100 risk score with proxy resolution."
+                "selfdestruct, proxy, deployer reputation). Returns a 0-100 "
+                'risk score with proxy resolution. "safe" is not a guarantee.'
             ),
             extensions=post_bazaar,
         ),
@@ -1285,8 +1302,8 @@ def create_app(
             "@type": "WebAPI",
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API. "
-                "Analyzes bytecode for 8 risk patterns and returns a 0-100 score."
+                "Base mainnet smart contract bytecode risk scoring API for agents. "
+                "Runs deterministic detectors and returns a 0-100 score with findings."
             ),
             "url": base_url,
             "provider": {
@@ -1298,7 +1315,7 @@ def create_app(
                 "price": "0.10",
                 "priceCurrency": "USD",
                 "url": f"{base_url}/analyze",
-                "description": "Per-call pricing via x402 protocol in USDC",
+                "description": "Per-call pricing via x402 protocol in USDC on Base",
             },
             "documentation": f"{base_url}/openapi.json",
         })
@@ -1312,8 +1329,9 @@ def create_app(
                     "acceptedAnswer": {
                         "@type": "Answer",
                         "text": (
-                            "Augur is an EVM smart contract risk scoring API. "
-                            "It fetches on-chain bytecode for any contract on Base and runs "
+                            "Augur is a Base mainnet smart contract bytecode risk scoring API "
+                            "for agents and the developers building them. It fetches on-chain "
+                            "bytecode for a contract on Base and runs "
                             "8 detectors (proxy, reentrancy, selfdestruct, honeypot, hidden mint, "
                             "fee manipulation, delegatecall, deployer reputation) to produce a "
                             "composite 0-100 risk score with detailed findings."
@@ -1364,6 +1382,17 @@ def create_app(
                     "acceptedAnswer": {
                         "@type": "Answer",
                         "text": "Base (EIP-155:8453). Payment is also in USDC on Base.",
+                    },
+                },
+                {
+                    "@type": "Question",
+                    "name": "Does a safe score mean the contract is guaranteed safe?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": (
+                            'No. "safe" means Augur did not detect major bytecode-level risk '
+                            "signals in this scan. It is not a full security audit or guarantee."
+                        ),
                     },
                 },
                 {
@@ -1596,16 +1625,16 @@ def create_app(
             "name_for_human": "Augur",
             "name_for_model": "augur",
             "description_for_human": (
-                "EVM smart contract risk scoring via x402. "
+                "Base mainnet smart contract bytecode risk scoring via x402. "
                 "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
-                "honeypot, hidden mint, fee manipulation, and delegatecall "
-                "patterns. Returns a 0-100 risk score."
+                "honeypot, hidden mint, fee manipulation, delegatecall, and "
+                "deployer reputation patterns. Returns a 0-100 risk score with findings."
             ),
             "description_for_model": (
-                "Analyzes EVM smart contract bytecode. "
-                "Send a contract address to /analyze and receive a 0-100 "
-                "risk score with detailed findings from 8 detectors. "
-                "Requires x402 payment of $0.10 USDC."
+                "Analyze Base mainnet smart contract bytecode. "
+                "Send a Base contract address to /analyze and receive a 0-100 "
+                'risk score with detailed findings from 8 detectors. "safe" is '
+                "not a guarantee or audit result. Requires x402 payment of $0.10 USDC on Base."
             ),
             "auth": {"type": "none"},
             "api": {
@@ -1622,9 +1651,9 @@ def create_app(
         return jsonify({
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API. "
-                "Analyzes bytecode patterns and returns a 0-100 risk score. "
-                "Pay $0.10/call via x402 in USDC."
+                "Base mainnet smart contract bytecode risk scoring API for agents. "
+                "Analyzes bytecode patterns and returns a 0-100 risk score with findings. "
+                "Pay $0.10/call via x402 in USDC on Base."
             ),
             "provider": {"organization": "risk-api"},
             "version": "1.0.0",
@@ -1645,7 +1674,7 @@ def create_app(
                     "id": "analyze-contract",
                     "name": "Risk Classification (OASF 1304)",
                     "description": (
-                        "Fetch on-chain bytecode for a contract address "
+                        "Fetch on-chain bytecode for a Base mainnet contract address "
                         "and run 8 detectors to produce a 0-100 risk score."
                     ),
                     "tags": ["oasf:security_privacy"],
@@ -1679,18 +1708,19 @@ def create_app(
                 f"{base_url}/analyze",
             ],
             "instructions": (
-                "# Augur — EVM Smart Contract Security Analysis\n\n"
-                "Bytecode-level risk scoring for EVM smart contracts on Base. "
+                "# Augur - Base Smart Contract Security Analysis\n\n"
+                "Bytecode-level risk scoring for Base mainnet smart contracts. "
                 "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
-                "selfdestruct, reentrancy guard, honeypot, proxy detection, "
+                "selfdestruct, reentrancy patterns, honeypot, proxy detection, "
                 "deployer reputation (Basescan). Returns a 0-100 composite "
                 "risk score with per-category breakdown.\n\n"
                 "## Usage\n\n"
-                "GET /analyze?address={contract_address}\n"
+                "GET /analyze?address={base_contract_address}\n"
                 "POST /analyze with JSON body: {\"address\": \"0x...\"}\n\n"
                 "## Output\n\n"
                 "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
                 "high=56-75, critical=76-100)\n"
+                '- `safe`: no major bytecode-level risk signals detected in this scan, not a guarantee\n'
                 "- `findings`: array of detector results with severity and points\n"
                 "- `category_scores`: per-category breakdown\n"
                 "- `implementation`: proxy target analysis (when proxy detected)\n\n"
@@ -1733,12 +1763,13 @@ def create_app(
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Augur",
             "description": (
-                "EVM smart contract risk scoring API. "
+                "Base mainnet smart contract bytecode risk scoring API for agents. "
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
                 "selfdestruct, honeypot, hidden mint, fee manipulation, "
-                "delegatecall) and returns a composite 0-100 risk score. "
-                "Pay $0.10/call via x402 in USDC. "
-                "Endpoint: GET /analyze?address={contract_address}"
+                "delegatecall, deployer reputation) and returns a composite 0-100 "
+                'risk score with findings. "safe" is not a guarantee or audit. '
+                "Pay $0.10/call via x402 in USDC on Base. "
+                "Endpoint: GET /analyze?address={base_contract_address}"
             ),
             "services": [
                 {

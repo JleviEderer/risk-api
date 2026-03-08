@@ -31,12 +31,13 @@ METADATA = {
     "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
     "name": "Augur",
     "description": (
-        "EVM smart contract risk scoring API. "
+        "Base mainnet smart contract bytecode risk scoring API for agents. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "
         "selfdestruct, honeypot, hidden mint, fee manipulation, "
-        "delegatecall) and returns a composite 0-100 risk score. "
-        "Pay $0.10/call via x402 in USDC. "
-        "Endpoint: GET https://augurrisk.com/analyze?address={contract_address}"
+        "delegatecall, deployer reputation) and returns a composite 0-100 "
+        'risk score with findings. "safe" is not a guarantee or audit. '
+        "Pay $0.10/call via x402 in USDC on Base. "
+        "Endpoint: GET https://augurrisk.com/analyze?address={base_contract_address}"
     ),
     "services": [
         {

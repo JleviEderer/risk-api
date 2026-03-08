@@ -36,23 +36,24 @@ WALLET_FILE = Path.home() / ".automaton" / "wallet.json"
 
 AGENT_NAME = "Augur"
 AGENT_DESCRIPTION = (
-    "EVM smart contract risk scoring API on Base. "
+    "Base mainnet smart contract bytecode risk scoring API for agents. "
     "Analyzes bytecode patterns (proxy detection, reentrancy, selfdestruct, "
     "honeypot, hidden mint, fee manipulation, delegatecall) and deployer "
-    "reputation. Returns a composite 0-100 risk score with severity levels. "
-    "Pay $0.10/call via x402 in USDC on Base."
+    'reputation. Returns a composite 0-100 risk score with severity levels. '
+    '"safe" is not a guarantee or audit. Pay $0.10/call via x402 in USDC on Base.'
 )
 
 SERVICE_LISTING = {
     "name": "Augur",
     "description": (
-        "Analyzes EVM smart contract bytecode for security risks. "
+        "Analyzes Base mainnet smart contract bytecode for security risks. "
         "Detects proxy patterns (EIP-1967/1822/OZ), reentrancy guards, "
         "selfdestruct, honeypot patterns, hidden mint functions, fee manipulation, "
         "and delegatecall usage. For proxy contracts, automatically resolves and "
         "analyzes the implementation. Returns a composite risk score (0-100) with "
         "per-detector findings and severity level (safe/low/medium/high/critical). "
-        "Deployer reputation check via Basescan when API key is configured."
+        '"safe" is not a guarantee or audit. Deployer reputation check via Basescan '
+        "when API key is configured."
     ),
     "endpoint_url": "https://augurrisk.com/analyze",
     "price_usdc": 0.10,

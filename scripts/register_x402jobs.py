@@ -30,12 +30,12 @@ API_BASE = "https://api.x402.jobs/api/v1"
 RESOURCE = {
     "name": "Augur",
     "description": (
-        "EVM smart contract risk scoring API. "
+        "Base mainnet smart contract bytecode risk scoring API for agents. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "
         "selfdestruct, honeypot, hidden mint, fee manipulation, "
-        "delegatecall) and returns a composite 0-100 risk score with "
-        "severity levels (safe/low/medium/high/critical). "
-        "Pay $0.10/call via x402 in USDC."
+        "delegatecall, deployer reputation) and returns a composite 0-100 "
+        'risk score with severity levels (safe/low/medium/high/critical). '
+        '"safe" is not a guarantee or audit. Pay $0.10/call via x402 in USDC on Base.'
     ),
     # Include default address (WETH) so x402.jobs "Run" button works out of box.
     # Real agents construct their own URL with their target address.
