@@ -15,26 +15,26 @@
    Do instead: locate the actual project root first, then search from that directory to avoid slow timeouts and noisy results.
 
 ## Repo-Specific Gotchas
-1. **[2026-03-08] Enforce the canonical host from `PUBLIC_URL`**
+1. **[2026-03-08] Keep the GitHub repo homepage aligned with the canonical domain**
+   Do instead: when auditing public discovery surfaces, treat the GitHub repository `homepageUrl` as editable metadata and keep it set to `https://augurrisk.com` so public repo cards and profile links do not advertise the retired Conway host.
+2. **[2026-03-08] Coinbase Bazaar indexing is separate from the `x402.org` ecosystem PR**
+   Do instead: verify CDP discovery through real facilitator-paid calls plus `python scripts/check_cdp_discovery.py`; do not assume a merged `coinbase/x402` PR will make Augur appear in Coinbase's public discovery feed.
+3. **[2026-03-08] Anthropic's official directory is not the default discovery path for Augur MCP**
+   Do instead: treat the MCP wrapper as a repo-distributed local install example first; Anthropic's current Connectors Directory policy excludes servers that transfer money or execute financial transactions, which likely includes Augur's x402-paying MCP wrapper.
+4. **[2026-03-08] Prefer a local stdio MCP wrapper over a hosted MCP surface**
+   Do instead: keep Augur as the canonical paid HTTP API and expose MCP through a local Node stdio bridge in `examples/javascript/augur-mcp` so wallet signing stays client-side and the wrapper can reuse the existing x402 client path.
+5. **[2026-03-08] MCP tool responses should not leak the payer wallet**
+   Do instead: keep wallet signing local, but do not include the local wallet address in model-visible tool output; expose only the payment path and whether a wallet is required.
+6. **[2026-03-08] Enforce the canonical host from `PUBLIC_URL`**
    Do instead: keep `PUBLIC_URL` set to `https://augurrisk.com` in production and expect non-canonical hosts to `308` redirect there, but exempt `/health` so Fly and external uptime probes do not get trapped by canonical-host enforcement; only bypass all redirects in `TESTING`.
-2. **[2026-03-08] The official `x402.org/ecosystem` listing is an upstream PR, not app config**
+7. **[2026-03-08] The official `x402.org/ecosystem` listing is an upstream PR, not app config**
    Do instead: use `docs/X402_ECOSYSTEM_SUBMISSION.md` and `docs/submissions/x402-ecosystem/metadata.json`, then open a PR against `coinbase/x402` under `typescript/site/app/ecosystem/partners-data/<slug>` with a logo in `typescript/site/public/logos/`.
-3. **[2026-03-08] Keep trust-language copy explicit about Base and non-guarantees**
+8. **[2026-03-08] Keep trust-language copy explicit about Base and non-guarantees**
    Do instead: whenever editing landing/docs/metadata/registry descriptions, say `Base mainnet`, say the product scores bytecode for agents, and clarify that `safe` is a heuristic bucket rather than an audit or guarantee across `src/risk_api/app.py`, `scripts/pin_metadata_ipfs.py`, and registration scripts together.
-4. **[2026-03-07] Reject no-bytecode addresses before the x402 paywall**
+9. **[2026-03-07] Reject no-bytecode addresses before the x402 paywall**
    Do instead: run a pre-paywall Base `eth_getCode` check for `GET` and `POST` `/analyze` requests and return `422` for EOAs or undeployed addresses so they are not billed or shown as `safe`.
-5. **[2026-03-07] Use `funnel_stage` rather than raw status codes for conversion reads**
+10. **[2026-03-07] Use `funnel_stage` rather than raw status codes for conversion reads**
    Do instead: read `/stats.funnel` and per-entry `funnel_stage` values from the request log when diagnosing drop-off; `paid` plus `422` or `402` totals alone are too coarse.
-6. **[2026-03-06] Discovery metadata is duplicated in multiple places**
-   Do instead: when changing agent metadata or discovery behavior, update `src/risk_api/app.py`, `scripts/pin_metadata_ipfs.py`, and registry scripts together to prevent drift.
-7. **[2026-03-06] Reuse `compute_score()` for all analysis paths**
-   Do instead: route proxy implementation scoring through `src/risk_api/analysis/scoring.py` so heuristic categories like `suspicious_selector` and `tiny_bytecode` stay consistent with top-level analysis.
-8. **[2026-03-06] Keep Basescan failure distinct from "not found"**
-   Do instead: model creator lookups with explicit success, not-found, and error states so external API failures degrade gracefully and do not add false risk points.
-9. **[2026-03-07] Treat `/dashboard` and `/stats` as per-instance logs, not canonical analytics**
-   Do instead: use them only to inspect the local `REQUEST_LOG_PATH` stream for that deployment and rely on registry, edge analytics, or durable storage when comparing traffic across domains or hosts.
-10. **[2026-03-07] Use Better Stack as the uptime source of truth**
-   Do instead: verify service health against Better Stack and the public `/health` probe before inferring availability from the dashboard or request-log volume.
 
 ## User Directives
 1. **[2026-03-06] Give opinionated codebase recommendations**

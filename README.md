@@ -71,6 +71,30 @@ npm start
 
 Need the protocol steps without code first? Read the live explainer at [`/how-payment-works`](https://augurrisk.com/how-payment-works).
 
+## MCP / Claude Desktop Example
+
+A local stdio MCP wrapper now lives in [`examples/javascript/augur-mcp`](examples/javascript/augur-mcp).
+
+This is the recommended MCP packaging shape for Augur:
+
+1. keep Augur itself as the canonical paid HTTP API
+2. run the MCP bridge locally so wallet signing stays on the operator machine
+3. expose Augur as MCP tools that pay `/analyze` over x402 on demand
+
+Quick start:
+
+```bash
+cd examples/javascript/augur-mcp
+npm install
+npm run smoke
+npm run smoke -- --paid
+```
+
+The example exports two tools:
+
+- `analyze_base_contract_risk`
+- `describe_augur_service`
+
 ---
 
 ## API
@@ -259,10 +283,13 @@ risk-api/
 |   |-- health_check.py         # External health check script (Better Stack / uptime monitors)
 |   `-- test_x402_client.py     # First paid-call Python quickstart / manual x402 payment flow
 |-- examples/
-|   `-- javascript/augur-paid-call/ # Node x402 client example for Augur
+|   `-- javascript/
+|       |-- augur-paid-call/      # Node x402 client example for Augur
+|       `-- augur-mcp/            # Local stdio MCP wrapper that pays Augur over x402
 |-- docs/
 |   |-- DECISIONS.md            # ADRs (ADR-001 through ADR-006)
 |   |-- BizPlanning.md          # Strategy, moat thesis, pricing rationale
+|   |-- MCP_PACKAGING_PLAN.md   # Chosen MCP wrapper shape and rationale
 |   |-- PYTHON_PAYMENT_QUICKSTART.md # Fastest path to a successful paid Python call
 |   `-- REGISTRATIONS.md        # Registry tracker + IPFS workflow
 |-- .github/workflows/
@@ -343,6 +370,12 @@ python scripts/test_x402_client.py
 cd examples/javascript/augur-paid-call
 npm install
 npm run dry-run
+
+# MCP wrapper smoke test (Node / stdio)
+cd examples/javascript/augur-mcp
+npm install
+npm run smoke
+npm run smoke -- --paid
 
 # Load .env in bash
 set -a && source .env && set +a

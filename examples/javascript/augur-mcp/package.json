@@ -1,0 +1,17 @@
+{
+  "name": "augur-mcp-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "smoke": "node smoke-test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@x402/evm": "^2.6.0",
+    "@x402/fetch": "^2.6.0",
+    "dotenv": "^17.3.1",
+    "viem": "^2.47.0",
+    "zod": "^3.25.76"
+  }
+}

@@ -215,19 +215,21 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Why now: higher-signal placement than another directory-clone optimization.
   Depends on: `G-004`.
   Done means: submission is live or blocked with a documented follow-up.
-  Status: upstream PR is open as `coinbase/x402` PR #1515; wait for merge and live listing verification.
+  Status: upstream PR is open as `coinbase/x402` PR #1515; email received on 2026-03-08 shows the PR is currently blocked on Coinbase-side review/deploy controls (`vercel[bot]` requires Coinbase team authorization, and Heimdall reported a review error on the `litlife1127-bot` approval citing MFA/public-email requirements). Treat this as an external blocker; come back after a Coinbase maintainer clears the gate, then verify the live listing.
 
-- [ ] `G-008` Define the MCP packaging approach
+- [x] `G-008` Define the MCP packaging approach
   Output: choose the minimum viable MCP surface: wrapper, server, or adapter.
   Why now: this is the cleanest path into the tools real agent builders already use.
   Depends on: `G-001`, `G-002`.
   Done means: one implementation path is selected with file targets and expected UX.
+  Status: documented in `docs/MCP_PACKAGING_PLAN.md`. Chosen path is a local Node stdio MCP server that acts as an x402-paying client bridge to the canonical Augur HTTP API.
 
-- [ ] `G-009` Ship MCP-compatible integration
+- [x] `G-009` Ship MCP-compatible integration
   Output: working MCP distribution artifact plus usage docs.
   Why now: packaging matters more than another endpoint right now.
   Depends on: `G-008`.
   Done means: a developer can add Augur through an MCP-style workflow without reading the whole codebase.
+  Status: `examples/javascript/augur-mcp` now provides a working stdio MCP server, README wiring instructions, and smoke tests including one paid MCP tool invocation against live `https://augurrisk.com/analyze`.
 
 ### P1 - Conversion and Onboarding
 
