@@ -43,3 +43,5 @@
 ## Repo Workflow
 1. **[2026-03-07] Keep `AGENTS.md` stable and use it for startup rules only**
    Do instead: put durable repo-wide agent instructions in `AGENTS.md`, and keep session state in `HANDOVER.md` plus recurring runbook knowledge in `.codex/napkin.md`.
+2. **[2026-03-08] Treat `/stats` as app telemetry, not edge telemetry**
+   Do instead: use `/stats` for per-instance summaries over logged public GET routes and `/analyze` including `host`, `referer`, `request_id`, `top_paths`, `top_hosts`, and `top_referers`, but use Fly / proxy / DNS-side telemetry for old-domain `403` traffic that may never reach Flask.

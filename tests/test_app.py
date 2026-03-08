@@ -2,6 +2,7 @@ import json
 
 import pytest
 import responses
+from flask import Response, request
 from unittest.mock import patch
 
 from risk_api.app import create_app
@@ -462,6 +463,124 @@ def test_dashboard_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/dashboard")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
+
+
+def test_request_log_captures_intent_page_host_referer_and_request_id(
+    test_config, monkeypatch, tmp_path
+):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+
+    resp = app.test_client().get(
+        "/honeypot-detection-api",
+        base_url="https://augurrisk.com",
+        headers={
+            "Referer": "https://example.com/search?q=augur",
+            "User-Agent": "pytest-agent",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["X-Request-ID"]
+
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 1
+
+    entry = entries[0]
+    assert entry["path"] == "/honeypot-detection-api"
+    assert entry["host"] == "augurrisk.com"
+    assert entry["referer"] == "https://example.com/search?q=augur"
+    assert entry["user_agent"] == "pytest-agent"
+    assert entry["request_id"] == resp.headers["X-Request-ID"]
+    assert entry["funnel_stage"] == "intent_honeypot_view"
+
+
+def test_stats_reports_new_page_and_source_summaries(
+    test_config, monkeypatch, tmp_path
+):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    client.get(
+        "/",
+        base_url="https://augurrisk.com",
+        headers={"User-Agent": "pytest-agent"},
+    )
+    client.get(
+        "/proxy-risk-api",
+        base_url="https://augurrisk.com",
+        headers={"Referer": "https://google.com/search?q=proxy+risk+api"},
+    )
+    client.get("/openapi.json", base_url="https://augurrisk.com")
+    client.get("/analyze?address=0x1234", base_url="https://augurrisk.com")
+
+    stats = client.get("/stats").get_json()
+
+    assert stats["total_requests"] == 4
+    assert stats["funnel"]["landing_views"] == 1
+    assert stats["funnel"]["intent_page_views"] == 1
+    assert stats["funnel"]["intent_proxy_views"] == 1
+    assert stats["funnel"]["machine_doc_fetches"] == 1
+    assert stats["funnel"]["invalid_address_requests"] == 1
+    assert stats["stage_counts"]["landing_view"] == 1
+    assert stats["stage_counts"]["intent_proxy_view"] == 1
+    assert stats["stage_counts"]["openapi_fetch"] == 1
+    assert stats["stage_counts"]["invalid_address"] == 1
+    assert stats["top_paths"][0]["path"] == "/"
+    assert any(item["path"] == "/proxy-risk-api" for item in stats["top_paths"])
+    assert stats["top_hosts"] == [{"host": "augurrisk.com", "count": 4}]
+    assert stats["top_referers"] == [
+        {"referer": "https://google.com/search?q=proxy+risk+api", "count": 1}
+    ]
+
+
+def test_stats_fallback_classifies_unpaid_402_requests(
+    test_config, monkeypatch, tmp_path
+):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    def install_fake_402_gate(app, _config):
+        @app.before_request
+        def fake_402_gate():
+            if request.path != "/analyze":
+                return None
+            return Response(
+                json.dumps({"error": "Payment Required"}),
+                status=402,
+                content_type="application/json",
+            )
+
+        return True
+
+    with patch(
+        "risk_api.app._setup_x402_middleware",
+        side_effect=install_fake_402_gate,
+    ), patch("risk_api.app.get_code", return_value="0x60006000"):
+        app = create_app(config=test_config, enable_x402=True)
+        app.config["TESTING"] = True
+        client = app.test_client()
+
+        addr = "0x" + "ab" * 20
+        resp = client.get(
+            f"/analyze?address={addr}",
+            base_url="https://augurrisk.com",
+        )
+
+    assert resp.status_code == 402
+
+    stats = client.get("/stats").get_json()
+    assert stats["total_requests"] == 1
+    assert stats["funnel"]["valid_unpaid_402_attempts"] == 1
+    assert stats["stage_counts"]["unpaid_402"] == 1
+    assert stats["top_hosts"] == [{"host": "augurrisk.com", "count": 1}]
 
 
 def test_avatar_returns_png(client):

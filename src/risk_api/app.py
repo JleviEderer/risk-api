@@ -6,9 +6,11 @@ import json
 import logging
 import re
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
+from uuid import uuid4
 
 from flask import Flask, Response, current_app, jsonify, redirect, request
 
@@ -879,6 +881,45 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
     },
 }
 
+PUBLIC_REQUEST_STAGE_BY_PATH: dict[str, str] = {
+    "/": "landing_view",
+    "/how-payment-works": "how_payment_view",
+    "/honeypot-detection-api": "intent_honeypot_view",
+    "/proxy-risk-api": "intent_proxy_view",
+    "/deployer-reputation-api": "intent_deployer_view",
+    "/openapi.json": "openapi_fetch",
+    "/llms.txt": "llms_txt_fetch",
+    "/llms-full.txt": "llms_full_fetch",
+    "/.well-known/x402": "x402_doc_fetch",
+    "/.well-known/agent-card.json": "agent_card_fetch",
+    "/agent-metadata.json": "agent_metadata_fetch",
+    "/robots.txt": "robots_fetch",
+    "/sitemap.xml": "sitemap_fetch",
+}
+
+MACHINE_DOC_STAGES = {
+    "openapi_fetch",
+    "llms_txt_fetch",
+    "llms_full_fetch",
+    "x402_doc_fetch",
+    "agent_card_fetch",
+    "agent_metadata_fetch",
+    "robots_fetch",
+    "sitemap_fetch",
+}
+
+INTENT_PAGE_STAGES = {
+    "intent_honeypot_view",
+    "intent_proxy_view",
+    "intent_deployer_view",
+}
+
+
+def _should_log_request(path: str, method: str) -> bool:
+    if path == "/analyze":
+        return True
+    return method == "GET" and path in PUBLIC_REQUEST_STAGE_BY_PATH
+
 
 def _render_intent_page(base_url: str, path: str) -> str:
     page = INTENT_PAGES[path]
@@ -1473,28 +1514,40 @@ def _configure_request_log_file(app: Flask) -> None:
     app.config["REQUEST_LOG_PATH"] = log_path
     os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
 
+    for handler in list(request_logger.handlers):
+        if getattr(handler, "_risk_api_request_log", False):
+            request_logger.removeHandler(handler)
+            handler.close()
+
     handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler._risk_api_request_log = True  # type: ignore[attr-defined]
     handler.setFormatter(logging.Formatter("%(message)s"))
     request_logger.addHandler(handler)
     request_logger.setLevel(logging.INFO)
+    request_logger.propagate = False
     logger.info("Request logging enabled: %s", log_path)
 
 
 def _setup_request_logging(app: Flask) -> None:
-    """Log landing views plus /analyze funnel events as structured JSON."""
+    """Log public page views plus /analyze funnel events as structured JSON."""
 
     @app.before_request
     def _start_timer() -> None:
-        if request.path in {"/", "/analyze"}:
+        request.environ["request_id"] = (
+            request.headers.get("X-Request-ID") or uuid4().hex
+        )
+        if _should_log_request(request.path, request.method):
             request.environ["_req_start"] = time.monotonic()
 
     @app.after_request
     def _log_request(response: Response) -> Response:
+        request_id = request.environ.get("request_id")
+        if isinstance(request_id, str) and request_id:
+            response.headers["X-Request-ID"] = request_id
+
         if request.environ.get("skip_request_log"):
             return response
-        if request.path not in {"/", "/analyze"}:
-            return response
-        if request.path == "/" and request.method != "GET":
+        if not _should_log_request(request.path, request.method):
             return response
 
         start = request.environ.get("_req_start")
@@ -1510,8 +1563,13 @@ def _setup_request_logging(app: Flask) -> None:
             "duration_ms": duration_ms,
             "user_agent": request.headers.get("User-Agent", ""),
             "method": request.method,
+            "host": request.host,
+            "referer": request.headers.get("Referer", ""),
+            "request_id": request_id or "",
         }
-        funnel_stage = request.environ.get("funnel_stage")
+        funnel_stage = request.environ.get("funnel_stage") or (
+            PUBLIC_REQUEST_STAGE_BY_PATH.get(request.path, "")
+        )
         if isinstance(funnel_stage, str) and funnel_stage:
             entry["funnel_stage"] = funnel_stage
 
@@ -1790,6 +1848,7 @@ def create_app(
 
     @app.route("/how-payment-works")
     def how_payment_works():
+        request.environ["funnel_stage"] = "how_payment_view"
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         html = PAYMENT_GUIDE_HTML.replace("__BASE_URL__", base_url)
         return Response(html, content_type="text/html")
@@ -1798,6 +1857,9 @@ def create_app(
     @app.route("/proxy-risk-api")
     @app.route("/deployer-reputation-api")
     def buyer_intent_page():
+        request.environ["funnel_stage"] = (
+            PUBLIC_REQUEST_STAGE_BY_PATH.get(request.path, "intent_page_view")
+        )
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         return Response(
             _render_intent_page(base_url, request.path),
@@ -1822,11 +1884,21 @@ def create_app(
                 "paid_requests": 0,
                 "funnel": {
                     "landing_views": 0,
+                    "how_payment_views": 0,
+                    "intent_page_views": 0,
+                    "intent_honeypot_views": 0,
+                    "intent_proxy_views": 0,
+                    "intent_deployer_views": 0,
+                    "machine_doc_fetches": 0,
                     "valid_unpaid_402_attempts": 0,
                     "invalid_address_requests": 0,
                     "no_bytecode_requests": 0,
                     "paid_requests": 0,
                 },
+                "stage_counts": {},
+                "top_paths": [],
+                "top_hosts": [],
+                "top_referers": [],
                 "avg_duration_ms": 0,
                 "hourly": [],
                 "recent": [],
@@ -1838,8 +1910,18 @@ def create_app(
         duration_count = 0
         hourly_buckets: dict[str, dict[str, int]] = {}
         recent: list[dict[str, object]] = []
+        stage_counts: Counter[str] = Counter()
+        path_counts: Counter[str] = Counter()
+        host_counts: Counter[str] = Counter()
+        referer_counts: Counter[str] = Counter()
         funnel = {
             "landing_views": 0,
+            "how_payment_views": 0,
+            "intent_page_views": 0,
+            "intent_honeypot_views": 0,
+            "intent_proxy_views": 0,
+            "intent_deployer_views": 0,
+            "machine_doc_fetches": 0,
             "valid_unpaid_402_attempts": 0,
             "invalid_address_requests": 0,
             "no_bytecode_requests": 0,
@@ -1887,6 +1969,12 @@ def create_app(
                             "dur_sum": 0,
                             "dur_n": 0,
                             "landing_views": 0,
+                            "how_payment_views": 0,
+                            "intent_page_views": 0,
+                            "intent_honeypot_views": 0,
+                            "intent_proxy_views": 0,
+                            "intent_deployer_views": 0,
+                            "machine_doc_fetches": 0,
                             "valid_unpaid_402_attempts": 0,
                             "invalid_address_requests": 0,
                             "no_bytecode_requests": 0,
@@ -1902,6 +1990,18 @@ def create_app(
 
                     if stage == "landing_view":
                         bucket["landing_views"] += 1
+                    elif stage == "how_payment_view":
+                        bucket["how_payment_views"] += 1
+                    elif stage in INTENT_PAGE_STAGES:
+                        bucket["intent_page_views"] += 1
+                        if stage == "intent_honeypot_view":
+                            bucket["intent_honeypot_views"] += 1
+                        elif stage == "intent_proxy_view":
+                            bucket["intent_proxy_views"] += 1
+                        elif stage == "intent_deployer_view":
+                            bucket["intent_deployer_views"] += 1
+                    elif stage in MACHINE_DOC_STAGES:
+                        bucket["machine_doc_fetches"] += 1
                     elif stage == "unpaid_402":
                         bucket["valid_unpaid_402_attempts"] += 1
                     elif stage == "invalid_address":
@@ -1913,6 +2013,18 @@ def create_app(
 
                 if stage == "landing_view":
                     funnel["landing_views"] += 1
+                elif stage == "how_payment_view":
+                    funnel["how_payment_views"] += 1
+                elif stage in INTENT_PAGE_STAGES:
+                    funnel["intent_page_views"] += 1
+                    if stage == "intent_honeypot_view":
+                        funnel["intent_honeypot_views"] += 1
+                    elif stage == "intent_proxy_view":
+                        funnel["intent_proxy_views"] += 1
+                    elif stage == "intent_deployer_view":
+                        funnel["intent_deployer_views"] += 1
+                elif stage in MACHINE_DOC_STAGES:
+                    funnel["machine_doc_fetches"] += 1
                 elif stage == "unpaid_402":
                     funnel["valid_unpaid_402_attempts"] += 1
                 elif stage == "invalid_address":
@@ -1922,6 +2034,21 @@ def create_app(
                 elif stage == "paid_request":
                     funnel["paid_requests"] += 1
 
+                if stage:
+                    stage_counts[stage] += 1
+
+                path = entry.get("path")
+                if isinstance(path, str) and path:
+                    path_counts[path] += 1
+
+                host = entry.get("host")
+                if isinstance(host, str) and host:
+                    host_counts[host] += 1
+
+                referer = entry.get("referer")
+                if isinstance(referer, str) and referer:
+                    referer_counts[referer] += 1
+
                 recent.append(entry)
 
         hourly = [
@@ -1930,6 +2057,12 @@ def create_app(
                 "count": b["count"],
                 "paid": b["paid"],
                 "landing_views": b["landing_views"],
+                "how_payment_views": b["how_payment_views"],
+                "intent_page_views": b["intent_page_views"],
+                "intent_honeypot_views": b["intent_honeypot_views"],
+                "intent_proxy_views": b["intent_proxy_views"],
+                "intent_deployer_views": b["intent_deployer_views"],
+                "machine_doc_fetches": b["machine_doc_fetches"],
                 "valid_unpaid_402_attempts": b["valid_unpaid_402_attempts"],
                 "invalid_address_requests": b["invalid_address_requests"],
                 "no_bytecode_requests": b["no_bytecode_requests"],
@@ -1941,10 +2074,20 @@ def create_app(
             for h, b in sorted(hourly_buckets.items())
         ]
 
+        def _top_items(counter: Counter[str], key_name: str) -> list[dict[str, object]]:
+            return [
+                {key_name: item, "count": count}
+                for item, count in counter.most_common(10)
+            ]
+
         return jsonify({
             "total_requests": total,
             "paid_requests": paid,
             "funnel": funnel,
+            "stage_counts": dict(stage_counts),
+            "top_paths": _top_items(path_counts, "path"),
+            "top_hosts": _top_items(host_counts, "host"),
+            "top_referers": _top_items(referer_counts, "referer"),
             "avg_duration_ms": (
                 round(duration_sum / duration_count) if duration_count else 0
             ),

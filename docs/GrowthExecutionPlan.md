@@ -282,6 +282,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Why now: discoverability work cannot be evaluated without some source visibility.
   Depends on: `G-016`.
   Done means: major acquisition surfaces can be compared with simple data.
+  Status: partial repo-side instrumentation now exists in `src/risk_api/app.py` for app-level request logging across the landing page, payment page, buyer-intent pages, key machine-readable discovery docs, and `/analyze`, including `host`, `referer`, `request_id`, and stage summaries in `/stats`. Durable analytics and edge-layer visibility for old-domain `403` traffic are still not complete.
 
 ---
 

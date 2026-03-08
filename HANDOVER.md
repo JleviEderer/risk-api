@@ -19,6 +19,7 @@
 - Tightened the MCP wrapper so Augur API errors become MCP errors, wallet addresses are not exposed in tool output, and the x402 client is pinned to Base mainnet.
 - Added repo-local git guardrails for parallel-session safety.
 - Completed `G-013` with the first three buyer-intent pages and linked them from the landing page plus sitemap.
+- Expanded app-level request logging so public page visits and discovery-doc fetches are measurable per instance with host/referrer context.
 
 ## What Got Done
 
@@ -196,11 +197,34 @@
   - `safe` is not an audit or guarantee
 - Added route and sitemap coverage in `tests/test_app.py`.
 
+### 17) Tightened app-level traffic instrumentation
+- Expanded request logging in `src/risk_api/app.py` beyond just `/` and `/analyze`.
+- Logged public GET traffic for:
+  - `/`
+  - `/how-payment-works`
+  - the three buyer-intent pages
+  - key discovery/doc endpoints such as `/openapi.json`, `/llms.txt`, `/.well-known/x402`, `/agent-metadata.json`, `/robots.txt`, and `/sitemap.xml`
+- Added these fields to each logged request:
+  - `host`
+  - `referer`
+  - `request_id`
+- Returned `X-Request-ID` on responses for easier correlation.
+- Extended `/stats` with:
+  - `stage_counts`
+  - `top_paths`
+  - `top_hosts`
+  - `top_referers`
+  - counters for intent-page views, machine-doc fetches, and payment-page views
+- Important limitation:
+  - this is still app-level telemetry only
+  - if the old Conway host returns `403` before reaching Flask, those hits will not appear in app logs or `/stats`
+  - edge-layer visibility still needs Fly / proxy / DNS-side inspection
+
 ## Validation
 - Ran:
   - `python -m pytest tests\test_app.py -q`
 - Result:
-  - `105 passed in 1.58s`
+  - `108 passed in 1.46s`
 - Verified current upstream listing/submission path against:
   - `https://www.x402.org/ecosystem`
   - `https://github.com/coinbase/x402`
@@ -218,8 +242,9 @@
 1. Keep `G-005` and `G-006` marked done unless new evidence shows an editable external listing still points at Conway.
 2. Monitor [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515) and verify `https://www.x402.org/ecosystem` after merge.
    Current blocker: Coinbase-side review/deploy gate clearance shown in the 2026-03-08 email thread.
-3. Move to `G-014` and publish one proof-of-work report that can reuse the new buyer-intent pages as internal-link targets.
-4. If external directories are refreshed manually, use the repo scripts and `docs/REGISTRATIONS.md` rather than old notes.
+3. Decide whether to ship the instrumentation update to production so `/stats` can show host/referrer/path summaries for the new public pages.
+4. For old-domain visibility, inspect edge-layer telemetry or config rather than assuming app logs can see Conway-host `403` traffic.
+5. Move to `G-014` and publish one proof-of-work report that can reuse the new buyer-intent pages as internal-link targets.
 
 ## Suggested Restart Context For Next Agent
 - `G-001`, `G-002`, `G-003`, `G-004`, `G-005`, `G-006`, `G-007`, and `G-016` are done in repo state.
