@@ -86,12 +86,14 @@ def test_analyze_request_is_logged(client_logged, app_with_logging):
 
     assert len(lines) == 1
     entry = json.loads(lines[0])
+    assert entry["path"] == "/analyze"
     assert entry["address"] == addr
     assert entry["status"] == 200
     assert entry["paid"] is False
     assert entry["score"] == 0
     assert entry["level"] == "safe"
     assert entry["method"] == "GET"
+    assert entry["funnel_stage"] == "analyze_success"
     assert "ts" in entry
     assert isinstance(entry["duration_ms"], int)
 
@@ -107,7 +109,10 @@ def test_failed_request_is_logged(client_logged, app_with_logging):
 
     assert len(lines) == 1
     entry = json.loads(lines[0])
+    assert entry["path"] == "/analyze"
     assert entry["status"] == 422
+    assert entry["funnel_stage"] == "invalid_address"
+    assert entry["error_type"] == "invalid_address"
     assert "score" not in entry
 
 
@@ -119,6 +124,41 @@ def test_health_not_logged(client_logged, app_with_logging):
             assert f.read().strip() == ""
 
 
+def test_landing_view_is_logged(client_logged, app_with_logging):
+    resp = client_logged.get("/")
+    assert resp.status_code == 200
+
+    log_path = app_with_logging.config["REQUEST_LOG_PATH"]
+    with open(log_path) as f:
+        lines = [l.strip() for l in f if l.strip()]
+
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["path"] == "/"
+    assert entry["status"] == 200
+    assert entry["funnel_stage"] == "landing_view"
+    assert "address" not in entry
+
+
+@responses.activate
+def test_no_bytecode_request_is_logged(client_logged, app_with_logging):
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": "0x"})
+
+    addr = "0x" + "cd" * 20
+    resp = client_logged.get(f"/analyze?address={addr}")
+    assert resp.status_code == 422
+
+    log_path = app_with_logging.config["REQUEST_LOG_PATH"]
+    with open(log_path) as f:
+        lines = [l.strip() for l in f if l.strip()]
+
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["status"] == 422
+    assert entry["funnel_stage"] == "no_bytecode"
+    assert entry["error_type"] == "no_bytecode"
+
+
 @responses.activate
 def test_stats_endpoint(client_logged, app_with_logging):
     bytecode = "0x" + "6080604052" + "00" * 200
@@ -126,15 +166,18 @@ def test_stats_endpoint(client_logged, app_with_logging):
     responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
 
     addr = "0x" + "ab" * 20
+    client_logged.get("/")
     client_logged.get(f"/analyze?address={addr}")
     client_logged.get(f"/analyze?address={addr}")
 
     resp = client_logged.get("/stats")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["total_requests"] == 2
+    assert data["total_requests"] == 3
     assert data["paid_requests"] == 0
-    assert len(data["recent"]) == 2
+    assert data["funnel"]["landing_views"] == 1
+    assert data["funnel"]["paid_requests"] == 0
+    assert len(data["recent"]) == 3
 
 
 def test_stats_empty_when_no_requests(client_logged):
@@ -142,6 +185,7 @@ def test_stats_empty_when_no_requests(client_logged):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["total_requests"] == 0
+    assert data["funnel"]["landing_views"] == 0
 
 
 def test_stats_returns_501_without_log_path(test_config):
@@ -175,4 +219,9 @@ def test_stats_includes_hourly_and_avg_duration(client_logged, app_with_logging)
     bucket = data["hourly"][0]
     assert "hour" in bucket
     assert bucket["count"] == 2
+    assert "landing_views" in bucket
+    assert "valid_unpaid_402_attempts" in bucket
+    assert "invalid_address_requests" in bucket
+    assert "no_bytecode_requests" in bucket
+    assert "paid_requests" in bucket
     assert "avg_duration_ms" in bucket

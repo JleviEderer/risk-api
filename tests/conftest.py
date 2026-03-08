@@ -11,26 +11,12 @@ from risk_api.config import Config
 # Bazaar extension data matching what _setup_x402_middleware registers.
 # Kept here so x402 gate tests don't need the real (slow) SDK imports.
 _EXAMPLE_OUTPUT = {
-    "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "score": 3,
+    "address": "0x4200000000000000000000000000000000000006",
+    "score": 0,
     "level": "safe",
     "bytecode_size": 4632,
-    "findings": [
-        {
-            "detector": "delegatecall",
-            "severity": "low",
-            "points": 3,
-            "description": "Uses DELEGATECALL opcode",
-        },
-    ],
-    "category_scores": {
-        "proxy": 0,
-        "access_control": 0,
-        "reentrancy": 0,
-        "value_manipulation": 0,
-        "destructive": 0,
-        "deployer_reputation": 0,
-    },
+    "findings": [],
+    "category_scores": {},
 }
 
 _ADDRESS_SCHEMA = {
@@ -55,7 +41,7 @@ def _build_payment_required(method: str, config: Config) -> dict:
                 "input": {
                     "type": "http",
                     "queryParams": {
-                        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                        "address": "0x4200000000000000000000000000000000000006"
                     },
                 },
                 "output": {"example": _EXAMPLE_OUTPUT},
@@ -77,7 +63,7 @@ def _build_payment_required(method: str, config: Config) -> dict:
                     "type": "http",
                     "bodyType": "json",
                     "body": {
-                        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                        "address": "0x4200000000000000000000000000000000000006"
                     },
                 },
                 "output": {"example": _EXAMPLE_OUTPUT},
@@ -168,7 +154,7 @@ def app_with_x402(test_config):
     with patch(
         "risk_api.app._setup_x402_middleware",
         side_effect=lambda app, config: _fake_x402_middleware_setup(app, config),
-    ):
+    ), patch("risk_api.app.get_code", return_value="0x60006000"):
         app = create_app(config=test_config, enable_x402=True)
         app.config["TESTING"] = True
         yield app

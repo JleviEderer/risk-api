@@ -12,7 +12,7 @@ from typing import Any
 from flask import Flask, Response, current_app, jsonify, request
 
 from risk_api.analysis.engine import analyze_contract
-from risk_api.chain.rpc import RPCError
+from risk_api.chain.rpc import RPCError, get_code
 from risk_api.config import Config, load_config
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,31 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 # Routes that require x402 payment
 PROTECTED_ROUTES = {"/analyze"}
+
+SAFE_EXAMPLE_ADDRESS = "0x4200000000000000000000000000000000000006"
+PROXY_EXAMPLE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS = "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779"
+NO_BYTECODE_ERROR_TEMPLATE = "No contract bytecode found at Base address: {address}"
+
+
+def _extract_requested_address() -> str:
+    """Read the requested address from query params or JSON body."""
+    address = request.args.get("address", "").strip()
+    if not address and request.is_json:
+        body = request.get_json(silent=True)
+        if body and isinstance(body, dict):
+            address = str(body.get("address", "")).strip()
+    return address
+
+
+def _bytecode_size(bytecode_hex: str) -> int:
+    hex_body = bytecode_hex[2:] if bytecode_hex.startswith("0x") else bytecode_hex
+    return len(hex_body) // 2
+
+
+def _no_bytecode_error(address: str) -> str:
+    return NO_BYTECODE_ERROR_TEMPLATE.format(address=address)
+
 
 # Load avatar image bytes at module level
 _AVATAR_BYTES: bytes | None = None
@@ -84,10 +109,10 @@ OPENAPI_SPEC: dict[str, object] = {
                                     "safe_contract": {
                                         "summary": "Simple contract — no risks detected",
                                         "value": {
-                                            "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                                            "address": SAFE_EXAMPLE_ADDRESS,
                                             "score": 0,
                                             "level": "safe",
-                                            "bytecode_size": 2846,
+                                            "bytecode_size": 4632,
                                             "findings": [],
                                             "category_scores": {},
                                         },
@@ -95,7 +120,7 @@ OPENAPI_SPEC: dict[str, object] = {
                                     "proxy_contract": {
                                         "summary": "Proxy contract — high risk with implementation analysis",
                                         "value": {
-                                            "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                                            "address": PROXY_EXAMPLE_ADDRESS,
                                             "score": 60,
                                             "level": "high",
                                             "bytecode_size": 1485,
@@ -122,7 +147,7 @@ OPENAPI_SPEC: dict[str, object] = {
                                                 "impl_hidden_mint": 10,
                                             },
                                             "implementation": {
-                                                "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
+                                                "address": PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS,
                                                 "bytecode_size": 24576,
                                                 "findings": [
                                                     {
@@ -155,13 +180,32 @@ OPENAPI_SPEC: dict[str, object] = {
                         "description": "Payment required — send x402 payment and retry",
                     },
                     "422": {
-                        "description": "Invalid or missing contract address",
+                        "description": "Invalid, missing, or non-contract Base address",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
                                     "properties": {
                                         "error": {"type": "string"},
+                                    },
+                                },
+                                "examples": {
+                                    "missing_address": {
+                                        "value": {
+                                            "error": "Missing 'address' query parameter",
+                                        },
+                                    },
+                                    "invalid_address": {
+                                        "value": {
+                                            "error": "Invalid Ethereum address: 0x1234",
+                                        },
+                                    },
+                                    "no_bytecode": {
+                                        "value": {
+                                            "error": _no_bytecode_error(
+                                                SAFE_EXAMPLE_ADDRESS
+                                            ),
+                                        },
                                     },
                                 },
                                 "example": {
@@ -221,10 +265,10 @@ OPENAPI_SPEC: dict[str, object] = {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
                                 "example": {
-                                    "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+                                    "address": SAFE_EXAMPLE_ADDRESS,
                                     "score": 0,
                                     "level": "safe",
-                                    "bytecode_size": 2846,
+                                    "bytecode_size": 4632,
                                     "findings": [],
                                     "category_scores": {},
                                 },
@@ -235,13 +279,32 @@ OPENAPI_SPEC: dict[str, object] = {
                         "description": "Payment required — send x402 payment and retry",
                     },
                     "422": {
-                        "description": "Invalid or missing contract address",
+                        "description": "Invalid, missing, or non-contract Base address",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
                                     "properties": {
                                         "error": {"type": "string"},
+                                    },
+                                },
+                                "examples": {
+                                    "missing_address": {
+                                        "value": {
+                                            "error": "Missing 'address' query parameter",
+                                        },
+                                    },
+                                    "invalid_address": {
+                                        "value": {
+                                            "error": "Invalid Ethereum address: 0x1234",
+                                        },
+                                    },
+                                    "no_bytecode": {
+                                        "value": {
+                                            "error": _no_bytecode_error(
+                                                SAFE_EXAMPLE_ADDRESS
+                                            ),
+                                        },
                                     },
                                 },
                                 "example": {
@@ -418,7 +481,7 @@ td{padding:8px 10px;border-bottom:1px solid #1e2235}
 <body>
 <h1><span>risk-api</span> dashboard</h1>
 <div class="cards">
-  <div class="card"><div class="label">Total Requests</div><div class="value blue" id="total">-</div></div>
+  <div class="card"><div class="label">Tracked Events</div><div class="value blue" id="total">-</div></div>
   <div class="card"><div class="label">Paid Requests</div><div class="value green" id="paid">-</div></div>
   <div class="card"><div class="label">Avg Response Time</div><div class="value orange" id="avgdur">-</div></div>
 </div>
@@ -428,9 +491,9 @@ td{padding:8px 10px;border-bottom:1px solid #1e2235}
   <div id="chart-fallback">Chart unavailable (Chart.js CDN unreachable)</div>
 </div>
 <div class="section">
-  <h2>Recent requests</h2>
+  <h2>Recent events</h2>
   <table>
-    <thead><tr><th>Time</th><th>Address</th><th>Status</th><th>Score</th><th>Level</th><th>Paid</th><th>Duration</th></tr></thead>
+    <thead><tr><th>Time</th><th>Stage</th><th>Address</th><th>Status</th><th>Score</th><th>Level</th><th>Paid</th><th>Duration</th></tr></thead>
     <tbody id="recent"></tbody>
   </table>
 </div>
@@ -462,6 +525,18 @@ function truncAddr(a){
   if(!a||a.length<12)return a||'';
   return a.slice(0,6)+'\\u2026'+a.slice(-4);
 }
+function stageLabel(stage){
+  var labels={
+    landing_view:'landing',
+    unpaid_402:'402 attempt',
+    invalid_address:'invalid',
+    no_bytecode:'no bytecode',
+    paid_request:'paid',
+    analyze_success:'success',
+    rpc_error:'rpc error'
+  };
+  return labels[stage]||stage||'';
+}
 function refresh(){
   fetch('/stats').then(function(r){return r.json()}).then(function(d){
     document.getElementById('total').textContent=d.total_requests;
@@ -489,9 +564,11 @@ function refresh(){
     rows.forEach(function(e){
       var tr=document.createElement('tr');
       var lvl=e.level||'';
+      var stage=stageLabel(e.funnel_stage);
       var paidBadge=e.paid?'<span class="badge paid">paid</span>':'<span class="badge unpaid">free</span>';
       tr.innerHTML='<td class="ts">'+relTime(e.ts)+'</td>'
-        +'<td class="addr">'+truncAddr(e.address)+'</td>'
+        +'<td>'+(stage?'<span class="badge unpaid">'+stage+'</span>':'')+'</td>'
+        +'<td class="addr">'+(e.address?truncAddr(e.address):'')</td>'
         +'<td class="status">'+e.status+'</td>'
         +'<td>'+(e.score!=null?e.score:'')+'</td>'
         +'<td>'+(lvl?'<span class="badge '+lvl+'">'+lvl+'</span>':'')+'</td>'
@@ -568,7 +645,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 
 <div class="section">
 <h2>Try it</h2>
-<pre>curl -s "__BASE_URL__/analyze?address=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" \\
+<pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p style="margin-top:8px;color:#718096;font-size:.82rem">
 Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores.
@@ -617,7 +694,7 @@ and runs 8 detectors to produce a composite risk score from 0 (safe) to 100 (cri
 ## How to Call
 
 ```
-GET __BASE_URL__/analyze?address=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 ```
 
 Payment: Include a `PAYMENT-SIGNATURE` header with an x402 payment proof ($0.10 USDC on Base). \
@@ -627,10 +704,10 @@ Any x402-compatible HTTP client handles this automatically.
 
 ```json
 {
-  "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "address": "0x4200000000000000000000000000000000000006",
   "score": 0,
   "level": "safe",
-  "bytecode_size": 2846,
+  "bytecode_size": 4632,
   "findings": [],
   "category_scores": {}
 }
@@ -686,10 +763,10 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 
 ```json
 {
-  "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "address": "0x4200000000000000000000000000000000000006",
   "score": 0,
   "level": "safe",
-  "bytecode_size": 2846,
+  "bytecode_size": 4632,
   "findings": [],
   "category_scores": {}
 }
@@ -800,6 +877,7 @@ Proxy contracts auto-resolve implementation (max 1 hop).
 ```json
 {"error": "Missing 'address' query parameter"}
 {"error": "Invalid Ethereum address: 0x1234"}
+{"error": "No contract bytecode found at Base address: 0x4200000000000000000000000000000000000006"}
 ```
 
 **402 — Payment required:** Returned with x402 payment instructions. \
@@ -928,29 +1006,15 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
             },
             "required": ["address"],
         }
-        example_input = {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}
+        example_input = {"address": SAFE_EXAMPLE_ADDRESS}
 
         example_output = {
-            "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-            "score": 3,
+            "address": SAFE_EXAMPLE_ADDRESS,
+            "score": 0,
             "level": "safe",
             "bytecode_size": 4632,
-            "findings": [
-                {
-                    "detector": "delegatecall",
-                    "severity": "low",
-                    "points": 3,
-                    "description": "Uses DELEGATECALL opcode",
-                },
-            ],
-            "category_scores": {
-                "proxy": 0,
-                "access_control": 0,
-                "reentrancy": 0,
-                "value_manipulation": 0,
-                "destructive": 0,
-                "deployer_reputation": 0,
-            },
+            "findings": [],
+            "category_scores": {},
         }
 
         get_bazaar = declare_discovery_extension(
@@ -1039,6 +1103,7 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
             return None
         else:
             # payment-error: return 402 with payment requirements
+            request.environ["funnel_stage"] = "unpaid_402"
             resp = result.response
             if resp is None:
                 return Response("Payment Required", status=402)
@@ -1086,16 +1151,18 @@ def _configure_request_log_file(app: Flask) -> None:
 
 
 def _setup_request_logging(app: Flask) -> None:
-    """Log every /analyze request as structured JSON for analytics."""
+    """Log landing views plus /analyze funnel events as structured JSON."""
 
     @app.before_request
     def _start_timer() -> None:
-        if request.path == "/analyze":
+        if request.path in {"/", "/analyze"}:
             request.environ["_req_start"] = time.monotonic()
 
     @app.after_request
-    def _log_analyze(response: Response) -> Response:
-        if request.path != "/analyze":
+    def _log_request(response: Response) -> Response:
+        if request.path not in {"/", "/analyze"}:
+            return response
+        if request.path == "/" and request.method != "GET":
             return response
 
         start = request.environ.get("_req_start")
@@ -1103,23 +1170,26 @@ def _setup_request_logging(app: Flask) -> None:
             round((time.monotonic() - start) * 1000) if start else None
         )
 
-        address = request.args.get("address", "")
-        if not address and request.is_json:
-            body = request.get_json(silent=True)
-            if body and isinstance(body, dict):
-                address = str(body.get("address", ""))
-
         entry: dict[str, object] = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "address": address,
+            "path": request.path,
             "status": response.status_code,
             "paid": request.environ.get("x402_payload") is not None,
             "duration_ms": duration_ms,
             "user_agent": request.headers.get("User-Agent", ""),
             "method": request.method,
         }
+        funnel_stage = request.environ.get("funnel_stage")
+        if isinstance(funnel_stage, str) and funnel_stage:
+            entry["funnel_stage"] = funnel_stage
 
-        if response.status_code == 200:
+        if request.path == "/analyze":
+            entry["address"] = _extract_requested_address()
+            error_type = request.environ.get("analyze_error_type")
+            if isinstance(error_type, str) and error_type:
+                entry["error_type"] = error_type
+
+        if request.path == "/analyze" and response.status_code == 200:
             try:
                 data = response.get_json(silent=True)
                 if data and isinstance(data, dict):
@@ -1161,16 +1231,16 @@ def create_app(
         if request.path != "/analyze":
             return None
 
-        address = request.args.get("address", "").strip()
-        if not address and request.is_json:
-            body = request.get_json(silent=True)
-            if body and isinstance(body, dict):
-                address = str(body.get("address", "")).strip()
+        address = _extract_requested_address()
 
         if not address:
+            request.environ["funnel_stage"] = "invalid_address"
+            request.environ["analyze_error_type"] = "missing_address"
             return jsonify({"error": "Missing 'address' query parameter"}), 422
 
         if not ADDRESS_RE.match(address):
+            request.environ["funnel_stage"] = "invalid_address"
+            request.environ["analyze_error_type"] = "invalid_address"
             return (
                 jsonify({"error": f"Invalid Ethereum address: {address}"}),
                 422,
@@ -1178,6 +1248,21 @@ def create_app(
 
         # Store validated address for the route handler
         request.environ["validated_address"] = address
+        if request.method == "HEAD":
+            return None
+
+        try:
+            bytecode_hex = get_code(address, config.base_rpc_url)
+        except RPCError as e:
+            request.environ["funnel_stage"] = "rpc_error"
+            request.environ["analyze_error_type"] = "rpc_error"
+            return jsonify({"error": f"RPC error: {e}"}), 502
+
+        if _bytecode_size(bytecode_hex) == 0:
+            request.environ["funnel_stage"] = "no_bytecode"
+            request.environ["analyze_error_type"] = "no_bytecode"
+            return jsonify({"error": _no_bytecode_error(address)}), 422
+
         return None
 
     if enable_x402:
@@ -1193,6 +1278,7 @@ def create_app(
 
     @app.route("/")
     def landing():
+        request.environ["funnel_stage"] = "landing_view"
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         json_ld = json.dumps({
             "@context": "https://schema.org",
@@ -1357,6 +1443,13 @@ def create_app(
             return jsonify({
                 "total_requests": 0,
                 "paid_requests": 0,
+                "funnel": {
+                    "landing_views": 0,
+                    "valid_unpaid_402_attempts": 0,
+                    "invalid_address_requests": 0,
+                    "no_bytecode_requests": 0,
+                    "paid_requests": 0,
+                },
                 "avg_duration_ms": 0,
                 "hourly": [],
                 "recent": [],
@@ -1368,6 +1461,13 @@ def create_app(
         duration_count = 0
         hourly_buckets: dict[str, dict[str, int]] = {}
         recent: list[dict[str, object]] = []
+        funnel = {
+            "landing_views": 0,
+            "valid_unpaid_402_attempts": 0,
+            "invalid_address_requests": 0,
+            "no_bytecode_requests": 0,
+            "paid_requests": 0,
+        }
         with open(log_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -1381,6 +1481,19 @@ def create_app(
                 if entry.get("paid"):
                     paid += 1
 
+                stage = entry.get("funnel_stage", "")
+                if not isinstance(stage, str) or not stage:
+                    if entry.get("path") == "/":
+                        stage = "landing_view"
+                    elif entry.get("paid") and entry.get("status") == 200:
+                        stage = "paid_request"
+                    elif entry.get("status") == 402:
+                        stage = "unpaid_402"
+                    elif entry.get("status") == 422:
+                        stage = "invalid_address"
+                    else:
+                        stage = ""
+
                 dur = entry.get("duration_ms")
                 if isinstance(dur, (int, float)):
                     duration_sum += dur
@@ -1391,7 +1504,17 @@ def create_app(
                     hour_key = ts[:13] + ":00:00Z"
                     bucket = hourly_buckets.get(hour_key)
                     if bucket is None:
-                        bucket = {"count": 0, "paid": 0, "dur_sum": 0, "dur_n": 0}
+                        bucket = {
+                            "count": 0,
+                            "paid": 0,
+                            "dur_sum": 0,
+                            "dur_n": 0,
+                            "landing_views": 0,
+                            "valid_unpaid_402_attempts": 0,
+                            "invalid_address_requests": 0,
+                            "no_bytecode_requests": 0,
+                            "paid_requests": 0,
+                        }
                         hourly_buckets[hour_key] = bucket
                     bucket["count"] += 1
                     if entry.get("paid"):
@@ -1400,6 +1523,28 @@ def create_app(
                         bucket["dur_sum"] += int(dur)
                         bucket["dur_n"] += 1
 
+                    if stage == "landing_view":
+                        bucket["landing_views"] += 1
+                    elif stage == "unpaid_402":
+                        bucket["valid_unpaid_402_attempts"] += 1
+                    elif stage == "invalid_address":
+                        bucket["invalid_address_requests"] += 1
+                    elif stage == "no_bytecode":
+                        bucket["no_bytecode_requests"] += 1
+                    elif stage == "paid_request":
+                        bucket["paid_requests"] += 1
+
+                if stage == "landing_view":
+                    funnel["landing_views"] += 1
+                elif stage == "unpaid_402":
+                    funnel["valid_unpaid_402_attempts"] += 1
+                elif stage == "invalid_address":
+                    funnel["invalid_address_requests"] += 1
+                elif stage == "no_bytecode":
+                    funnel["no_bytecode_requests"] += 1
+                elif stage == "paid_request":
+                    funnel["paid_requests"] += 1
+
                 recent.append(entry)
 
         hourly = [
@@ -1407,6 +1552,11 @@ def create_app(
                 "hour": h,
                 "count": b["count"],
                 "paid": b["paid"],
+                "landing_views": b["landing_views"],
+                "valid_unpaid_402_attempts": b["valid_unpaid_402_attempts"],
+                "invalid_address_requests": b["invalid_address_requests"],
+                "no_bytecode_requests": b["no_bytecode_requests"],
+                "paid_requests": b["paid_requests"],
                 "avg_duration_ms": (
                     round(b["dur_sum"] / b["dur_n"]) if b["dur_n"] else 0
                 ),
@@ -1417,6 +1567,7 @@ def create_app(
         return jsonify({
             "total_requests": total,
             "paid_requests": paid,
+            "funnel": funnel,
             "avg_duration_ms": (
                 round(duration_sum / duration_count) if duration_count else 0
             ),
@@ -1656,7 +1807,14 @@ def create_app(
                 address, config.base_rpc_url, config.basescan_api_key
             )
         except RPCError as e:
+            request.environ["funnel_stage"] = "rpc_error"
+            request.environ["analyze_error_type"] = "rpc_error"
             return jsonify({"error": f"RPC error: {e}"}), 502
+
+        if request.environ.get("x402_payload") is not None:
+            request.environ["funnel_stage"] = "paid_request"
+        else:
+            request.environ["funnel_stage"] = "analyze_success"
 
         response_data: dict[str, object] = {
             "address": result.address,

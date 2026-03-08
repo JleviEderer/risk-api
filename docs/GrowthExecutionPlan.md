@@ -162,13 +162,13 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P0 - Trust and Correctness
 
-- [ ] `G-001` Hard-error no-bytecode inputs
+- [x] `G-001` Hard-error no-bytecode inputs
   Output: `/analyze` returns an explicit error when the address has no contract bytecode on Base.
   Why now: prevents wallet or wrong-address inputs from returning a misleading `safe` result.
   Depends on: none.
   Done means: route behavior, docs, and tests all reflect the new error case.
 
-- [ ] `G-002` Standardize all public example addresses
+- [x] `G-002` Standardize all public example addresses
   Output: one canonical Base example set used across landing page, OpenAPI, Bazaar examples, `llms.txt`, scripts, and docs.
   Why now: removes Base versus mainnet confusion from the first impression.
   Depends on: none.
@@ -202,7 +202,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
 
 ### P0 - Measurement Baseline
 
-- [ ] `G-016` Instrument the funnel stages
+- [x] `G-016` Instrument the funnel stages
   Output: analytics distinguish landing views, valid unpaid `402` attempts, invalid addresses, no-bytecode requests, and paid requests.
   Why now: future prioritization should be based on actual drop-off, not guesses.
   Depends on: `G-001`.

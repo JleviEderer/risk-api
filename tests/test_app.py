@@ -2,6 +2,7 @@ import json
 
 import pytest
 import responses
+from unittest.mock import patch
 
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
@@ -81,6 +82,19 @@ def test_analyze_success(client):
 
 
 @responses.activate
+def test_analyze_no_bytecode_returns_422(client):
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": "0x"},
+    )
+    addr = "0x" + "aa" * 20
+    resp = client.get(f"/analyze?address={addr}")
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == f"No contract bytecode found at Base address: {addr}"
+
+
+@responses.activate
 def test_analyze_rpc_error(client):
     responses.post(
         RPC_URL,
@@ -128,6 +142,16 @@ def test_analyze_invalid_address_returns_422_without_payment(client_with_x402):
     assert resp.status_code == 422
     data = resp.get_json()
     assert "Invalid" in data["error"]
+
+
+def test_analyze_no_bytecode_returns_422_without_payment(client_with_x402):
+    """No-bytecode address returns 422 before x402 payment processing."""
+    addr = "0x" + "aa" * 20
+    with patch("risk_api.app.get_code", return_value="0x"):
+        resp = client_with_x402.get(f"/analyze?address={addr}")
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == f"No contract bytecode found at Base address: {addr}"
 
 
 def test_analyze_head_without_address_returns_422(client_with_x402):
@@ -834,6 +858,8 @@ def test_openapi_get_422_has_example(client):
     data = resp.get_json()
     example = data["paths"]["/analyze"]["get"]["responses"]["422"]["content"]["application/json"]["example"]
     assert "error" in example
+    examples = data["paths"]["/analyze"]["get"]["responses"]["422"]["content"]["application/json"]["examples"]
+    assert "no_bytecode" in examples
 
 
 def test_openapi_post_200_has_example(client):

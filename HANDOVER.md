@@ -6,240 +6,157 @@
 - Branch: `master`
 - Status: yellow
 - Working tree:
-  - Modified: `README.md`, `docs/REGISTRATIONS.md`
-  - Untracked: `.claude/settings.local.json`, `.codex/`, `.playwright-mcp/`, `avatar.html`
+  - Modified: `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `src/risk_api/app.py`, `tests/conftest.py`, `tests/test_app.py`, `tests/test_logging.py`
+  - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`
 
 ## What We Worked On
-- Reviewed the codebase and turned that review into a strategy-aware, bugfix-first refactor roadmap.
-- Cross-checked refactor advice against `docs/DECISIONS.md`, especially ADR-006 (`ship fast, iterate from live data`).
-- Fixed two real correctness issues:
-  - proxy implementation scoring missed shared heuristics
-  - deployer reputation conflated true "not found" with external API failure
-- Synced version/runtime docs with the actual package and container config.
-- Audited current monitoring and discovery surfaces after the domain migration.
-- Added a repo-level `AGENTS.md` so future agent sessions share the same startup and source-of-truth rules.
-- Refreshed repo handoff and napkin guidance for future sessions.
-- Reorganized strategy and execution docs so business planning and active backlog are no longer mixed together.
+- Executed the first pass of the growth backlog in priority order:
+  - `G-001` hard-error no-bytecode inputs
+  - `G-002` standardize public example addresses
+  - `G-004` continue directory audit
+  - `G-016` lightweight funnel instrumentation on the existing request-log `/stats` path
 
 ## What Got Done
 
-### 1) Code review and priority reset
-- Reviewed the main flow in:
+### 1) `G-001` no-bytecode inputs now fail before payment
+- Problem:
+  - `/analyze` only validated address shape before the x402 gate.
+  - EOA, wallet, or undeployed Base addresses could still reach analysis and look `safe`, which is misleading.
+- Fix:
   - `src/risk_api/app.py`
-  - `src/risk_api/analysis/engine.py`
-  - `src/risk_api/analysis/scoring.py`
-  - `src/risk_api/analysis/reputation.py`
-  - `src/risk_api/chain/rpc.py`
-- Initial refactor plan over-emphasized modularization.
-- After reading `docs/DECISIONS.md`, the practical order became:
-  1. Fix implementation scoring correctness
-  2. Fix version/doc drift
-  3. Fix reputation edge-case semantics
-  4. Assess `/stats` scalability risk
-  5. Defer `app.py` modularization until traffic or change pain justifies it
-
-### 2) Fixed implementation scoring bug
-- Problem:
-  - `_analyze_implementation()` in `src/risk_api/analysis/engine.py` manually summed finding points instead of using `compute_score()`.
-  - Proxy implementation contracts were missing shared heuristics such as:
-    - `suspicious_selector`
-    - `tiny_bytecode`
-- Fix:
-  - Replaced the manual category accumulation path with `compute_score(findings, instructions, bytecode_hex)`.
+    - added a pre-paywall `get_code()` check for `GET` and `POST`
+    - returns `422` with `No contract bytecode found at Base address: ...` when bytecode is empty
+    - keeps `HEAD` lightweight and syntax-only so payment preflight behavior is unchanged
+    - returns `502` before payment if the Base RPC lookup itself fails
 - Result:
-  - Implementation scoring now matches top-level contract scoring behavior.
+  - wrong-address and wallet-address inputs no longer look analyzable or billable
 
-### 3) Added regression tests for implementation scoring
-- Updated `tests/test_engine.py` with new cases covering:
-  - implementation-level suspicious selector scoring
-  - implementation-level tiny bytecode scoring
-- Validation run:
-  - `python -m pytest tests/test_engine.py -q`
-  - Result: `19 passed in 0.27s`
-
-### 4) Fixed reputation edge-case semantics
-- Problem:
-  - `get_contract_creator()` in `src/risk_api/analysis/reputation.py` returned `None` for both:
-    - genuine "creator not found"
-    - Basescan/network/API failure
-  - `detect_deployer_reputation()` treated both as a 3-point `"Contract creator not found on Basescan"` finding.
-  - This meant external API failure could incorrectly raise contract risk.
-- Fix:
-  - Added explicit creator lookup states with:
-    - `CreatorLookupStatus`
-    - `CreatorLookupResult`
-  - `get_contract_creator()` now distinguishes:
-    - `FOUND`
-    - `NOT_FOUND`
-    - `ERROR`
-  - `detect_deployer_reputation()` now:
-    - returns `[]` on external/API error
-    - only adds the 3-point finding on true `NOT_FOUND`
-- Result:
-  - Basescan failure now degrades gracefully without false penalties.
-
-### 5) Updated reputation tests
-- Updated `tests/test_reputation.py` to cover the new semantics:
-  - creator found
-  - creator not found
-  - creator API error
-  - full graceful failure path returns no findings
-- Validation run:
-  - `cmd /c python -m pytest tests\test_reputation.py -q`
-  - Result: `14 passed in 0.18s`
-- Note:
-  - A direct PowerShell test invocation hit an environment/runtime issue (`OutOfMemoryException`) unrelated to repo code, so the suite was rerun successfully via `cmd`.
-
-### 6) Fixed docs/runtime drift
-- Synced docs to actual runtime config from:
-  - `pyproject.toml`
-  - `Dockerfile`
-- Updated:
+### 2) `G-002` public examples now use one Base example set
+- Canonical examples now used across public app surfaces:
+  - safe example: Base WETH `0x4200000000000000000000000000000000000006`
+  - proxy example: Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+  - implementation example: `0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779`
+- Updated in:
+  - OpenAPI examples
+  - landing-page curl example
+  - Bazaar/x402 discovery examples
+  - `llms.txt` / `llms-full.txt`
   - `README.md`
-  - `CLAUDE.md`
-- Specific corrections:
-  - Python requirement described as `3.10+` package requirement with `3.13` in Docker
-  - x402 reference updated from stale `v2.2.0` wording to current `>=2.3.0,<2.4` / `2.3.x` wording
-  - production `gunicorn` command in `CLAUDE.md` now matches `Dockerfile`
+  - x402 test fixtures
 
-### 7) Napkin updates
-- Updated `.codex/napkin.md` with reusable repo guidance:
-  - prefer `pyproject.toml` as dependency/version source of truth
-  - metadata/discovery content is duplicated across runtime and scripts
-  - reuse `compute_score()` across analysis paths
-  - keep Basescan external failure distinct from true "not found"
+### 3) `G-016` funnel instrumentation is now in the request log and `/stats`
+- `src/risk_api/app.py`
+  - request logging now tracks both `/` and `/analyze`
+  - each logged event can carry `funnel_stage`
+  - current stages in use:
+    - `landing_view`
+    - `unpaid_402`
+    - `invalid_address`
+    - `no_bytecode`
+    - `paid_request`
+    - `analyze_success`
+    - `rpc_error`
+- `/stats` now returns:
+  - `funnel.landing_views`
+  - `funnel.valid_unpaid_402_attempts`
+  - `funnel.invalid_address_requests`
+  - `funnel.no_bytecode_requests`
+  - `funnel.paid_requests`
+  - hourly buckets with the same breakdown
+- `/dashboard` was only lightly adjusted:
+  - labels now say "Tracked Events"
+  - recent table shows event stage
+  - it still uses the same `/stats` endpoint and is still a per-instance log view, not durable analytics
 
-### 8) Reorganized growth planning docs
-- `docs/BizPlanning.md` was rewritten as the durable strategy document:
-  - funnel diagnosis
-  - durable priorities
-  - pricing and moat
-  - explicit "what not to do first"
-- Added `docs/GrowthExecutionPlan.md` as the operating backlog:
-  - workstreams
-  - current sprint checklist
-  - issue-style items `G-001` through `G-017`
-  - sequencing across `Now`, `Next`, and `Later`
-- Key planning outcome:
-  - prioritize trust and correctness before expanding surface area
-  - instrument the funnel early enough to guide the next sprint
-  - treat old-domain redirect work as conditional on the registry audit
+### 4) `G-004` directory audit continued and was documented
+- Added a fresh audit table to `docs/REGISTRATIONS.md` for 2026-03-07.
+- Current audit state captured there:
+  - `8004scan` / ERC-8004 page: correct, canonical domain visible
+  - `x402.jobs`: public listing route returns `200` but the page is wrapped in a `MaintenanceGate`; old Conway slug still appears in the path, so manual/authenticated verification is still needed
+  - `x402list.fun`: still not trustworthy as a repo-side signal; static HTML did not expose the Augur listing in this pass
+  - `x402.org/ecosystem`: missing
+  - Coinbase public x402 discovery feed: responds, but no `Augur` / `augurrisk.com` item is present
+- Practical result:
+  - `G-004` advanced, but I would not mark it fully closed until the remaining manual/dynamic-directory checks are done
 
-### 9) Audited monitoring and external directory state
-- Confirmed:
-  - Better Stack is the external uptime/health monitor for `https://augurrisk.com/health`
-  - Fly has `PUBLIC_URL` deployed for `augurrisk.com`
-  - the current `x402.jobs` listing already points to `augurrisk.com`
-- Confirmed remaining issue:
-  - `x402list.fun` still shows the legacy Conway hostname (`risk-api.life.conway.tech`)
-  - this persisted even after fresh paid settlements against `augurrisk.com`
-- Practical conclusion:
-  - treat Better Stack and `/health` as the uptime source of truth
-  - treat `/dashboard` and `/stats` as per-instance request-log views only
-  - treat the x402list.fun hostname drift as an external directory/indexing issue, not a repo-side config bug
-- Documentation update:
-  - added monitoring notes to `README.md`
-  - added monitoring/x402list state notes to `docs/REGISTRATIONS.md`
+### 5) Growth plan docs were updated to reflect progress
+- `docs/GrowthExecutionPlan.md`
+  - marked `G-001`, `G-002`, and `G-016` complete
+- `README.md`
+  - now documents the explicit no-bytecode `422`
+  - example response matches the canonical Base proxy example
 
-### 10) Added repo-level agent startup rules
-- Added `AGENTS.md` at the repo root.
-- Purpose:
-  - tell future agents to read `HANDOVER.md` and `.codex/napkin.md` first
-  - define code/runtime config as the source of truth over docs
-  - preserve the current monitoring and discovery rules around Better Stack, `/dashboard`, and x402list.fun
-- Rule of thumb:
-  - keep `AGENTS.md` short and durable
-  - put session state in `HANDOVER.md`
-  - put recurring execution guidance in `.codex/napkin.md`
+## Validation
+- Ran:
+  - `cmd /c python -m pytest tests\test_app.py tests\test_logging.py -q`
+- Result:
+  - `97 passed in 3.24s`
 
 ## What Worked
-- Reading `docs/DECISIONS.md` was the right strategic constraint; it prevented an over-engineered refactor path.
-- Both correctness fixes were small, local, and easy to regression test.
-- Focused test runs (`test_engine.py`, `test_reputation.py`) were fast and sufficient for these changes.
-- Using `login:false` for shell commands avoided several PowerShell startup issues in this environment.
-- Falling back to `cmd /c` was effective when PowerShell itself became unstable.
+- Doing the no-bytecode check before the paywall was the right product behavior.
+  - Because `risk_api.chain.rpc.get_code()` is cached, the later analysis path can reuse the same lookup instead of paying for a second live RPC roundtrip.
+- Extending the existing request-log flow was enough for `G-016`.
+  - No new analytics service or schema migration was needed.
+- Targeted route/logging tests were sufficient and fast.
 
 ## What Didn’t / Gotchas
-- Do **not** trust `README.md` / `CLAUDE.md` as the source of truth for versions; they had drifted from `pyproject.toml` and `Dockerfile`.
-- `handover` and `napkin` are **skills**, not necessarily slash commands visible in the `/` picker.
-- PowerShell in this environment is flaky:
-  - some commands failed with CLR/init issues under normal startup
-  - one pytest invocation failed with a PowerShell `OutOfMemoryException` before tests even ran
-  - `cmd /c ...` is a good fallback for test commands
+- Dynamic/public directory pages are still awkward to audit from static HTML alone.
+  - `x402.jobs` exposed a `MaintenanceGate` shell instead of a clean public listing payload.
+  - `x402list.fun` did not expose the relevant listing details in prerendered HTML.
+- The Coinbase public discovery feed endpoint currently responds with JSON, but Augur is not present there.
+  - Do not assume facilitator settlements alone have indexed the service.
+- `/stats` still scans the full request log on each request.
+  - Acceptable for now, but worth revisiting if traffic grows.
 
 ## Key Decisions
-- Do **not** do a large `app.py` modularization now.
-  - Reason: `docs/DECISIONS.md` ADR-006 favors shipping and learning over speculative architecture work.
-- Treat both discovered issues as **correctness bugs**, not broad refactors:
-  - implementation scoring gap
-  - reputation error/not-found conflation
-- Prefer low-cost correctness and documentation fixes before structural cleanup.
-- Do **not** keep chasing x402list.fun hostname drift via repo code changes once `PUBLIC_URL`, app scripts, and primary listings already point at `augurrisk.com`.
-  - Reason: current evidence points to an external directory state problem, not an app/runtime bug.
+- Keep the no-bytecode rejection before x402 payment.
+  - Reason: users should not pay for EOAs or undeployed addresses, and those inputs should never look `safe`.
+- Keep `HEAD /analyze` cheap.
+  - Reason: it preserves the current payment-preflight behavior without forcing an RPC lookup on every HEAD request.
+- Treat the new funnel instrumentation as log enrichment, not a dashboard project.
+  - Reason: this satisfies `G-016` without introducing a heavier analytics dependency.
+- Treat the remaining directory issues as external/manual verification work unless a live surface clearly exposes stale repo-controlled metadata.
 
 ## Recommended Next Steps
-1. `G-001` Hard-error no-bytecode inputs in `/analyze`
-   - Wrong-address or wallet-address inputs should not return `safe`.
-2. `G-002` Standardize all public example addresses
-   - Replace any lingering Base/mainnet-confusing examples in landing page, OpenAPI, Bazaar metadata, and `llms.txt`.
-3. `G-004` Audit registry and directory listings
-   - Narrow the remaining discovery audit to x402list.fun and other external directories; `x402.jobs` and Fly `PUBLIC_URL` are already confirmed healthy.
-4. `G-016` Instrument the funnel baseline
-   - At minimum: landing page views, valid unpaid `402` attempts, invalid addresses, no-bytecode requests, paid requests.
-5. Optionally assess `/stats` behavior in `src/risk_api/app.py`
-   - It appears to scan the full request log on every request; verify whether that matters yet.
+1. Finish `G-004`.
+   - Manually verify `x402.jobs` from an authenticated browser session.
+   - Recheck `x402list.fun` in a live browser and capture whether it still shows the Conway host.
+   - Decide whether the legacy `x402 Bazaar` ID in `docs/REGISTRATIONS.md` still maps to a real public surface or should be downgraded to historical.
+2. Start `G-003`.
+   - Now that examples are standardized, audit wording across landing page, docs, and machine-readable metadata for any remaining trust leaks or chain ambiguity.
+3. Consider a small `/dashboard` follow-up only if needed.
+   - The data is now in `/stats`; only do more UI work if the current dashboard makes the funnel hard to read.
+4. If Augur is still absent from the public CDP feed, treat that as follow-up work for discovery/distribution, not an app bug.
 
-## Important Files Modified This Session
-- `src/risk_api/analysis/engine.py`
-  - Fixed implementation scoring to route through `compute_score()`.
-- `tests/test_engine.py`
-  - Added regression coverage for implementation suspicious-selector and tiny-bytecode scoring.
-- `src/risk_api/analysis/reputation.py`
-  - Added explicit creator lookup result states so API failure and true not-found are handled differently.
-- `tests/test_reputation.py`
-  - Updated tests for the new reputation semantics.
-- `README.md`
-  - Synced version/runtime docs with actual package/runtime config and documented Better Stack plus the role of `/health` vs `/dashboard`.
-- `docs/REGISTRATIONS.md`
-  - Added monitoring notes and recorded that x402list.fun still shows the legacy Conway hostname as of 2026-03-07.
-- `AGENTS.md`
-  - Added repo-level startup, source-of-truth, monitoring, and documentation hygiene rules for future agent sessions.
-- `CLAUDE.md`
-  - Synced stack and production command docs with `pyproject.toml` and `Dockerfile`.
-- `.codex/napkin.md`
-  - Added reusable repo guidance for request-log interpretation, Better Stack uptime checks, and x402list.fun host drift.
-- `docs/BizPlanning.md`
-  - Rewritten to hold durable strategy instead of mixed strategy/backlog content.
-- `docs/GrowthExecutionPlan.md`
-  - New execution backlog for growth, conversion, and revenue work.
-- `HANDOVER.md`
-  - Updated to reflect the planning split and current execution priorities.
-
-## Important Files Read For Context
-- `docs/DECISIONS.md`
-- `pyproject.toml`
-- `Dockerfile`
+## Important Files Modified
 - `src/risk_api/app.py`
-- `src/risk_api/analysis/scoring.py`
-- `src/risk_api/analysis/reputation.py`
-- `tests/test_engine.py`
-- `tests/test_reputation.py`
+  - pre-paywall no-bytecode validation
+  - canonical example constants
+  - funnel-stage request logging
+  - richer `/stats`
+  - minor `/dashboard` stage display tweak
+- `tests/test_app.py`
+  - route coverage for the new no-bytecode `422`
+  - OpenAPI coverage for the new `422` examples
+- `tests/test_logging.py`
+  - landing-view logging coverage
+  - no-bytecode logging coverage
+  - `/stats` funnel coverage
+- `tests/conftest.py`
+  - canonical Bazaar fixture examples
+  - default mocked bytecode for x402-gated tests
+- `README.md`
+  - documented no-bytecode `422`
+  - canonicalized example response
+- `docs/GrowthExecutionPlan.md`
+  - checked off `G-001`, `G-002`, `G-016`
+- `docs/REGISTRATIONS.md`
+  - added the 2026-03-07 current-state audit table
 
 ## Suggested Restart Context For Next Agent
-- The two main correctness issues found during review are already fixed:
-  - implementation scoring gap
-  - reputation error/not-found conflation
-- Current planning now lives in two places:
-  - `docs/BizPlanning.md` for durable strategy
-  - `docs/GrowthExecutionPlan.md` for active execution
-- Best immediate follow-up is the top of the growth checklist:
-  - `G-001`
-  - `G-002`
-  - `G-004` with emphasis on x402list.fun and other external directories, not repo-side domain config
-  - `G-016` in parallel once `G-001` is defined
-- Current operational read:
-  - Better Stack is the uptime source of truth
-  - `x402.jobs` is already on `augurrisk.com`
-  - `x402list.fun` still shows the Conway hostname despite fresh new-domain settlements
-  - further x402list.fun work likely requires external directory intervention or waiting on their indexing behavior
-- Keep the strategy constraint in mind: prefer bug fixes and low-cost cleanup over structural churn unless real usage pain justifies it.
+- `G-001`, `G-002`, and `G-016` are implemented and tested.
+- `G-004` is partially completed in docs, but still needs manual/dynamic verification for `x402.jobs` and `x402list.fun`.
+- The most important runtime behavior change is:
+  - `/analyze` now rejects empty-bytecode Base addresses with `422` before payment
+- The most important analytics change is:
+  - `/stats` now exposes funnel counts and recent events via `funnel_stage`

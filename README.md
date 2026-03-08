@@ -29,40 +29,40 @@ The x402 flow:
 3. Client resends request with `PAYMENT-SIGNATURE` header containing proof
 4. Server verifies with facilitator -> returns analysis
 
+Wallet, EOA, or undeployed addresses return `422` with an explicit `No contract bytecode found at Base address: ...` error and are not billed.
+
 **Example response:**
 ```json
 {
   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "score": 63,
+  "score": 60,
   "level": "high",
-  "bytecode_size": 1820,
+  "bytecode_size": 1485,
   "findings": [
     {
       "detector": "proxy",
-      "severity": "info",
-      "title": "EIP-1967 Proxy",
-      "description": "Contract delegates calls to an implementation address",
-      "points": 5,
-      "offset": 42
+      "severity": "medium",
+      "title": "EIP-1967 Proxy Detected",
+      "description": "Contract uses the EIP-1967 transparent proxy pattern. Logic resides in a separate implementation contract that can be upgraded.",
+      "points": 20
     },
     {
-      "detector": "impl_delegatecall",
-      "severity": "high",
-      "title": "Delegatecall in Implementation",
-      "description": "Implementation contract uses DELEGATECALL",
+      "detector": "delegatecall",
+      "severity": "medium",
+      "title": "Delegatecall Usage",
+      "description": "Contract uses DELEGATECALL to execute code from another contract.",
       "points": 15,
-      "offset": 1234
     }
   ],
   "category_scores": {
-    "proxy": 5,
+    "proxy": 20,
     "delegatecall": 15,
     "impl_delegatecall": 15,
-    "impl_hidden_mint": 25
+    "impl_hidden_mint": 10
   },
   "implementation": {
-    "address": "0x2ce610...d779",
-    "bytecode_size": 23000,
+    "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
+    "bytecode_size": 24576,
     "findings": [...],
     "category_scores": {...}
   }
