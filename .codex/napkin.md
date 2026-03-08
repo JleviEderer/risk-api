@@ -33,8 +33,8 @@
    Do instead: verify service health against Better Stack and the public `/health` probe before inferring availability from the dashboard or request-log volume.
 9. **[2026-03-08] Treat x402list.fun stale-host drift as external directory state**
    Do instead: once app config, scripts, and `PUBLIC_URL` all point to `augurrisk.com`, assume the live `risk-api.life.conway.tech` provider page and `augurrisk.com` `404` on x402list.fun need directory-side intervention, not more repo-side edits.
-10. **[2026-03-07] x402.jobs public listing checks can be inconclusive**
-   Do instead: if the public route is wrapped in a `MaintenanceGate` shell, treat the slug as verified but keep rendered-content checks as browser-only follow-up.
+10. **[2026-03-08] Verify CDP usage from Fly machine env, not memory**
+   Do instead: when Coinbase indexing is in doubt, confirm `FACILITATOR_URL` directly from the live Fly machine and pair it with a real paid settlement before blaming repo config.
 
 ## User Directives
 1. **[2026-03-06] Give opinionated codebase recommendations**

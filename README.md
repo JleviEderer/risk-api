@@ -326,8 +326,8 @@ RPC calls are mocked via the `responses` library. Call `clear_analysis_cache()` 
 | Registry | Details |
 |----------|---------|
 | **ERC-8004 #19074** | Base mainnet, owner `0x1358...9891`, IPFS metadata |
-| **Coinbase Bazaar** | Auto-indexed after first CDP facilitator settlement |
-| **x402.jobs** | Listed (old domain `risk-api.life.conway.tech` - needs update) |
+| **Coinbase Bazaar** | Production is using the CDP facilitator, but Augur is still missing from the public discovery feed as of 2026-03-08 |
+| **x402.jobs** | Listed at the canonical `augurrisk-com/augur-base` URL and browser-verified correct on 2026-03-08 |
 | **x402list.fun** | Listed (old domain - needs update) |
 
 **Current on-chain agent URI:** `ipfs://QmNUK1ZnwN8fShKFFSmDa2EZvy6VBquftpU7m2oazsPZv1`

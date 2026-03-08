@@ -6,7 +6,7 @@
 - Branch: `master`
 - Status: yellow
 - Working tree:
-  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`
+  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/REGISTRATIONS.md`
   - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`
 
 ## What We Worked On
@@ -71,10 +71,10 @@
 ### 4) `G-004` is now closed as an audit
 - Rechecked the public surfaces on 2026-03-08 and updated `docs/REGISTRATIONS.md`:
   - `8004scan`: still correct
-  - `x402.jobs`: canonical route is live, but public HTML still only exposes a `MaintenanceGate` shell
+  - `x402.jobs`: browser verification showed the canonical listing is correct
   - `x402list.fun`: stale legacy provider page is still live at `risk-api.life.conway.tech`, while `augurrisk.com` returns `404`
   - legacy `x402 Bazaar` ID is now treated as historical or unverified until it can be tied to a public surface
-  - Coinbase public x402 discovery feed still does not expose Augur
+  - Coinbase public x402 discovery feed still does not expose Augur, even though production is on CDP
   - `x402.org/ecosystem` still does not list Augur
 - Practical result:
   - `G-004` is complete as a current-state audit
@@ -85,6 +85,21 @@
   - marked `G-001`, `G-002`, `G-004`, and `G-016` complete
 - `docs/REGISTRATIONS.md`
   - now records the confirmed stale x402list legacy page and canonical `404`
+  - now records that production is using the CDP facilitator and that a real Conway-wallet paid call succeeded on 2026-03-08
+
+### 6) CDP facilitator usage is now explicitly verified
+- Ran `python scripts/test_x402_payment.py` with Conway wallet `0x79301Cf19Aaea29fbe40F0F5B78F73e2c3b0a2b8`.
+- Result:
+  - real paid call to `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`
+  - `402` then `200`
+  - response score `3` / `safe`
+- Verified live Fly production config from machine `e2861d10f1e928`:
+  - `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`
+  - `PUBLIC_URL=https://augurrisk.com`
+  - `CDP_API_KEY_ID` is present
+- Practical result:
+  - production is definitely using CDP, not Mogami
+  - Coinbase public discovery-feed absence is not caused by wrong facilitator config
 
 ## Validation
 - Previously ran:
@@ -101,12 +116,13 @@
 - Static CLI fetches were enough to confirm the most important discovery facts this time.
   - `x402list.fun/provider/risk-api.life.conway.tech` is live
   - `x402list.fun/provider/augurrisk.com` is `404`
+- The real Conway-wallet paid call plus Fly machine env check settled the CDP question decisively.
 
 ## What Didn't / Gotchas
 - Dynamic public directory pages are still awkward to audit from static HTML alone.
   - `x402.jobs` exposes a `MaintenanceGate` shell instead of a clean rendered listing payload.
 - The Coinbase public discovery feed responds with JSON, but Augur is not present there.
-  - Do not assume facilitator settlements alone have indexed the service.
+  - Even confirmed CDP production config plus a fresh paid settlement do not guarantee public-feed indexing.
 - `/stats` still scans the full request log on each request.
   - Acceptable for now, but worth revisiting if traffic grows.
 
@@ -119,6 +135,8 @@
   - Reason: this satisfies `G-016` without introducing a heavier analytics dependency.
 - Treat `x402list.fun` as confirmed stale external directory state for now.
   - Reason: the live old-host provider page still exists and the canonical host page is `404`, even though repo-side metadata already points at `augurrisk.com`.
+- Treat Coinbase public-feed absence as external indexing behavior unless CDP changes or new evidence appears.
+  - Reason: production `FACILITATOR_URL` is confirmed CDP and a real paid settlement succeeded on 2026-03-08.
 
 ## Recommended Next Steps
 1. Start `G-005`.
@@ -129,6 +147,7 @@
 3. Consider a small `/dashboard` follow-up only if needed.
    - The data is now in `/stats`; only do more UI work if the current dashboard makes the funnel hard to read.
 4. If Augur is still absent from the public CDP feed, treat that as follow-up work for discovery or distribution, not an app bug.
+   - Do not reopen the "maybe production is still on Mogami" question unless Fly config changes.
 
 ## Important Files Modified
 - `docs/GrowthExecutionPlan.md`
@@ -137,6 +156,10 @@
   - updated the 2026-03-08 current-state audit table
   - marked x402list.fun as confirmed stale on the legacy Conway host
   - downgraded the old manual `x402 Bazaar` ID to historical or unverified
+  - recorded the successful Conway-wallet paid call and confirmed CDP facilitator config
+- `README.md`
+  - fixed the stale x402.jobs discovery note
+  - corrected Coinbase Bazaar wording to match the current verified state
 - `.codex/napkin.md`
   - tightened the x402list.fun runbook note with the confirmed live stale provider page and canonical `404`
 
@@ -146,6 +169,10 @@
 - The highest-signal external discovery finding is:
   - `x402list.fun/provider/risk-api.life.conway.tech` still serves the old provider page
   - `x402list.fun/provider/augurrisk.com` returns `404`
+- The CDP facilitator question is settled:
+  - production Fly config points at `https://api.cdp.coinbase.com/platform/v2/x402`
+  - a real Conway-wallet paid call succeeded on 2026-03-08
+  - Coinbase public feed still does not list Augur
 - The most important runtime behavior change is:
   - `/analyze` now rejects empty-bytecode Base addresses with `422` before payment
 - The most important analytics change is:

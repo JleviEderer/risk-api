@@ -23,11 +23,25 @@ Use this table as the current `G-004` source of truth. The list above still incl
 | Surface | Current State | Evidence | Notes |
 |---------|---------------|----------|-------|
 | [ERC-8004 / 8004scan agent #19074](https://www.8004scan.io/agents/base/19074) | Correct | Public 8004scan page shows `Augur`, `https://augurrisk.com/`, `https://augurrisk.com/avatar.png`, and Base agent `19074`. | Canonical domain and metadata are aligned on the public registry page. |
-| [x402.jobs listing route](https://www.x402.jobs/resources/augurrisk-com/augur-base) | Correct URL, content partially blocked | Public route returns `200` on 2026-03-08, uses the canonical `augurrisk-com/augur-base` slug, and static HTML still exposes a `MaintenanceGate` shell rather than the rendered listing content. | Treat this as the canonical x402.jobs listing URL. Only do browser verification if the rendered inner content matters. |
+| [x402.jobs listing route](https://www.x402.jobs/resources/augurrisk-com/augur-base) | Correct | Public route returns `200` on 2026-03-08, uses the canonical `augurrisk-com/augur-base` slug, and browser verification on 2026-03-08 showed the correct `augurrisk.com` endpoint, Base network, and $0.10 price. Static CLI fetches still only expose a `MaintenanceGate` shell. | Treat x402.jobs as verified and done unless the listing content changes later. |
 | [x402list.fun legacy provider page](https://x402list.fun/provider/risk-api.life.conway.tech) | Stale | Public provider page still returns `200` on 2026-03-08, while `https://x402list.fun/provider/augurrisk.com` returns `404`. Embedded endpoint data still points at `https://risk-api.life.conway.tech/analyze`. | This is confirmed stale directory state, not just a search-index blind spot. Repo-side metadata already points at `augurrisk.com`. |
 | x402 Bazaar legacy manual ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | Blocked / historical | Current repo notes still have the manual registration ID, but this audit did not find a matching public page or public API response tied back to that ID. | Treat this as historical until a public surface can be linked to it. |
 | [x402.org ecosystem](https://www.x402.org/ecosystem) | Missing | Public ecosystem page HTML did not include `Augur`, `augurrisk`, or `risk-api`. | `G-007` remains valid: submit Augur here rather than assuming secondary listings are enough. |
-| [Coinbase public x402 discovery feed](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) | Missing from public feed | Live JSON feed responded successfully on 2026-03-08, but no item matched `Augur`, `augurrisk.com`, `risk-api`, or `/analyze`. | Auto-indexing should not be assumed. Verify after future paid settlements or facilitator-side changes. |
+| [Coinbase public x402 discovery feed](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) | Missing from public feed | Live JSON feed responded successfully on 2026-03-08, but no item matched `Augur`, `augurrisk.com`, `risk-api`, or `/analyze`. On the same date, a real Conway-wallet paid call to `https://augurrisk.com/analyze` succeeded, and Fly production confirmed `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402` with deployed CDP credentials. | This means public feed absence is not explained by Mogami fallback or missing CDP config. Treat it as CDP-side indexing lag or separate discovery behavior unless new evidence says otherwise. |
+
+### CDP Facilitator Verification (2026-03-08)
+
+- Real paid call executed from Conway wallet `0x79301Cf19Aaea29fbe40F0F5B78F73e2c3b0a2b8` to `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
+- Request returned `402`, then `200` after payment, with score `3` / `safe`.
+- Live Fly production machine `e2861d10f1e928` confirmed:
+  - `FACILITATOR_URL=https://api.cdp.coinbase.com/platform/v2/x402`
+  - `PUBLIC_URL=https://augurrisk.com`
+  - `CDP_API_KEY_ID` present
+  - `WALLET_ADDRESS=0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`
+- Practical conclusion:
+  - production is pointed at the CDP facilitator
+  - paid settlement via CDP is working
+  - missing Coinbase public-feed discovery is not caused by the app using the wrong facilitator
 
 ### How to verify wallet on 8004scan
 
