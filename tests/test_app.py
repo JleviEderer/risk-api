@@ -819,7 +819,9 @@ def test_landing_links_discovery_endpoints(client):
     resp = client.get("/")
     assert b">OpenAPI<" in resp.data
     assert b">x402<" in resp.data
+    assert b">MCP<" in resp.data
     assert b">How Payment Works<" in resp.data
+    assert b"/mcp" in resp.data
     assert b"/openapi.json" in resp.data
     assert b"/.well-known/agent-card.json" in resp.data
     assert b"/.well-known/x402" in resp.data
@@ -879,6 +881,32 @@ def test_how_payment_works_uses_public_url(app):
 
 def test_how_payment_works_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/how-payment-works")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+
+
+def test_mcp_page(client):
+    resp = client.get("/mcp")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"Augur MCP Setup" in resp.data
+    assert b"Claude Desktop" in resp.data
+    assert b"Codex-compatible clients" in resp.data
+    assert b"examples/javascript/augur-mcp" in resp.data
+    assert b"analyze_base_contract_risk" in resp.data
+
+
+def test_mcp_page_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    with app.test_client() as c:
+        resp = c.get("/mcp")
+        assert b"https://augurrisk.com/how-payment-works" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
+        assert b"https://augurrisk.com/.well-known/x402" in resp.data
+
+
+def test_mcp_page_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/mcp")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
 
@@ -1055,6 +1083,7 @@ def test_sitemap_returns_xml(client):
 def test_sitemap_lists_public_endpoints(client):
     resp = client.get("/sitemap.xml")
     text = resp.data.decode()
+    assert "/mcp" in text
     assert "/how-payment-works" in text
     assert "/honeypot-detection-api" in text
     assert "/proxy-risk-api" in text
@@ -1157,6 +1186,7 @@ def test_llms_txt_uses_public_url(app):
         resp = c.get("/llms.txt")
         text = resp.data.decode()
         assert "https://augurrisk.com/analyze" in text
+        assert "https://augurrisk.com/mcp" in text
         assert "https://augurrisk.com/openapi.json" in text
 
 
@@ -1193,6 +1223,7 @@ def test_llms_full_txt_uses_public_url(app):
     with app.test_client() as c:
         resp = c.get("/llms-full.txt")
         text = resp.data.decode()
+        assert "https://augurrisk.com/mcp" in text
         assert "https://augurrisk.com/analyze" in text
 
 
@@ -1286,6 +1317,28 @@ def test_robots_allows_llms(client):
 def test_landing_links_llms_txt(client):
     resp = client.get("/")
     assert b"/llms.txt" in resp.data
+
+
+def test_request_log_captures_mcp_page_stage(test_config, monkeypatch, tmp_path):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+
+    resp = app.test_client().get(
+        "/mcp",
+        base_url="https://augurrisk.com",
+        headers={"User-Agent": "pytest-agent"},
+    )
+
+    assert resp.status_code == 200
+
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 1
+    assert entries[0]["path"] == "/mcp"
+    assert entries[0]["funnel_stage"] == "mcp_guide_view"
 
 
 def test_request_log_captures_proof_report_stage(test_config, monkeypatch, tmp_path):

@@ -1133,6 +1133,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 <nav class="topnav">
   <a href="__BASE_URL__/openapi.json">OpenAPI</a>
   <a href="__BASE_URL__/.well-known/x402">x402</a>
+  <a href="__BASE_URL__/mcp">MCP</a>
   <a href="__BASE_URL__/how-payment-works">How Payment Works</a>
 </nav>
 <h1>Augur</h1>
@@ -1193,6 +1194,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <div class="section">
 <h2>Discovery &amp; Integration</h2>
 <div class="links">
+  <a href="__BASE_URL__/mcp">MCP Setup<div class="path">/mcp</div></a>
   <a href="__BASE_URL__/openapi.json">OpenAPI Spec <div class="path">/openapi.json</div></a>
   <a href="__BASE_URL__/.well-known/agent-card.json">A2A Agent Card <div class="path">/.well-known/agent-card.json</div></a>
   <a href="__BASE_URL__/.well-known/x402">x402 Discovery <div class="path">/.well-known/x402</div></a>
@@ -1207,6 +1209,84 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <footer>
 Augur &middot; ERC-8004 Agent #19074 &middot; Powered by x402
 </footer>
+</body>
+</html>"""
+
+MCP_GUIDE_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Augur MCP Setup</title>
+<meta name="description" content="Install Augur as a local stdio MCP server for Claude Desktop, Codex-compatible clients, and other MCP tooling.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0f1117;color:#e0e0e0;padding:24px;max-width:860px;margin:0 auto;line-height:1.65}
+h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:8px;font-weight:600}
+h2{font-size:1.05rem;color:#a0aec0;margin:24px 0 10px;font-weight:500}
+p{margin-bottom:10px}
+.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}
+code{background:#0f1117;border:1px solid #2d3148;border-radius:4px;padding:2px 6px}
+pre{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.84rem;color:#68d391;margin-top:8px}
+a{color:#f6ad55}
+a:hover{color:#fbd38d}
+ul{margin:8px 0 0 18px}
+.links{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}
+.links a{display:block;background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;
+  color:#90cdf4;text-decoration:none;font-size:.85rem;transition:border-color .2s}
+.links a:hover{border-color:#63b3ed}
+.links a .path{color:#68d391;font-family:monospace;font-size:.8rem}
+</style>
+</head>
+<body>
+<h1>Augur MCP Setup</h1>
+<p>Augur already ships a working local stdio MCP wrapper. Use it when you want the existing paid HTTP API surfaced as MCP tools inside Claude Desktop, Codex-compatible clients, or other MCP tooling.</p>
+
+<div class="section">
+<h2>What this gives you</h2>
+<ul>
+  <li>Local stdio MCP server</li>
+  <li>x402 payment stays client-side on your machine</li>
+  <li>No API key or signup for Augur itself</li>
+  <li>Two tools out of the box: <code>analyze_base_contract_risk</code> and <code>describe_augur_service</code></li>
+</ul>
+</div>
+
+<div class="section">
+<h2>Install</h2>
+<pre>git clone https://github.com/JleviEderer/risk-api
+cd risk-api/examples/javascript/augur-mcp
+npm install</pre>
+<p>Set your wallet key in <code>.env</code> using the example file in that folder, then smoke test it:</p>
+<pre>npm run smoke
+npm run smoke -- --paid</pre>
+</div>
+
+<div class="section">
+<h2>Wire it into an MCP client</h2>
+<p>Point your MCP client at the local stdio server entrypoint:</p>
+<pre>{
+  "command": "node",
+  "args": [
+    "C:/path/to/risk-api/examples/javascript/augur-mcp/index.mjs"
+  ],
+  "env": {
+    "CLIENT_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY"
+  }
+}</pre>
+<p>Use the same stdio command in Claude Desktop, Codex-compatible clients, or other MCP tooling that supports local servers.</p>
+</div>
+
+<div class="section">
+<h2>Read the wrapper docs</h2>
+<div class="links">
+  <a href="https://github.com/JleviEderer/risk-api/tree/master/examples/javascript/augur-mcp">GitHub MCP Example<div class="path">examples/javascript/augur-mcp</div></a>
+  <a href="__BASE_URL__/how-payment-works">How Payment Works<div class="path">/how-payment-works</div></a>
+  <a href="__BASE_URL__/openapi.json">OpenAPI Spec<div class="path">/openapi.json</div></a>
+  <a href="__BASE_URL__/.well-known/x402">x402 Discovery<div class="path">/.well-known/x402</div></a>
+</div>
+</div>
 </body>
 </html>"""
 
@@ -1355,6 +1435,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
 
 PUBLIC_REQUEST_STAGE_BY_PATH: dict[str, str] = {
     "/": "landing_view",
+    "/mcp": "mcp_guide_view",
     "/how-payment-works": "how_payment_view",
     "/honeypot-detection-api": "intent_honeypot_view",
     "/proxy-risk-api": "intent_proxy_view",
@@ -1574,6 +1655,7 @@ Any x402-compatible HTTP client handles this automatically.
 
 ## Links
 
+- [MCP Setup](__BASE_URL__/mcp)
 - [OpenAPI Spec](__BASE_URL__/openapi.json)
 - [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
 - [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
@@ -1747,6 +1829,7 @@ Use any x402-compatible HTTP client. The flow is:
 
 ## Links
 
+- [MCP Setup](__BASE_URL__/mcp)
 - [OpenAPI Spec](__BASE_URL__/openapi.json)
 - [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
 - [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
@@ -2325,6 +2408,7 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         paths = [
             "/",
+            "/mcp",
             "/how-payment-works",
             *INTENT_PAGES.keys(),
             *REPORT_PAGES.keys(),
@@ -2353,6 +2437,13 @@ def create_app(
         request.environ["funnel_stage"] = "how_payment_view"
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         html = PAYMENT_GUIDE_HTML.replace("__BASE_URL__", base_url)
+        return Response(html, content_type="text/html")
+
+    @app.route("/mcp")
+    def mcp_guide():
+        request.environ["funnel_stage"] = "mcp_guide_view"
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        html = MCP_GUIDE_HTML.replace("__BASE_URL__", base_url)
         return Response(html, content_type="text/html")
 
     @app.route("/reports/<path:slug>")
