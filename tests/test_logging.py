@@ -1,11 +1,13 @@
 import json
 import logging
 import os
+import sqlite3
 import tempfile
 
 import pytest
 import responses
 
+from risk_api.analytics import append_sqlite_entry
 from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
@@ -60,6 +62,7 @@ def test_config():
 @pytest.fixture()
 def app_with_logging(test_config, log_dir, monkeypatch):
     log_path = os.path.join(log_dir, "requests.jsonl")
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
     monkeypatch.setenv("REQUEST_LOG_PATH", log_path)
     app = create_app(config=test_config, enable_x402=False)
     app.config["TESTING"] = True
@@ -69,6 +72,21 @@ def app_with_logging(test_config, log_dir, monkeypatch):
 @pytest.fixture()
 def client_logged(app_with_logging):
     return app_with_logging.test_client()
+
+
+@pytest.fixture()
+def app_with_analytics_db(test_config, log_dir, monkeypatch):
+    db_path = os.path.join(log_dir, "analytics.sqlite3")
+    monkeypatch.delenv("REQUEST_LOG_PATH", raising=False)
+    monkeypatch.setenv("ANALYTICS_DB_PATH", db_path)
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+    return app
+
+
+@pytest.fixture()
+def client_analytics(app_with_analytics_db):
+    return app_with_analytics_db.test_client()
 
 
 @responses.activate
@@ -175,6 +193,8 @@ def test_stats_endpoint(client_logged, app_with_logging):
     data = resp.get_json()
     assert data["total_requests"] == 3
     assert data["paid_requests"] == 0
+    assert data["storage_backend"] == "jsonl"
+    assert data["storage_durable"] is False
     assert data["funnel"]["landing_views"] == 1
     assert data["funnel"]["paid_requests"] == 0
     assert len(data["recent"]) == 3
@@ -185,10 +205,14 @@ def test_stats_empty_when_no_requests(client_logged):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["total_requests"] == 0
+    assert data["storage_backend"] == "jsonl"
+    assert data["storage_durable"] is False
     assert data["funnel"]["landing_views"] == 0
 
 
-def test_stats_returns_501_without_log_path(test_config):
+def test_stats_returns_501_without_log_path(test_config, monkeypatch):
+    monkeypatch.delenv("REQUEST_LOG_PATH", raising=False)
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
     app = create_app(config=test_config, enable_x402=False)
     app.config["TESTING"] = True
     client = app.test_client()
@@ -225,3 +249,64 @@ def test_stats_includes_hourly_and_avg_duration(client_logged, app_with_logging)
     assert "no_bytecode_requests" in bucket
     assert "paid_requests" in bucket
     assert "avg_duration_ms" in bucket
+
+
+@responses.activate
+def test_durable_analytics_db_persists_request_events(
+    client_analytics, app_with_analytics_db
+):
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "ab" * 20
+    client_analytics.get("/")
+    client_analytics.get(f"/analyze?address={addr}")
+
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM request_events").fetchone()[0]
+
+    assert count == 2
+
+    data = client_analytics.get("/stats").get_json()
+    assert data["total_requests"] == 2
+    assert data["storage_backend"] == "sqlite"
+    assert data["storage_durable"] is True
+    assert data["funnel"]["landing_views"] == 1
+    assert data["stage_counts"]["analyze_success"] == 1
+    assert data["recent"][-1]["path"] == "/analyze"
+
+
+def test_stats_empty_when_only_durable_analytics_is_configured(client_analytics):
+    resp = client_analytics.get("/stats")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["total_requests"] == 0
+    assert data["storage_backend"] == "sqlite"
+    assert data["storage_durable"] is True
+    assert data["funnel"]["landing_views"] == 0
+
+
+def test_sqlite_analytics_ignores_duplicate_entries(app_with_analytics_db):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    entry = {
+        "ts": "2026-03-09T12:00:00Z",
+        "path": "/",
+        "status": 200,
+        "paid": False,
+        "duration_ms": 12,
+        "user_agent": "pytest-agent",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-duplicate-test",
+        "funnel_stage": "landing_view",
+    }
+
+    assert append_sqlite_entry(db_path, entry) is True
+    assert append_sqlite_entry(db_path, entry) is False
+
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM request_events").fetchone()[0]
+
+    assert count == 1

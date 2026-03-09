@@ -141,7 +141,10 @@ Canonical host policy:
 
 - Better Stack is the external uptime monitor for `https://augurrisk.com/health`.
 - `scripts/health_check.py` is the matching manual probe for that public health check.
-- Treat `/dashboard` and `/stats` as per-instance request-log views, not the authoritative monitoring surface.
+- Treat `/dashboard` and `/stats` as app telemetry, not the authoritative monitoring surface.
+- Legacy mode: if only `REQUEST_LOG_PATH` is configured, both surfaces read from the local JSONL request log and will reset on deploy or machine replacement.
+- Durable mode: if `ANALYTICS_DB_PATH` is configured on a mounted persistent path such as a Fly volume, request events are also written to SQLite and survive app restarts on that volume.
+- Current production state as of 2026-03-09: Fly now mounts volume `augur_analytics` at `/data`, and live `/stats` reports `storage_backend=sqlite`, `storage_path=/data/analytics.sqlite3`, and `storage_durable=true`.
 
 ## x402list.fun Note
 

@@ -469,6 +469,7 @@ def test_request_log_captures_intent_page_host_referer_and_request_id(
     test_config, monkeypatch, tmp_path
 ):
     log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
     monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
 
     app = create_app(config=test_config, enable_x402=False)
@@ -502,6 +503,7 @@ def test_stats_reports_new_page_and_source_summaries(
     test_config, monkeypatch, tmp_path
 ):
     log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
     monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
 
     app = create_app(config=test_config, enable_x402=False)
@@ -545,6 +547,7 @@ def test_stats_fallback_classifies_unpaid_402_requests(
     test_config, monkeypatch, tmp_path
 ):
     log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
     monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
 
     def install_fake_402_gate(app, _config):

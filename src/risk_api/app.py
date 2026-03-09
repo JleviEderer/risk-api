@@ -6,7 +6,6 @@ import json
 import logging
 import re
 import time
-from collections import Counter
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -14,6 +13,14 @@ from uuid import uuid4
 
 from flask import Flask, Response, current_app, jsonify, redirect, request
 
+from risk_api.analytics import (
+    append_sqlite_entry,
+    build_stats_payload,
+    empty_stats_payload,
+    init_sqlite_store,
+    iter_jsonl_entries,
+    iter_sqlite_entries,
+)
 from risk_api.analysis.engine import analyze_contract
 from risk_api.chain.rpc import RPCError, get_code
 from risk_api.config import Config, load_config
@@ -672,6 +679,7 @@ tr:hover td{background:rgba(17,29,47,.45)}
     </div>
     <div class="status-bar">
       <span>Auto-refreshes every 30s. Source: <code>/stats</code>. Old-domain <code>403</code> traffic may still require edge-layer visibility.</span>
+      <span id="analytics-source">Analytics backend: waiting...</span>
       <span id="updated">Waiting for data...</span>
     </div>
   </section>
@@ -1022,11 +1030,14 @@ function refresh(){
     var intent=funnel.intent_page_views||0;
     var valuable=intent+attempts+paid;
     var intentBreakdown=(funnel.intent_honeypot_views||0)+' / '+(funnel.intent_proxy_views||0)+' / '+(funnel.intent_deployer_views||0);
+    var backend=d.storage_backend||'unknown';
+    var durable=!!d.storage_durable;
+    var backendLabel=durable?('Persistent '+backend):('Ephemeral '+backend);
 
-    setMetric('total',fmtNumber(total),'Current instance log size. Use trends, not absolute lifetime counts.');
+    setMetric('total',fmtNumber(total),durable?'Current durable event count visible to this app.':'Current instance log size. Use trends, not absolute lifetime counts.');
     setMetric('valuable',fmtNumber(valuable),pct(valuable,total)+' of tracked traffic is closer to commercial value.');
     setMetric('docs',fmtNumber(docs),pct(docs,total)+' of tracked traffic is machine-readable discovery or crawler fetches.');
-    setMetric('paid',fmtNumber(paid),paid?'Visible paid traffic on this instance.':'No paid requests visible on this instance yet.');
+    setMetric('paid',fmtNumber(paid),paid?(durable?'Visible paid traffic in durable analytics.':'Visible paid traffic on this instance.'):('No paid requests visible '+(durable?'in durable analytics yet.':'on this instance yet.')));
     setMetric('landing',fmtNumber(landing),pct(landing,total)+' of tracked traffic is homepage awareness.');
     setMetric('intent',fmtNumber(intent),'Honeypot / proxy / deployer = '+intentBreakdown);
     setMetric('attempts',fmtNumber(attempts),attempts?('Paid conversion so far: '+pct(paid,attempts)):'No unpaid 402 attempts logged yet.');
@@ -1036,7 +1047,8 @@ function refresh(){
     document.getElementById('paid-conv').textContent=attempts?pct(paid,attempts):'0%';
     document.getElementById('best-signal').textContent=paid?('paid x '+paid):(attempts?('402 x '+attempts):(intent?('intent x '+intent):'docs'));
     document.getElementById('page-mix').textContent=intent+' : '+landing;
-    document.getElementById('page-mix-sub').textContent='Intent views versus homepage views on this instance.';
+    document.getElementById('page-mix-sub').textContent=durable?'Intent views versus homepage views in the durable store.':'Intent views versus homepage views on this instance.';
+    document.getElementById('analytics-source').textContent=backendLabel+(d.storage_path?(' ('+d.storage_path+')'):'');
     document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString();
     renderTrafficChart(d);
     renderFunnelBars(d);
@@ -1979,6 +1991,19 @@ def _configure_request_log_file(app: Flask) -> None:
     logger.info("Request logging enabled: %s", log_path)
 
 
+def _configure_analytics_store(app: Flask) -> None:
+    """Initialize the durable analytics backend when configured."""
+    import os
+
+    db_path = os.environ.get("ANALYTICS_DB_PATH", "")
+    if not db_path:
+        return
+
+    init_sqlite_store(db_path)
+    app.config["ANALYTICS_DB_PATH"] = db_path
+    logger.info("Durable analytics enabled: %s", db_path)
+
+
 def _setup_request_logging(app: Flask) -> None:
     """Log public page views plus /analyze funnel events as structured JSON."""
 
@@ -2040,6 +2065,13 @@ def _setup_request_logging(app: Flask) -> None:
                 pass
 
         request_logger.info(json.dumps(entry, separators=(",", ":")))
+
+        db_path = app.config.get("ANALYTICS_DB_PATH", "")
+        if isinstance(db_path, str) and db_path:
+            try:
+                append_sqlite_entry(db_path, entry)
+            except Exception:
+                logger.exception("failed to persist analytics entry")
         return response
 
 
@@ -2078,8 +2110,9 @@ def create_app(
         request.environ["skip_request_log"] = True
         return redirect(redirect_target, code=308)
 
-    _setup_request_logging(app)
     _configure_request_log_file(app)
+    _configure_analytics_store(app)
+    _setup_request_logging(app)
 
     @app.before_request
     def validate_analyze_params():
@@ -2323,228 +2356,41 @@ def create_app(
 
     @app.route("/stats")
     def stats():
-        """Basic analytics from the request log."""
+        """Basic analytics from the configured request-event store."""
+        analytics_db_path = app.config.get("ANALYTICS_DB_PATH", "")
         log_path = app.config.get("REQUEST_LOG_PATH", "")
+        if analytics_db_path:
+            return jsonify(
+                build_stats_payload(
+                    iter_sqlite_entries(str(analytics_db_path)),
+                    intent_page_stages=INTENT_PAGE_STAGES,
+                    machine_doc_stages=MACHINE_DOC_STAGES,
+                    storage_backend="sqlite",
+                    storage_path=str(analytics_db_path),
+                    storage_durable=True,
+                )
+            )
         if not log_path:
             return jsonify({"error": "logging not configured"}), 501
 
         import os
         if not os.path.exists(log_path):
-            return jsonify({
-                "total_requests": 0,
-                "paid_requests": 0,
-                "funnel": {
-                    "landing_views": 0,
-                    "how_payment_views": 0,
-                    "intent_page_views": 0,
-                    "intent_honeypot_views": 0,
-                    "intent_proxy_views": 0,
-                    "intent_deployer_views": 0,
-                    "machine_doc_fetches": 0,
-                    "valid_unpaid_402_attempts": 0,
-                    "invalid_address_requests": 0,
-                    "no_bytecode_requests": 0,
-                    "paid_requests": 0,
-                },
-                "stage_counts": {},
-                "top_paths": [],
-                "top_hosts": [],
-                "top_referers": [],
-                "avg_duration_ms": 0,
-                "hourly": [],
-                "recent": [],
-            })
+            payload = empty_stats_payload()
+            payload["storage_backend"] = "jsonl"
+            payload["storage_path"] = str(log_path)
+            payload["storage_durable"] = False
+            return jsonify(payload)
 
-        total = 0
-        paid = 0
-        duration_sum = 0.0
-        duration_count = 0
-        hourly_buckets: dict[str, dict[str, int]] = {}
-        recent: list[dict[str, object]] = []
-        stage_counts: Counter[str] = Counter()
-        path_counts: Counter[str] = Counter()
-        host_counts: Counter[str] = Counter()
-        referer_counts: Counter[str] = Counter()
-        funnel = {
-            "landing_views": 0,
-            "how_payment_views": 0,
-            "intent_page_views": 0,
-            "intent_honeypot_views": 0,
-            "intent_proxy_views": 0,
-            "intent_deployer_views": 0,
-            "machine_doc_fetches": 0,
-            "valid_unpaid_402_attempts": 0,
-            "invalid_address_requests": 0,
-            "no_bytecode_requests": 0,
-            "paid_requests": 0,
-        }
-        with open(log_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                total += 1
-                if entry.get("paid"):
-                    paid += 1
-
-                stage = entry.get("funnel_stage", "")
-                if not isinstance(stage, str) or not stage:
-                    if entry.get("path") == "/":
-                        stage = "landing_view"
-                    elif entry.get("paid") and entry.get("status") == 200:
-                        stage = "paid_request"
-                    elif entry.get("status") == 402:
-                        stage = "unpaid_402"
-                    elif entry.get("status") == 422:
-                        stage = "invalid_address"
-                    else:
-                        stage = ""
-
-                dur = entry.get("duration_ms")
-                if isinstance(dur, (int, float)):
-                    duration_sum += dur
-                    duration_count += 1
-
-                ts = entry.get("ts", "")
-                if len(ts) >= 13:
-                    hour_key = ts[:13] + ":00:00Z"
-                    bucket = hourly_buckets.get(hour_key)
-                    if bucket is None:
-                        bucket = {
-                            "count": 0,
-                            "paid": 0,
-                            "dur_sum": 0,
-                            "dur_n": 0,
-                            "landing_views": 0,
-                            "how_payment_views": 0,
-                            "intent_page_views": 0,
-                            "intent_honeypot_views": 0,
-                            "intent_proxy_views": 0,
-                            "intent_deployer_views": 0,
-                            "machine_doc_fetches": 0,
-                            "valid_unpaid_402_attempts": 0,
-                            "invalid_address_requests": 0,
-                            "no_bytecode_requests": 0,
-                            "paid_requests": 0,
-                        }
-                        hourly_buckets[hour_key] = bucket
-                    bucket["count"] += 1
-                    if entry.get("paid"):
-                        bucket["paid"] += 1
-                    if isinstance(dur, (int, float)):
-                        bucket["dur_sum"] += int(dur)
-                        bucket["dur_n"] += 1
-
-                    if stage == "landing_view":
-                        bucket["landing_views"] += 1
-                    elif stage == "how_payment_view":
-                        bucket["how_payment_views"] += 1
-                    elif stage in INTENT_PAGE_STAGES:
-                        bucket["intent_page_views"] += 1
-                        if stage == "intent_honeypot_view":
-                            bucket["intent_honeypot_views"] += 1
-                        elif stage == "intent_proxy_view":
-                            bucket["intent_proxy_views"] += 1
-                        elif stage == "intent_deployer_view":
-                            bucket["intent_deployer_views"] += 1
-                    elif stage in MACHINE_DOC_STAGES:
-                        bucket["machine_doc_fetches"] += 1
-                    elif stage == "unpaid_402":
-                        bucket["valid_unpaid_402_attempts"] += 1
-                    elif stage == "invalid_address":
-                        bucket["invalid_address_requests"] += 1
-                    elif stage == "no_bytecode":
-                        bucket["no_bytecode_requests"] += 1
-                    elif stage == "paid_request":
-                        bucket["paid_requests"] += 1
-
-                if stage == "landing_view":
-                    funnel["landing_views"] += 1
-                elif stage == "how_payment_view":
-                    funnel["how_payment_views"] += 1
-                elif stage in INTENT_PAGE_STAGES:
-                    funnel["intent_page_views"] += 1
-                    if stage == "intent_honeypot_view":
-                        funnel["intent_honeypot_views"] += 1
-                    elif stage == "intent_proxy_view":
-                        funnel["intent_proxy_views"] += 1
-                    elif stage == "intent_deployer_view":
-                        funnel["intent_deployer_views"] += 1
-                elif stage in MACHINE_DOC_STAGES:
-                    funnel["machine_doc_fetches"] += 1
-                elif stage == "unpaid_402":
-                    funnel["valid_unpaid_402_attempts"] += 1
-                elif stage == "invalid_address":
-                    funnel["invalid_address_requests"] += 1
-                elif stage == "no_bytecode":
-                    funnel["no_bytecode_requests"] += 1
-                elif stage == "paid_request":
-                    funnel["paid_requests"] += 1
-
-                if stage:
-                    stage_counts[stage] += 1
-
-                path = entry.get("path")
-                if isinstance(path, str) and path:
-                    path_counts[path] += 1
-
-                host = entry.get("host")
-                if isinstance(host, str) and host:
-                    host_counts[host] += 1
-
-                referer = entry.get("referer")
-                if isinstance(referer, str) and referer:
-                    referer_counts[referer] += 1
-
-                recent.append(entry)
-
-        hourly = [
-            {
-                "hour": h,
-                "count": b["count"],
-                "paid": b["paid"],
-                "landing_views": b["landing_views"],
-                "how_payment_views": b["how_payment_views"],
-                "intent_page_views": b["intent_page_views"],
-                "intent_honeypot_views": b["intent_honeypot_views"],
-                "intent_proxy_views": b["intent_proxy_views"],
-                "intent_deployer_views": b["intent_deployer_views"],
-                "machine_doc_fetches": b["machine_doc_fetches"],
-                "valid_unpaid_402_attempts": b["valid_unpaid_402_attempts"],
-                "invalid_address_requests": b["invalid_address_requests"],
-                "no_bytecode_requests": b["no_bytecode_requests"],
-                "paid_requests": b["paid_requests"],
-                "avg_duration_ms": (
-                    round(b["dur_sum"] / b["dur_n"]) if b["dur_n"] else 0
-                ),
-            }
-            for h, b in sorted(hourly_buckets.items())
-        ]
-
-        def _top_items(counter: Counter[str], key_name: str) -> list[dict[str, object]]:
-            return [
-                {key_name: item, "count": count}
-                for item, count in counter.most_common(10)
-            ]
-
-        return jsonify({
-            "total_requests": total,
-            "paid_requests": paid,
-            "funnel": funnel,
-            "stage_counts": dict(stage_counts),
-            "top_paths": _top_items(path_counts, "path"),
-            "top_hosts": _top_items(host_counts, "host"),
-            "top_referers": _top_items(referer_counts, "referer"),
-            "avg_duration_ms": (
-                round(duration_sum / duration_count) if duration_count else 0
-            ),
-            "hourly": hourly,
-            "recent": recent[-20:],
-        })
+        return jsonify(
+            build_stats_payload(
+                iter_jsonl_entries(str(log_path)),
+                intent_page_stages=INTENT_PAGE_STAGES,
+                machine_doc_stages=MACHINE_DOC_STAGES,
+                storage_backend="jsonl",
+                storage_path=str(log_path),
+                storage_durable=False,
+            )
+        )
 
     @app.route("/avatar.png")
     def avatar():

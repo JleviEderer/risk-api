@@ -43,5 +43,9 @@
 ## Repo Workflow
 1. **[2026-03-07] Keep `AGENTS.md` stable and use it for startup rules only**
    Do instead: put durable repo-wide agent instructions in `AGENTS.md`, and keep session state in `HANDOVER.md` plus recurring runbook knowledge in `.codex/napkin.md`.
-2. **[2026-03-08] Treat `/stats` as app telemetry, not edge telemetry**
-   Do instead: use `/stats` for per-instance summaries over logged public GET routes and `/analyze` including `host`, `referer`, `request_id`, `top_paths`, `top_hosts`, and `top_referers`, but use Fly / proxy / DNS-side telemetry for old-domain `403` traffic that may never reach Flask.
+2. **[2026-03-09] Treat `/stats` and `/dashboard` as app telemetry, not canonical analytics**
+   Do instead: use them for request-event summaries over logged public GET routes and `/analyze` including `host`, `referer`, `request_id`, `top_paths`, `top_hosts`, and `top_referers`; if `ANALYTICS_DB_PATH` is unset they still read from local JSONL state and reset across Fly deploys, so enable the SQLite backend on a mounted durable path before treating the dashboard as persistent. This Fly-volume SQLite path assumes a single active app machine; use edge telemetry for old-domain `403` traffic that never reaches Flask and redesign storage before scaling analytics across multiple active machines.
+3. **[2026-03-09] Fly config now assumes the analytics volume exists**
+   Do instead: production already has Fly volume `augur_analytics` in `iad`; if you recreate production or add another environment, create that volume first because `fly.toml` mounts it at `/data` and points `ANALYTICS_DB_PATH` plus `REQUEST_LOG_PATH` there by default.
+4. **[2026-03-09] Production durable analytics is live on a Fly volume**
+   Do instead: expect live `/stats` to report `storage_backend=sqlite`, `storage_path=/data/analytics.sqlite3`, and `storage_durable=true`; if those fields regress after future deploys, check Fly volume attachment before debugging app code.

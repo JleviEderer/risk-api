@@ -1,13 +1,13 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-08
+- Date: 2026-03-09
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
 - Status: green
 - Working tree:
-  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `docs/x402-landscape-research.md`, `src/risk_api/app.py`, `tests/test_app.py`
-  - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `docs/MCP_PACKAGING_PLAN.md`, `docs/agent-economy-primer.md`, `examples/javascript/augur-mcp/`, `scripts/check_cdp_discovery.py`
+  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `fly.toml`, `src/risk_api/app.py`, `tests/test_app.py`, `tests/test_logging.py`
+  - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `docs/DURABLE_ANALYTICS_CUTOVER.md`, `docs/MCP_PACKAGING_PLAN.md`, `docs/agent-economy-primer.md`, `examples/javascript/augur-mcp/`, `scripts/backfill_analytics_db.py`, `scripts/check_cdp_discovery.py`, `src/risk_api/analytics.py`
 
 ## What We Worked On
 - Continued the growth backlog and completed `G-005`, `G-006`, `G-007`, `G-010`, `G-011`, and `G-012` from `docs/GrowthExecutionPlan.md`.
@@ -20,6 +20,14 @@
 - Added repo-local git guardrails for parallel-session safety.
 - Completed `G-013` with the first three buyer-intent pages and linked them from the landing page plus sitemap.
 - Expanded app-level request logging so public page visits and discovery-doc fetches are measurable per instance with host/referrer context.
+- Upgraded `/dashboard` into a human-readable traffic-quality view and deployed it live.
+- Confirmed that current `/stats` and `/dashboard` still reset across Fly deploys because analytics remain local per-instance state.
+- Chose the next direction: keep Fly for the app and move analytics to durable storage instead of migrating platforms just to fix telemetry.
+- Started the durable analytics cut by adding a SQLite-backed request-event store behind `/stats` while keeping the JSONL request log as a fallback.
+- Documented the new `ANALYTICS_DB_PATH` toggle and the requirement that Fly mount it on a persistent path for restart-safe dashboards.
+- Added a one-command JSONL-to-SQLite backfill script plus dashboard/status metadata so cutover can be verified after deploy.
+- Updated `fly.toml` so Fly deployments now expect the durable analytics volume and default to `/data/analytics.sqlite3` plus `/data/requests.jsonl`.
+- Created the Fly volume, deployed the app, and verified that production `/stats` is now running from persistent SQLite storage on `/data`.
 
 ## What Got Done
 
@@ -220,11 +228,122 @@
   - if the old Conway host returns `403` before reaching Flask, those hits will not appear in app logs or `/stats`
   - edge-layer visibility still needs Fly / proxy / DNS-side inspection
 
+### 18) Upgraded the dashboard and deployed it live
+- Reworked `/dashboard` from a minimal chart/table page into a real operator view:
+  - summary cards for tracked events, valuable signals, docs traffic, paid requests, landing views, intent views, `402` attempts, and response time
+  - traffic-mix chart
+  - top paths, hosts, referrers, and stage-count panels
+  - a richer recent-events table with path, host, referer, user agent, payment state, and request ID
+  - interpretation panels that explain whether traffic looks like crawler noise or movement toward paid demand
+- Committed and deployed as:
+  - `cd748d0` `Upgrade traffic dashboard`
+- Live route:
+  - `https://augurrisk.com/dashboard`
+
+### 19) Confirmed the current telemetry limit on Fly
+- Live `/dashboard` and `/stats` reset to zero after the dashboard deploy.
+- Practical conclusion:
+  - current analytics are backed by local per-instance request logs
+  - Fly deploys / machine replacement make that state ephemeral
+  - the upgraded dashboard is now a better UI, but it is still not canonical analytics
+- Decision:
+  - do not migrate away from Fly just to fix this
+  - next build a durable analytics store, then repoint `/stats` and `/dashboard` to it
+
+### 20) Started the durable analytics backend
+- Added `src/risk_api/analytics.py` to centralize analytics aggregation and storage.
+- Added a SQLite event-store path controlled by `ANALYTICS_DB_PATH`.
+- Request logging now:
+  - still writes JSONL when `REQUEST_LOG_PATH` is configured
+  - also writes the same structured event into SQLite when `ANALYTICS_DB_PATH` is configured
+- `/stats` now:
+  - prefers the SQLite backend when `ANALYTICS_DB_PATH` is set
+  - falls back to the legacy JSONL request log when only `REQUEST_LOG_PATH` is set
+  - preserves the existing response shape used by `/dashboard`
+- This is repo-side support only so far:
+  - production persistence still requires mounting durable storage on Fly and pointing `ANALYTICS_DB_PATH` at that mounted path
+  - without that runtime config, `/dashboard` and `/stats` will still reset on deploy
+
+### 21) Documented the cutover requirements
+- Updated `README.md` with:
+  - the new `ANALYTICS_DB_PATH` environment variable
+  - monitoring notes explaining JSONL fallback versus durable SQLite mode
+- Added `docs/DURABLE_ANALYTICS_CUTOVER.md` with:
+  - Fly volume creation command
+  - `fly.toml` mount snippet
+  - secret/env cutover steps
+  - restart verification steps
+  - single-machine constraint for the SQLite-on-volume approach
+- Updated `docs/GrowthExecutionPlan.md`:
+  - `G-017` now records that durable backend support exists in repo state, but production cutover is still pending
+- Updated `docs/REGISTRATIONS.md`:
+  - monitoring notes now distinguish legacy local-log mode from durable SQLite mode
+- Updated `.codex/napkin.md`:
+  - recurring note now says persistence only exists when `ANALYTICS_DB_PATH` points at mounted durable storage
+
+### 22) Added cutover verification and backfill support
+- `/stats` now includes:
+  - `storage_backend`
+  - `storage_path`
+  - `storage_durable`
+- The dashboard now surfaces the active analytics backend so operators can tell whether production is still on ephemeral JSONL or has moved to persistent SQLite.
+- Added `scripts/backfill_analytics_db.py`:
+  - imports legacy JSONL request logs into the SQLite analytics store
+  - skips duplicate entries using a content fingerprint
+- Hardened the SQLite store itself:
+  - duplicate events are ignored on re-import
+  - this makes backfill reruns safe enough for cutover/retry workflows
+
+### 23) Wired Fly config for the persistent analytics path
+- Updated `fly.toml` with:
+  - `[env] ANALYTICS_DB_PATH='/data/analytics.sqlite3'`
+  - `[env] REQUEST_LOG_PATH='/data/requests.jsonl'`
+  - `[[mounts]] source='augur_analytics' destination='/data'`
+- Practical consequence:
+  - repo-side Fly config now points production at a persistent analytics path by default
+  - production now has the required `augur_analytics` volume attached
+  - any recreated or new environment must create the volume before deploy
+
+### 24) Completed the Fly durable-analytics cutover in production
+- Checked Fly volume state and confirmed no existing analytics volume was attached.
+- Created production Fly volume:
+  - `flyctl volumes create augur_analytics --region iad --size 1 -a augurrisk --yes`
+  - created volume `vol_vpg0qzjp1y23o8kv`
+- Deployed the current app state with:
+  - `flyctl deploy --remote-only`
+- Verified live production stats:
+  - `https://augurrisk.com/stats` now returns
+    - `storage_backend=sqlite`
+    - `storage_path=/data/analytics.sqlite3`
+    - `storage_durable=true`
+- Verified restart persistence:
+  - sent a logged landing-page hit
+  - confirmed `total_requests` increased
+  - restarted the live machine with `flyctl machine restart 68349d0fd43d08 -a augurrisk --force`
+  - confirmed `total_requests` remained present after restart and `/stats` still reported SQLite durable mode
+- Practical result:
+  - `/dashboard` and `/stats` no longer reset on normal Fly app restarts/deploys as long as the single app machine keeps the attached volume
+  - this solves the original restart-reset problem for the current one-machine deployment model
+
 ## Validation
 - Ran:
-  - `python -m pytest tests\test_app.py -q`
+  - `python -m pytest tests\test_logging.py tests\test_app.py -q`
 - Result:
-  - `108 passed in 1.46s`
+  - `120 passed in 7.89s`
+- Manually verified:
+  - `python scripts/backfill_analytics_db.py --from-log <sample.jsonl> --to-db <sample.sqlite3>`
+  - duplicate JSONL entries imported once (`inserted=1 skipped=1`)
+- Verified live infrastructure:
+  - `flyctl volumes list -a augurrisk`
+  - `flyctl machine list -a augurrisk`
+  - `flyctl deploy --remote-only`
+  - `flyctl machine restart 68349d0fd43d08 -a augurrisk --force`
+  - live `https://augurrisk.com/stats` before and after restart
+- Deployed and verified live:
+  - [Fly Deploy run 22831735298](https://github.com/JleviEderer/risk-api/actions/runs/22831735298) for app-level instrumentation
+  - [Fly Deploy run 22835049546](https://github.com/JleviEderer/risk-api/actions/runs/22835049546) for the dashboard upgrade
+  - `https://augurrisk.com/dashboard`
+  - `https://augurrisk.com/stats`
 - Verified current upstream listing/submission path against:
   - `https://www.x402.org/ecosystem`
   - `https://github.com/coinbase/x402`
@@ -237,14 +356,17 @@
 - Treat `x402list.fun` stale Conway-host output as external directory state, not a repo-side metadata bug.
 - Enforce canonical origin at runtime rather than relying only on metadata cleanup.
 - Use `308` so method and query string are preserved when clients hit the wrong host.
+- Keep Fly for app hosting; the current problem is analytics durability, not app hosting.
+- Treat `/dashboard` and `/stats` as a useful operator UI over app telemetry; they are now durably backed on the current single-machine Fly deployment, but they still are not canonical edge telemetry or a multi-machine analytics system.
 
 ## Recommended Next Steps
 1. Keep `G-005` and `G-006` marked done unless new evidence shows an editable external listing still points at Conway.
 2. Monitor [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515) and verify `https://www.x402.org/ecosystem` after merge.
    Current blocker: Coinbase-side review/deploy gate clearance shown in the 2026-03-08 email thread.
-3. Decide whether to ship the instrumentation update to production so `/stats` can show host/referrer/path summaries for the new public pages.
-4. For old-domain visibility, inspect edge-layer telemetry or config rather than assuming app logs can see Conway-host `403` traffic.
-5. Move to `G-014` and publish one proof-of-work report that can reuse the new buyer-intent pages as internal-link targets.
+3. Decide whether to backfill any historical JSONL request logs into production SQLite or accept the new durable count baseline from the cutover date.
+4. If you keep this SQLite-on-volume plan, keep Fly on a single active app machine; do not scale analytics across multiple active machines without moving to shared storage.
+5. For old-domain visibility, inspect edge-layer telemetry or config rather than assuming app logs can see Conway-host `403` traffic.
+6. After durable analytics are live, return to `G-014` and publish one proof-of-work report that can reuse the buyer-intent pages as internal-link targets.
 
 ## Suggested Restart Context For Next Agent
 - `G-001`, `G-002`, `G-003`, `G-004`, `G-005`, `G-006`, `G-007`, and `G-016` are done in repo state.
@@ -259,6 +381,14 @@
 - `G-011` is done via `examples/javascript/augur-paid-call` and the README link near the top.
 - `G-012` is done via the live `/how-payment-works` route linked from the landing page and README.
 - `G-013` is done via the live `/honeypot-detection-api`, `/proxy-risk-api`, and `/deployer-reputation-api` pages, each internally linked from the landing page and sitemap.
+- `/dashboard` is now a much more usable operator UI and is live on production, and it now reads from the persistent SQLite analytics store on `/data`.
+- Current observed behavior after cutover: `/stats` and `/dashboard` survive normal Fly machine restarts and deploys on the active attached volume.
+- Repo state includes a durable SQLite analytics backend behind `ANALYTICS_DB_PATH`, and production is now cut over to mounted persistent storage.
+- There is now a cutover doc at `docs/DURABLE_ANALYTICS_CUTOVER.md` and a backfill helper at `scripts/backfill_analytics_db.py`.
+- `/stats` and `/dashboard` now expose which backend is active so cutover can be checked live after deploy.
+- `fly.toml` is already prepared to mount Fly volume `augur_analytics` at `/data` and use `/data/analytics.sqlite3` by default.
+- Production durable analytics is now live on Fly volume `vol_vpg0qzjp1y23o8kv`, and live `/stats` survived a machine restart with `storage_backend=sqlite`.
+- The next technical priority is historical backfill choice plus any future multi-machine analytics design, not migrating away from Fly.
 - The public GitHub repository homepage now matches the canonical site: `https://augurrisk.com`.
 - `G-008` and `G-009` are done via `docs/MCP_PACKAGING_PLAN.md` and `examples/javascript/augur-mcp`.
 - MCP wrapper guardrails: keep payer wallet addresses out of model-visible output and return explicit MCP errors for Augur `422` / API failures.

@@ -319,7 +319,8 @@ risk-api/
 | `PRICE` | No | `$0.10` | Use single quotes: `'$0.10'` - double quotes expand `$0` |
 | `BASESCAN_API_KEY` | No | - | Enables deployer reputation detector. Degrades gracefully without it. |
 | `PUBLIC_URL` | No | - | Required behind reverse proxies. e.g. `https://augurrisk.com` |
-| `REQUEST_LOG_PATH` | No | - | Path for JSON-lines request log |
+| `REQUEST_LOG_PATH` | No | - | Path for JSON-lines request log. `fly.toml` now defaults this to `/data/requests.jsonl` on Fly. |
+| `ANALYTICS_DB_PATH` | No | - | Path to the SQLite analytics store. When set, request events are persisted there and `/stats` prefers it over `REQUEST_LOG_PATH`. `fly.toml` now defaults this to `/data/analytics.sqlite3` on Fly. |
 | `PINATA_JWT` | No | - | Pinata API JWT for IPFS pinning |
 | `ERC8004_AGENT_ID` | No | - | Adds `registrations` array to agent metadata |
 
@@ -388,6 +389,9 @@ python scripts/pin_metadata_ipfs.py
 
 # Update on-chain agent URI after re-pinning
 python scripts/register_erc8004.py --update-uri ipfs://<NEW_CID>
+
+# Backfill legacy JSONL analytics into the durable SQLite store
+python scripts/backfill_analytics_db.py --from-log /path/to/requests.jsonl --to-db /data/analytics.sqlite3
 ```
 
 ---
@@ -396,7 +400,13 @@ python scripts/register_erc8004.py --update-uri ipfs://<NEW_CID>
 
 - Better Stack is the external uptime monitor for `https://augurrisk.com/health`.
 - `scripts/health_check.py` mirrors that public health probe for manual checks and simple alert integrations.
-- `/dashboard` and `/stats` are per-deployment request-log views, not the canonical uptime source of truth.
+- `/dashboard` and `/stats` are not the canonical uptime source of truth.
+- If only `REQUEST_LOG_PATH` is set, they are per-deployment / per-machine views over the local JSONL request log.
+- If `ANALYTICS_DB_PATH` is set to a mounted durable path, request events are also stored in SQLite and survive app restarts on that volume.
+- `/stats` now reports `storage_backend`, `storage_path`, and `storage_durable` so cutover can be verified after deploy.
+- `fly.toml` now expects a Fly volume named `augur_analytics` mounted at `/data`; any new environment must create that volume before deploy.
+- Current production state: `augurrisk.com/stats` is now running on the SQLite backend at `/data/analytics.sqlite3` and survived a Fly machine restart on 2026-03-09.
+- Cutover runbook: [`docs/DURABLE_ANALYTICS_CUTOVER.md`](docs/DURABLE_ANALYTICS_CUTOVER.md)
 
 ---
 

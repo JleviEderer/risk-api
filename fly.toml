@@ -8,6 +8,10 @@ primary_region = 'iad'
 
 [build]
 
+[env]
+  ANALYTICS_DB_PATH = '/data/analytics.sqlite3'
+  REQUEST_LOG_PATH = '/data/requests.jsonl'
+
 [http_service]
   internal_port = 8000
   force_https = true
@@ -21,6 +25,10 @@ primary_region = 'iad'
     grace_period = '10s'
     method = 'GET'
     path = '/health'
+
+[[mounts]]
+  source = 'augur_analytics'
+  destination = '/data'
 
 [[vm]]
   memory = '256mb'
