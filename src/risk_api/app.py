@@ -483,62 +483,352 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>risk-api dashboard</title>
 <style>
+:root{
+  --bg:#09111f;
+  --panel:#0f1b2d;
+  --border:#223554;
+  --text:#e5edf8;
+  --muted:#8ea3bf;
+  --blue:#7dd3fc;
+  --teal:#5eead4;
+  --green:#86efac;
+  --amber:#fbbf24;
+  --red:#fca5a5;
+  --purple:#c4b5fd;
+  --shadow:0 18px 48px rgba(0,0,0,.26);
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  background:#0f1117;color:#e0e0e0;padding:24px;max-width:1200px;margin:0 auto}
-h1{font-size:1.4rem;color:#a0aec0;margin-bottom:20px;font-weight:500}
-h1 span{color:#63b3ed}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
-.card{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px}
-.card .label{font-size:.75rem;color:#718096;text-transform:uppercase;letter-spacing:.05em}
-.card .value{font-size:2rem;font-weight:700;margin-top:4px}
-.card .value.blue{color:#63b3ed}
-.card .value.green{color:#68d391}
-.card .value.orange{color:#f6ad55}
-.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:20px}
-.section h2{font-size:.9rem;color:#a0aec0;margin-bottom:14px;font-weight:500}
-#chart-container{position:relative;height:260px}
-#chart-fallback{display:none;color:#718096;padding:40px;text-align:center}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
-th{text-align:left;color:#718096;font-weight:500;padding:8px 10px;border-bottom:1px solid #2d3148}
-td{padding:8px 10px;border-bottom:1px solid #1e2235}
-.addr{font-family:monospace;font-size:.8rem;color:#90cdf4}
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase}
-.badge.safe{background:#22543d;color:#68d391}
-.badge.low{background:#2a4365;color:#63b3ed}
-.badge.medium{background:#744210;color:#f6ad55}
-.badge.high{background:#742a2a;color:#fc8181}
-.badge.critical{background:#63171b;color:#feb2b2}
-.badge.paid{background:#2a4365;color:#63b3ed}
-.badge.unpaid{background:#2d3748;color:#718096}
-.ts{color:#718096;font-size:.75rem}
-.status{text-align:center}
-.status-bar{font-size:.7rem;color:#4a5568;margin-top:16px;text-align:right}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  color:var(--text);
+  margin:0;
+  background:
+    radial-gradient(circle at top left, rgba(34,211,238,.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(196,181,253,.10), transparent 24%),
+    linear-gradient(180deg, #08101d 0%, #0a1220 54%, #08111d 100%);
+  min-height:100vh;
+}
+.shell{max-width:1380px;margin:0 auto;padding:28px 22px 40px}
+.hero{
+  background:linear-gradient(135deg, rgba(18,33,56,.95), rgba(8,18,33,.98));
+  border:1px solid var(--border);
+  border-radius:24px;
+  box-shadow:var(--shadow);
+  padding:24px;
+  margin-bottom:20px;
+}
+.hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.eyebrow{
+  display:inline-block;
+  border:1px solid rgba(125,211,252,.35);
+  color:var(--blue);
+  background:rgba(17,30,50,.75);
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:.72rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+h1{font-size:2rem;line-height:1.05;margin-top:14px;font-weight:650;letter-spacing:-.03em}
+h1 span{color:var(--blue)}
+.hero p{max-width:760px;color:#b8c8de;margin-top:12px;font-size:.98rem;line-height:1.6}
+.hero-meta{display:grid;gap:10px;min-width:260px}
+.pill{
+  background:rgba(11,20,34,.78);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:12px 14px;
+}
+.pill .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.pill .value{font-size:.98rem;color:var(--text);margin-top:4px}
+.layout{display:grid;grid-template-columns:2.15fr 1fr;gap:20px}
+.maincol,.sidecol{min-width:0}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.card{
+  background:linear-gradient(180deg, rgba(18,31,51,.96), rgba(12,22,37,.96));
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:18px;
+  box-shadow:var(--shadow);
+  min-height:138px;
+}
+.card .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.card .value{font-size:2rem;font-weight:700;margin-top:10px;letter-spacing:-.04em}
+.card .sub{margin-top:8px;color:#9fb0c8;font-size:.84rem;line-height:1.45}
+.card.blue .value{color:var(--blue)}
+.card.green .value{color:var(--green)}
+.card.amber .value{color:var(--amber)}
+.card.teal .value{color:var(--teal)}
+.section{
+  background:linear-gradient(180deg, rgba(16,28,46,.95), rgba(11,20,34,.97));
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:var(--shadow);
+  margin-bottom:20px;
+}
+.section h2{font-size:1rem;color:#d7e3f4;margin-bottom:4px;font-weight:620}
+.section .intro{color:var(--muted);font-size:.86rem;margin-bottom:16px;line-height:1.5}
+.chart-grid{display:grid;grid-template-columns:1.35fr .95fr;gap:16px}
+.chart-shell{background:rgba(7,14,24,.55);border:1px solid rgba(34,53,84,.8);border-radius:18px;padding:16px}
+.chart-shell h3,.mini h3,.table-header h3{
+  font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px
+}
+.chart-wrap{position:relative;height:290px}
+.chart-fallback{display:none;color:var(--muted);padding:48px 24px;text-align:center}
+.mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mini{
+  background:rgba(9,18,31,.72);
+  border:1px solid rgba(34,53,84,.8);
+  border-radius:16px;
+  padding:14px;
+}
+.mini .big{font-size:1.6rem;font-weight:700;letter-spacing:-.03em}
+.mini .muted{margin-top:6px;color:var(--muted);font-size:.82rem;line-height:1.45}
+.progress-cluster{display:grid;gap:10px}
+.progress-row{display:grid;gap:6px}
+.progress-label{display:flex;justify-content:space-between;gap:12px;font-size:.84rem;color:#d6e1f2}
+.progress-track{height:10px;border-radius:999px;background:#0a1322;overflow:hidden;border:1px solid rgba(34,53,84,.8)}
+.progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg, var(--blue), var(--teal))}
+.list{display:grid;gap:10px}
+.list-item{
+  display:flex;justify-content:space-between;gap:12px;align-items:flex-start;
+  background:rgba(13,24,40,.72);border:1px solid rgba(34,53,84,.65);border-radius:14px;padding:10px 12px
+}
+.list-item .name{font-size:.86rem;line-height:1.4;color:#dfe8f5;word-break:break-word}
+.list-item .count{font-size:.78rem;color:var(--blue);white-space:nowrap}
+.empty{color:var(--muted);font-size:.84rem;padding:8px 0}
+.table-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap}
+.table-note{font-size:.78rem;color:var(--muted)}
+.table-wrap{overflow:auto;border-radius:16px;border:1px solid rgba(34,53,84,.8)}
+table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:980px;background:rgba(7,14,24,.45)}
+th{text-align:left;color:var(--muted);font-weight:520;padding:11px 12px;border-bottom:1px solid rgba(34,53,84,.95);background:rgba(10,18,31,.92)}
+td{padding:10px 12px;border-bottom:1px solid rgba(23,37,60,.9);vertical-align:top}
+tr:hover td{background:rgba(17,29,47,.45)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.79rem}
+.path{color:var(--blue)}
+.host{color:var(--purple)}
+.referer{max-width:260px;word-break:break-word;color:#c7d4e7}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;
+  font-size:.69rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em
+}
+.badge.stage{background:#16263f;color:#9edcff;border:1px solid rgba(125,211,252,.2)}
+.badge.safe{background:#173b2c;color:var(--green)}
+.badge.low{background:#16334c;color:var(--blue)}
+.badge.medium{background:#4d330d;color:#ffd17c}
+.badge.high{background:#4d1d21;color:#ffb2b2}
+.badge.critical{background:#511117;color:#ffc0cb}
+.badge.paid{background:#103b2d;color:var(--green)}
+.badge.free{background:#273347;color:#b0bfd2}
+.status{font-weight:700}
+.status.good{color:var(--green)}
+.status.warn{color:var(--amber)}
+.status.bad{color:var(--red)}
+.insight-list{display:grid;gap:10px}
+.insight{
+  padding:12px 14px;border-radius:16px;border:1px solid rgba(34,53,84,.8);
+  background:rgba(7,14,24,.58)
+}
+.insight strong{display:block;color:#e5edf8;font-size:.88rem}
+.insight span{display:block;margin-top:5px;color:var(--muted);font-size:.82rem;line-height:1.45}
+.status-bar{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--muted);font-size:.78rem;margin-top:10px;flex-wrap:wrap}
+@media (max-width:1120px){
+  .layout{grid-template-columns:1fr}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chart-grid{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .shell{padding:18px 14px 28px}
+  .hero,.section,.card{border-radius:18px}
+  .cards,.mini-grid{grid-template-columns:1fr}
+  h1{font-size:1.7rem}
+}
 </style>
 </head>
 <body>
-<h1><span>risk-api</span> dashboard</h1>
-<div class="cards">
-  <div class="card"><div class="label">Tracked Events</div><div class="value blue" id="total">-</div></div>
-  <div class="card"><div class="label">Paid Requests</div><div class="value green" id="paid">-</div></div>
-  <div class="card"><div class="label">Avg Response Time</div><div class="value orange" id="avgdur">-</div></div>
+<div class="shell">
+  <section class="hero">
+    <div class="hero-top">
+      <div>
+        <span class="eyebrow">risk-api dashboard</span>
+        <h1><span>Augur</span> Traffic and User Quality</h1>
+        <p>
+          Use this page to separate crawler noise from valuable traffic signals. The dashboard highlights intent-page visits,
+          machine-readable discovery fetches, unpaid <code>402</code> attempts, and paid calls so you can tell whether growth work is
+          moving real users toward Augur's paid API.
+        </p>
+      </div>
+      <div class="hero-meta">
+        <div class="pill">
+          <div class="label">Telemetry Scope</div>
+          <div class="value">Per-instance app telemetry</div>
+        </div>
+        <div class="pill">
+          <div class="label">Use Better Stack For</div>
+          <div class="value">Uptime, health checks, and alerting</div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <span>Auto-refreshes every 30s. Source: <code>/stats</code>. Old-domain <code>403</code> traffic may still require edge-layer visibility.</span>
+      <span id="updated">Waiting for data...</span>
+    </div>
+  </section>
+
+  <div class="cards">
+    <div class="card blue">
+      <div class="label">Tracked Events</div>
+      <div class="value" id="total">-</div>
+      <div class="sub" id="total-sub">All logged public GET routes plus <code>/analyze</code>.</div>
+    </div>
+    <div class="card teal">
+      <div class="label">Valuable Signals</div>
+      <div class="value" id="valuable">-</div>
+      <div class="sub" id="valuable-sub">Intent views, unpaid 402 attempts, and paid requests.</div>
+    </div>
+    <div class="card amber">
+      <div class="label">Crawler / Doc Fetches</div>
+      <div class="value" id="docs">-</div>
+      <div class="sub" id="docs-sub">Machine-readable discovery traffic, not buyer intent.</div>
+    </div>
+    <div class="card green">
+      <div class="label">Paid Requests</div>
+      <div class="value" id="paid">-</div>
+      <div class="sub" id="paid-sub">Confirmed paid calls visible on this instance.</div>
+    </div>
+    <div class="card blue">
+      <div class="label">Landing Views</div>
+      <div class="value" id="landing">-</div>
+      <div class="sub" id="landing-sub">Homepage traffic. Good for awareness, weak for conversion on its own.</div>
+    </div>
+    <div class="card teal">
+      <div class="label">Intent Page Views</div>
+      <div class="value" id="intent">-</div>
+      <div class="sub" id="intent-sub">High-signal SEO / use-case traffic.</div>
+    </div>
+    <div class="card amber">
+      <div class="label">402 Attempts</div>
+      <div class="value" id="attempts">-</div>
+      <div class="sub" id="attempts-sub">People close enough to payment to request the paid endpoint.</div>
+    </div>
+    <div class="card amber">
+      <div class="label">Avg Response</div>
+      <div class="value" id="avgdur">-</div>
+      <div class="sub" id="avgdur-sub">Mean response time for logged requests.</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <main class="maincol">
+      <section class="section">
+        <h2>Traffic Mix</h2>
+        <div class="intro">See whether this instance is getting discovery fetches, broad awareness traffic, or higher-intent interactions closer to payment.</div>
+        <div class="chart-grid">
+          <div class="chart-shell">
+            <h3>Hourly traffic composition</h3>
+            <div class="chart-wrap"><canvas id="traffic-chart"></canvas></div>
+            <div class="chart-fallback" id="traffic-fallback">Chart unavailable (Chart.js CDN unreachable)</div>
+          </div>
+          <div class="chart-shell">
+            <h3>Quality summary</h3>
+            <div class="mini-grid">
+              <div class="mini">
+                <h3>Value share</h3>
+                <div class="big" id="value-share">-</div>
+                <div class="muted" id="value-share-sub">Share of tracked traffic that looks closer to real buyer intent.</div>
+              </div>
+              <div class="mini">
+                <h3>Paid conversion</h3>
+                <div class="big" id="paid-conv">-</div>
+                <div class="muted" id="paid-conv-sub">Paid requests divided by unpaid 402 attempts.</div>
+              </div>
+              <div class="mini">
+                <h3>Best signal</h3>
+                <div class="big" id="best-signal">-</div>
+                <div class="muted" id="best-signal-sub">Which stage currently stands out the most.</div>
+              </div>
+              <div class="mini">
+                <h3>Page mix</h3>
+                <div class="big" id="page-mix">-</div>
+                <div class="muted" id="page-mix-sub">Intent versus landing page volume.</div>
+              </div>
+            </div>
+            <div style="margin-top:16px">
+              <h3>Funnel posture</h3>
+              <div class="progress-cluster" id="funnel-bars"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="table-header">
+          <div>
+            <h3 style="margin:0 0 4px">Recent events</h3>
+            <div class="table-note">Latest logged requests on this instance, newest first.</div>
+          </div>
+          <div class="table-note">Includes stage, host, referer, request ID, and response outcome.</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Stage</th>
+                <th>Path</th>
+                <th>Host</th>
+                <th>Referer</th>
+                <th>UA</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Risk</th>
+                <th>Payment</th>
+                <th>Request</th>
+              </tr>
+            </thead>
+            <tbody id="recent"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <aside class="sidecol">
+      <section class="section">
+        <h2>What matters</h2>
+        <div class="intro">Quick interpretation layer over the raw stats so you can judge whether recent changes are attracting valuable traffic.</div>
+        <div class="insight-list" id="insights"></div>
+      </section>
+
+      <section class="section">
+        <h2>Top paths</h2>
+        <div class="intro">Which routes are actually getting attention.</div>
+        <div class="list" id="top-paths"></div>
+      </section>
+
+      <section class="section">
+        <h2>Top hosts</h2>
+        <div class="intro">Only includes traffic that reaches Flask.</div>
+        <div class="list" id="top-hosts"></div>
+      </section>
+
+      <section class="section">
+        <h2>Top referrers</h2>
+        <div class="intro">External or internal navigation sources when browsers send them.</div>
+        <div class="list" id="top-referers"></div>
+      </section>
+
+      <section class="section">
+        <h2>Stage counts</h2>
+        <div class="intro">Raw stage totals across the current request log.</div>
+        <div class="list" id="stage-counts"></div>
+      </section>
+    </aside>
+  </div>
 </div>
-<div class="section">
-  <h2>Requests per hour</h2>
-  <div id="chart-container"><canvas id="chart"></canvas></div>
-  <div id="chart-fallback">Chart unavailable (Chart.js CDN unreachable)</div>
-</div>
-<div class="section">
-  <h2>Recent events</h2>
-  <table>
-    <thead><tr><th>Time</th><th>Stage</th><th>Address</th><th>Status</th><th>Score</th><th>Level</th><th>Paid</th><th>Duration</th></tr></thead>
-    <tbody id="recent"></tbody>
-  </table>
-</div>
-<div class="status-bar">Auto-refreshes every 30s &middot; <span id="updated"></span></div>
 
 <script>
-var chartInstance=null,chartLoaded=false;
+var trafficChart=null,chartLoaded=false;
 function loadChart(){
   return new Promise(function(resolve){
     if(window.Chart){chartLoaded=true;resolve();return}
@@ -546,8 +836,8 @@ function loadChart(){
     s.src='https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
     s.onload=function(){chartLoaded=true;resolve()};
     s.onerror=function(){
-      document.getElementById('chart-container').querySelector('canvas').style.display='none';
-      document.getElementById('chart-fallback').style.display='block';
+      document.getElementById('traffic-chart').style.display='none';
+      document.getElementById('traffic-fallback').style.display='block';
       resolve();
     };
     document.head.appendChild(s);
@@ -559,13 +849,33 @@ function relTime(ts){
   if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';
   if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';
 }
-function truncAddr(a){
-  if(!a||a.length<12)return a||'';
-  return a.slice(0,6)+'\\u2026'+a.slice(-4);
+function truncText(v,n){
+  if(!v)return '';
+  if(v.length<=n)return v;
+  return v.slice(0,n-1)+'\\u2026';
+}
+function pct(part,total){
+  if(!total)return '0%';
+  return Math.round((part/total)*100)+'%';
+}
+function fmtNumber(v){
+  return (v==null?0:v).toLocaleString();
 }
 function stageLabel(stage){
   var labels={
     landing_view:'landing',
+    how_payment_view:'payment explainer',
+    intent_honeypot_view:'intent: honeypot',
+    intent_proxy_view:'intent: proxy',
+    intent_deployer_view:'intent: deployer',
+    openapi_fetch:'openapi fetch',
+    llms_txt_fetch:'llms.txt fetch',
+    llms_full_fetch:'llms-full fetch',
+    x402_doc_fetch:'x402 doc',
+    agent_card_fetch:'agent card',
+    agent_metadata_fetch:'agent metadata',
+    robots_fetch:'robots',
+    sitemap_fetch:'sitemap',
     unpaid_402:'402 attempt',
     invalid_address:'invalid',
     no_bytecode:'no bytecode',
@@ -575,26 +885,166 @@ function stageLabel(stage){
   };
   return labels[stage]||stage||'';
 }
+function stageBadge(stage){
+  var text=stageLabel(stage);
+  return text?'<span class="badge stage">'+text+'</span>':'';
+}
+function levelBadge(level){
+  return level?'<span class="badge '+level+'">'+level+'</span>':'';
+}
+function paymentBadge(paid){
+  return paid?'<span class="badge paid">paid</span>':'<span class="badge free">free</span>';
+}
+function statusClass(code){
+  if(code>=500)return 'bad';
+  if(code>=400)return 'warn';
+  return 'good';
+}
+function requestShort(id){
+  if(!id)return '';
+  return id.slice(0,8);
+}
+function topItemRow(label,count){
+  return '<div class="list-item"><div class="name">'+label+'</div><div class="count">'+fmtNumber(count)+'</div></div>';
+}
+function renderList(id,items,labelKey,emptyText){
+  var el=document.getElementById(id);
+  if(!items||!items.length){
+    el.innerHTML='<div class="empty">'+emptyText+'</div>';
+    return;
+  }
+  el.innerHTML=items.map(function(item){
+    var label=item[labelKey]||'(blank)';
+    return topItemRow(truncText(label,58),item.count||0);
+  }).join('');
+}
+function renderStageCounts(stageCounts){
+  var el=document.getElementById('stage-counts');
+  var entries=Object.entries(stageCounts||{}).sort(function(a,b){return b[1]-a[1]});
+  if(!entries.length){
+    el.innerHTML='<div class="empty">No stages logged yet.</div>';
+    return;
+  }
+  el.innerHTML=entries.map(function(pair){
+    return topItemRow(stageLabel(pair[0]),pair[1]);
+  }).join('');
+}
+function renderInsights(data){
+  var funnel=data.funnel||{};
+  var total=data.total_requests||0;
+  var landing=funnel.landing_views||0;
+  var intent=funnel.intent_page_views||0;
+  var docs=funnel.machine_doc_fetches||0;
+  var attempts=funnel.valid_unpaid_402_attempts||0;
+  var paid=funnel.paid_requests||0;
+  var items=[];
+
+  if(intent>0){
+    items.push('<div class="insight"><strong>Intent traffic is finally showing up.</strong><span>'+fmtNumber(intent)+' tracked intent-page views means people are landing on use-case pages, not just the homepage.</span></div>');
+  }else{
+    items.push('<div class="insight"><strong>No intent-page traffic yet.</strong><span>Current tracked traffic is still mostly homepage and machine-readable discovery fetches. Growth work has not yet driven visible use-case visits on this instance.</span></div>');
+  }
+
+  if(attempts>0||paid>0){
+    items.push('<div class="insight"><strong>People are touching the paid API.</strong><span>'+fmtNumber(attempts)+' unpaid 402 attempts and '+fmtNumber(paid)+' paid requests are the strongest conversion signals in this dashboard.</span></div>');
+  }else{
+    items.push('<div class="insight"><strong>No payment-adjacent traffic visible yet.</strong><span>There are no unpaid 402 attempts or paid requests in this instance log, so discovery is not yet turning into measurable API demand here.</span></div>');
+  }
+
+  if(docs>landing&&docs>0){
+    items.push('<div class="insight"><strong>Machine discovery currently outweighs human demand.</strong><span>'+fmtNumber(docs)+' machine-doc fetches versus '+fmtNumber(landing)+' landing views suggests crawlers and agent registries are still a large share of traffic.</span></div>');
+  }else{
+    items.push('<div class="insight"><strong>Homepage awareness is carrying the current traffic mix.</strong><span>'+fmtNumber(landing)+' landing views account for '+pct(landing,total)+' of tracked traffic on this instance.</span></div>');
+  }
+
+  document.getElementById('insights').innerHTML=items.join('');
+}
+function renderFunnelBars(data){
+  var funnel=data.funnel||{};
+  var total=data.total_requests||0;
+  var rows=[
+    ['Landing views',funnel.landing_views||0],
+    ['Intent pages',funnel.intent_page_views||0],
+    ['Payment explainer',funnel.how_payment_views||0],
+    ['Machine docs',funnel.machine_doc_fetches||0],
+    ['402 attempts',funnel.valid_unpaid_402_attempts||0],
+    ['Paid requests',funnel.paid_requests||0]
+  ];
+  document.getElementById('funnel-bars').innerHTML=rows.map(function(row){
+    var count=row[1],width=total?Math.max((count/total)*100,(count?4:0)):0;
+    return '<div class="progress-row">'
+      +'<div class="progress-label"><span>'+row[0]+'</span><span>'+fmtNumber(count)+' <span style="color:var(--muted)">('+pct(count,total)+')</span></span></div>'
+      +'<div class="progress-track"><div class="progress-fill" style="width:'+width+'%"></div></div>'
+      +'</div>';
+  }).join('');
+}
+function setMetric(id,value,sub){
+  document.getElementById(id).textContent=value;
+  if(sub){document.getElementById(id+'-sub').innerHTML=sub}
+}
+function renderTrafficChart(data){
+  if(!(chartLoaded&&window.Chart&&data.hourly))return;
+  var labels=data.hourly.map(function(h){return h.hour.slice(11,16)});
+  var landing=data.hourly.map(function(h){return h.landing_views||0});
+  var intent=data.hourly.map(function(h){return h.intent_page_views||0});
+  var docs=data.hourly.map(function(h){return h.machine_doc_fetches||0});
+  var attempts=data.hourly.map(function(h){return h.valid_unpaid_402_attempts||0});
+  var paid=data.hourly.map(function(h){return h.paid_requests||0});
+  if(trafficChart){trafficChart.destroy()}
+  trafficChart=new Chart(document.getElementById('traffic-chart').getContext('2d'),{
+    type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'Landing',data:landing,backgroundColor:'rgba(125,211,252,.88)',borderRadius:5},
+      {label:'Intent',data:intent,backgroundColor:'rgba(94,234,212,.9)',borderRadius:5},
+      {label:'Docs',data:docs,backgroundColor:'rgba(196,181,253,.88)',borderRadius:5},
+      {label:'402 attempts',data:attempts,backgroundColor:'rgba(251,191,36,.88)',borderRadius:5},
+      {label:'Paid',data:paid,backgroundColor:'rgba(134,239,172,.92)',borderRadius:5}
+    ]},
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#bcd0e6',boxWidth:12}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#8ea3bf'},grid:{color:'rgba(34,53,84,.42)'}},
+        y:{stacked:true,beginAtZero:true,ticks:{color:'#8ea3bf',stepSize:1},grid:{color:'rgba(34,53,84,.42)'}}
+      }
+    }
+  });
+}
 function refresh(){
   fetch('/stats').then(function(r){return r.json()}).then(function(d){
-    document.getElementById('total').textContent=d.total_requests;
-    document.getElementById('paid').textContent=d.paid_requests;
-    document.getElementById('avgdur').textContent=d.avg_duration_ms?d.avg_duration_ms+'ms':'-';
-    document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString();
+    var funnel=d.funnel||{};
+    var total=d.total_requests||0;
+    var paid=funnel.paid_requests||d.paid_requests||0;
+    var attempts=funnel.valid_unpaid_402_attempts||0;
+    var docs=funnel.machine_doc_fetches||0;
+    var landing=funnel.landing_views||0;
+    var intent=funnel.intent_page_views||0;
+    var valuable=intent+attempts+paid;
+    var intentBreakdown=(funnel.intent_honeypot_views||0)+' / '+(funnel.intent_proxy_views||0)+' / '+(funnel.intent_deployer_views||0);
 
-    if(chartLoaded&&window.Chart&&d.hourly){
-      var labels=d.hourly.map(function(h){return h.hour.slice(11,16)});
-      var paidData=d.hourly.map(function(h){return h.paid});
-      var unpaidData=d.hourly.map(function(h){return h.count-h.paid});
-      if(chartInstance){chartInstance.destroy()}
-      var ctx=document.getElementById('chart').getContext('2d');
-      chartInstance=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[
-        {label:'Paid',data:paidData,backgroundColor:'#68d391',borderRadius:3},
-        {label:'Unpaid',data:unpaidData,backgroundColor:'#4a5568',borderRadius:3}
-      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#a0aec0'}}},
-        scales:{x:{stacked:true,ticks:{color:'#718096'},grid:{color:'#1e2235'}},
-                y:{stacked:true,beginAtZero:true,ticks:{color:'#718096',stepSize:1},grid:{color:'#1e2235'}}}}});
-    }
+    setMetric('total',fmtNumber(total),'Current instance log size. Use trends, not absolute lifetime counts.');
+    setMetric('valuable',fmtNumber(valuable),pct(valuable,total)+' of tracked traffic is closer to commercial value.');
+    setMetric('docs',fmtNumber(docs),pct(docs,total)+' of tracked traffic is machine-readable discovery or crawler fetches.');
+    setMetric('paid',fmtNumber(paid),paid?'Visible paid traffic on this instance.':'No paid requests visible on this instance yet.');
+    setMetric('landing',fmtNumber(landing),pct(landing,total)+' of tracked traffic is homepage awareness.');
+    setMetric('intent',fmtNumber(intent),'Honeypot / proxy / deployer = '+intentBreakdown);
+    setMetric('attempts',fmtNumber(attempts),attempts?('Paid conversion so far: '+pct(paid,attempts)):'No unpaid 402 attempts logged yet.');
+    setMetric('avgdur',d.avg_duration_ms?d.avg_duration_ms+'ms':'-','Lower is better, but quality of traffic matters more than speed here.');
+
+    document.getElementById('value-share').textContent=pct(valuable,total);
+    document.getElementById('paid-conv').textContent=attempts?pct(paid,attempts):'0%';
+    document.getElementById('best-signal').textContent=paid?('paid x '+paid):(attempts?('402 x '+attempts):(intent?('intent x '+intent):'docs'));
+    document.getElementById('page-mix').textContent=intent+' : '+landing;
+    document.getElementById('page-mix-sub').textContent='Intent views versus homepage views on this instance.';
+    document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString();
+    renderTrafficChart(d);
+    renderFunnelBars(d);
+    renderInsights(d);
+    renderList('top-paths',d.top_paths,'path','No paths logged yet.');
+    renderList('top-hosts',d.top_hosts,'host','No hosts logged yet.');
+    renderList('top-referers',d.top_referers,'referer','No referers logged yet.');
+    renderStageCounts(d.stage_counts||{});
 
     var tbody=document.getElementById('recent');
     tbody.innerHTML='';
@@ -602,16 +1052,17 @@ function refresh(){
     rows.forEach(function(e){
       var tr=document.createElement('tr');
       var lvl=e.level||'';
-      var stage=stageLabel(e.funnel_stage);
-      var paidBadge=e.paid?'<span class="badge paid">paid</span>':'<span class="badge unpaid">free</span>';
       tr.innerHTML='<td class="ts">'+relTime(e.ts)+'</td>'
-        +'<td>'+(stage?'<span class="badge unpaid">'+stage+'</span>':'')+'</td>'
-        +'<td class="addr">'+(e.address?truncAddr(e.address):'')</td>'
-        +'<td class="status">'+e.status+'</td>'
+        +'<td>'+stageBadge(e.funnel_stage)+'</td>'
+        +'<td class="mono path" title="'+(e.path||'')+'">'+truncText(e.path||'',28)+'</td>'
+        +'<td class="mono host" title="'+(e.host||'')+'">'+truncText(e.host||'',22)+'</td>'
+        +'<td class="referer" title="'+(e.referer||'')+'">'+truncText(e.referer||'',42)+'</td>'
+        +'<td title="'+(e.user_agent||'')+'">'+truncText(e.user_agent||'',34)+'</td>'
+        +'<td class="status '+statusClass(e.status||0)+'">'+(e.status||'')+'</td>'
         +'<td>'+(e.score!=null?e.score:'')+'</td>'
-        +'<td>'+(lvl?'<span class="badge '+lvl+'">'+lvl+'</span>':'')+'</td>'
-        +'<td>'+paidBadge+'</td>'
-        +'<td>'+(e.duration_ms!=null?e.duration_ms+'ms':'')+'</td>';
+        +'<td>'+levelBadge(lvl)+'</td>'
+        +'<td>'+paymentBadge(e.paid)+'</td>'
+        +'<td class="mono" title="'+(e.request_id||'')+'">'+requestShort(e.request_id||'')+'</td>';
       tbody.appendChild(tr);
     });
   }).catch(function(){});
