@@ -8,6 +8,7 @@ from unittest.mock import patch
 from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.chain.rpc import clear_cache
+from risk_api.proof_reports import REPORT_PAGES
 
 
 RPC_URL = "https://mainnet.base.org"
@@ -834,6 +835,11 @@ def test_landing_links_intent_pages(client):
     assert b"/deployer-reputation-api" in resp.data
 
 
+def test_landing_links_proof_report(client):
+    resp = client.get("/")
+    assert b"/reports/base-bluechip-bytecode-snapshot" in resp.data
+
+
 def test_landing_uses_public_url(app):
     app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
@@ -841,6 +847,7 @@ def test_landing_uses_public_url(app):
         assert b"https://augurrisk.com/openapi.json" in resp.data
         assert b"https://augurrisk.com/how-payment-works" in resp.data
         assert b"https://augurrisk.com/honeypot-detection-api" in resp.data
+        assert b"https://augurrisk.com/reports/base-bluechip-bytecode-snapshot" in resp.data
         assert b"https://augurrisk.com/avatar.png" in resp.data
 
 
@@ -874,6 +881,80 @@ def test_how_payment_works_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/how-payment-works")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
+
+
+def test_proof_report_page(client):
+    resp = client.get("/reports/base-bluechip-bytecode-snapshot")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"Base Blue-Chip Bytecode Snapshot" in resp.data
+    assert b"0x4200000000000000000000000000000000000006" in resp.data
+    assert b"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" in resp.data
+    assert b"0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" in resp.data
+    assert b"2026-03-09" in resp.data
+    assert b"/how-payment-works" in resp.data
+    assert b"/analyze?address=0x4200000000000000000000000000000000000006" in resp.data
+    assert b"not recomputed on page load" in resp.data
+    assert b"&quot;category_scores&quot;: {" in resp.data
+    assert (
+        b"&quot;description&quot;: &quot;Contract has transfer functions with conditional REVERT patterns"
+        in resp.data
+    )
+    assert b"&quot;implementation&quot;: {" in resp.data
+    assert b"&quot;implementation_address&quot;" not in resp.data
+
+
+def test_proof_report_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    with app.test_client() as c:
+        resp = c.get("/reports/base-bluechip-bytecode-snapshot")
+        assert b"https://augurrisk.com/" in resp.data
+        assert b"https://augurrisk.com/how-payment-works" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
+
+
+def test_proof_report_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/reports/base-bluechip-bytecode-snapshot")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+
+
+def test_proof_report_route_dispatches_from_registry(app, monkeypatch):
+    monkeypatch.setitem(
+        REPORT_PAGES,
+        "/reports/registry-test-report",
+        {
+            "title": "Registry Test Report",
+            "meta_description": "Registry-dispatched proof report.",
+            "eyebrow": "Proof of Work",
+            "snapshot_date": "2026-03-09",
+            "summary": "Synthetic report used to verify registry-backed routing.",
+            "methodology": ["Registry route smoke test."],
+            "takeaways": ["Routing should follow REPORT_PAGES."],
+            "contracts": [
+                {
+                    "name": "Registry Contract",
+                    "snapshot": {
+                        "address": "0x1111111111111111111111111111111111111111",
+                        "score": 0,
+                        "level": "safe",
+                        "findings": [],
+                        "category_scores": {},
+                        "bytecode_size": 1,
+                        "implementation": None,
+                    },
+                    "interpretation": "Synthetic contract for route coverage.",
+                }
+            ],
+        },
+    )
+
+    with app.test_client() as c:
+        resp = c.get("/reports/registry-test-report")
+
+    assert resp.status_code == 200
+    assert b"Registry Test Report" in resp.data
+    assert b"0x1111111111111111111111111111111111111111" in resp.data
 
 
 @pytest.mark.parametrize(
@@ -978,6 +1059,7 @@ def test_sitemap_lists_public_endpoints(client):
     assert "/honeypot-detection-api" in text
     assert "/proxy-risk-api" in text
     assert "/deployer-reputation-api" in text
+    assert "/reports/base-bluechip-bytecode-snapshot" in text
     assert "/openapi.json" in text
     assert "/agent-metadata.json" in text
     assert "/.well-known/agent-card.json" in text
@@ -1204,3 +1286,77 @@ def test_robots_allows_llms(client):
 def test_landing_links_llms_txt(client):
     resp = client.get("/")
     assert b"/llms.txt" in resp.data
+
+
+def test_request_log_captures_proof_report_stage(test_config, monkeypatch, tmp_path):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+
+    resp = app.test_client().get(
+        "/reports/base-bluechip-bytecode-snapshot",
+        base_url="https://augurrisk.com",
+        headers={"User-Agent": "pytest-agent"},
+    )
+
+    assert resp.status_code == 200
+
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 1
+    assert entries[0]["path"] == "/reports/base-bluechip-bytecode-snapshot"
+    assert entries[0]["funnel_stage"] == "proof_report_view"
+
+
+def test_request_log_captures_registry_report_stage(
+    test_config, monkeypatch, tmp_path
+):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+    monkeypatch.setitem(
+        REPORT_PAGES,
+        "/reports/registry-log-test",
+        {
+            "title": "Registry Log Test",
+            "meta_description": "Registry-backed logging test.",
+            "eyebrow": "Proof of Work",
+            "snapshot_date": "2026-03-09",
+            "summary": "Synthetic report used to verify report logging.",
+            "methodology": ["Registry logging smoke test."],
+            "takeaways": ["Report logging should follow REPORT_PAGES."],
+            "contracts": [
+                {
+                    "name": "Registry Contract",
+                    "snapshot": {
+                        "address": "0x2222222222222222222222222222222222222222",
+                        "score": 0,
+                        "level": "safe",
+                        "findings": [],
+                        "category_scores": {},
+                        "bytecode_size": 1,
+                        "implementation": None,
+                    },
+                    "interpretation": "Synthetic contract for logging coverage.",
+                }
+            ],
+        },
+    )
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+
+    resp = app.test_client().get(
+        "/reports/registry-log-test",
+        base_url="https://augurrisk.com",
+        headers={"User-Agent": "pytest-agent"},
+    )
+
+    assert resp.status_code == 200
+
+    entries = [json.loads(line) for line in log_path.read_text().splitlines()]
+    assert len(entries) == 1
+    assert entries[0]["path"] == "/reports/registry-log-test"
+    assert entries[0]["funnel_stage"] == "proof_report_view"

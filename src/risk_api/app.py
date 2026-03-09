@@ -24,6 +24,7 @@ from risk_api.analytics import (
 from risk_api.analysis.engine import NoBytecodeError, analyze_contract
 from risk_api.chain.rpc import RPCError, get_code
 from risk_api.config import Config, load_config
+from risk_api.proof_reports import REPORT_PAGES, render_report_page
 
 logger = logging.getLogger(__name__)
 request_logger = logging.getLogger("risk_api.requests")
@@ -1182,6 +1183,14 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 </div>
 
 <div class="section">
+<h2>Proof of Work</h2>
+<p style="color:#718096;font-size:.85rem">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
+<div class="links">
+  <a href="__BASE_URL__/reports/base-bluechip-bytecode-snapshot">Base Blue-Chip Bytecode Snapshot <div class="path">/reports/base-bluechip-bytecode-snapshot</div></a>
+</div>
+</div>
+
+<div class="section">
 <h2>Discovery &amp; Integration</h2>
 <div class="links">
   <a href="__BASE_URL__/openapi.json">OpenAPI Spec <div class="path">/openapi.json</div></a>
@@ -1378,10 +1387,19 @@ INTENT_PAGE_STAGES = {
 }
 
 
+def _public_request_stage(path: str) -> str:
+    stage = PUBLIC_REQUEST_STAGE_BY_PATH.get(path)
+    if stage:
+        return stage
+    if path in REPORT_PAGES:
+        return "proof_report_view"
+    return ""
+
+
 def _should_log_request(path: str, method: str) -> bool:
     if path == "/analyze":
         return True
-    return method == "GET" and path in PUBLIC_REQUEST_STAGE_BY_PATH
+    return method == "GET" and bool(_public_request_stage(path))
 
 
 def _render_intent_page(base_url: str, path: str) -> str:
@@ -2043,8 +2061,8 @@ def _setup_request_logging(app: Flask) -> None:
             "referer": request.headers.get("Referer", ""),
             "request_id": request_id or "",
         }
-        funnel_stage = request.environ.get("funnel_stage") or (
-            PUBLIC_REQUEST_STAGE_BY_PATH.get(request.path, "")
+        funnel_stage = request.environ.get("funnel_stage") or _public_request_stage(
+            request.path
         )
         if isinstance(funnel_stage, str) and funnel_stage:
             entry["funnel_stage"] = funnel_stage
@@ -2310,6 +2328,7 @@ def create_app(
             "/",
             "/how-payment-works",
             *INTENT_PAGES.keys(),
+            *REPORT_PAGES.keys(),
             "/openapi.json",
             "/agent-metadata.json",
             "/.well-known/ai-plugin.json",
@@ -2336,6 +2355,18 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         html = PAYMENT_GUIDE_HTML.replace("__BASE_URL__", base_url)
         return Response(html, content_type="text/html")
+
+    @app.route("/reports/<path:slug>")
+    def proof_report(slug: str):
+        report_path = f"/reports/{slug}"
+        if report_path not in REPORT_PAGES:
+            return jsonify({"error": "report not found"}), 404
+        request.environ["funnel_stage"] = _public_request_stage(report_path)
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        return Response(
+            render_report_page(base_url, report_path),
+            content_type="text/html",
+        )
 
     @app.route("/honeypot-detection-api")
     @app.route("/proxy-risk-api")

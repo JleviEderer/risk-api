@@ -263,11 +263,12 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Done means: at least three intent pages are live with clear internal links to Augur.
   Status: live public pages now exist at `/honeypot-detection-api`, `/proxy-risk-api`, and `/deployer-reputation-api`, each linking back to the canonical paid `/analyze` endpoint and the core discovery docs. The landing page and sitemap include all three.
 
-- [ ] `G-014` Publish one proof-of-work report
+- [x] `G-014` Publish one proof-of-work report
   Output: one high-quality report on notable Base contracts using Augur's scoring output.
   Why now: proof beats claims for early trust building.
   Depends on: `G-001`, `G-002`.
   Done means: one report is live and reusable in outreach.
+  Status: live report page now exists at `/reports/base-bluechip-bytecode-snapshot`, publishing a 2026-03-09 Augur snapshot on Base WETH, USDC, and cbBTC with exact point-in-time score output plus interpretation about what bytecode-first screening does and does not prove.
   Note: the scoped post-`G-014` execution-based honeypot expansion is documented separately in `docs/HONEYPOT_EXECUTION_PHASE2.md`; do not treat that design as a prerequisite for publishing the first proof-of-work report.
 
 - [ ] `G-015` Do one targeted distribution push

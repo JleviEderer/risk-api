@@ -63,3 +63,7 @@
    Do instead: production already has Fly volume `augur_analytics` in `iad`; if you recreate production or add another environment, create that volume first because `fly.toml` mounts it at `/data` and points `ANALYTICS_DB_PATH` plus `REQUEST_LOG_PATH` there by default.
 4. **[2026-03-09] Production durable analytics is live on a Fly volume**
    Do instead: expect live `/stats` to report `storage_backend=sqlite`, `storage_path=/data/analytics.sqlite3`, and `storage_durable=true`; if those fields regress after future deploys, check Fly volume attachment before debugging app code.
+5. **[2026-03-09] Reuse the live proof report before inventing new proof content**
+   Do instead: treat `/reports/base-bluechip-bytecode-snapshot` as the first reusable outreach artifact for `G-015`; if you publish or distribute proof content, point traffic there first and measure `proof_report_view` plus referrers before building more report pages.
+6. **[2026-03-09] Treat `REPORT_PAGES` as the source of truth for public report pages**
+   Do instead: when adding a new proof report, store the exact live `/analyze` response payload in `src/risk_api/proof_reports.py` and rely on the registry for routing, sitemap inclusion, and request logging so public examples do not drift from the real API contract.

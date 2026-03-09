@@ -6,8 +6,8 @@
 - Branch: `master`
 - Status: green
 - Working tree:
-  - Modified: `.codex/napkin.md`, `HANDOVER.md`, `README.md`, `docs/GrowthExecutionPlan.md`, `docs/REGISTRATIONS.md`, `fly.toml`, `src/risk_api/app.py`, `tests/test_app.py`, `tests/test_logging.py`
-  - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `docs/DURABLE_ANALYTICS_CUTOVER.md`, `docs/MCP_PACKAGING_PLAN.md`, `docs/agent-economy-primer.md`, `examples/javascript/augur-mcp/`, `scripts/backfill_analytics_db.py`, `scripts/check_cdp_discovery.py`, `src/risk_api/analytics.py`
+  - Modified: `docs/GrowthExecutionPlan.md`, `src/risk_api/app.py`, `tests/test_app.py`
+  - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `src/risk_api/proof_reports.py`
 
 ## What We Worked On
 - Audited scoring and honeypot detection before `G-014` and shipped the smallest high-confidence fixes in the analysis engine.
@@ -29,6 +29,7 @@
 - Added a one-command JSONL-to-SQLite backfill script plus dashboard/status metadata so cutover can be verified after deploy.
 - Updated `fly.toml` so Fly deployments now expect the durable analytics volume and default to `/data/analytics.sqlite3` plus `/data/requests.jsonl`.
 - Created the Fly volume, deployed the app, and verified that production `/stats` is now running from persistent SQLite storage on `/data`.
+- Completed `G-014` with one reusable proof-of-work report page showing exact Augur output on notable Base contracts.
 
 ## What Got Done
 
@@ -353,6 +354,31 @@
   - `/dashboard` and `/stats` no longer reset on normal Fly app restarts/deploys as long as the single app machine keeps the attached volume
   - this solves the original restart-reset problem for the current one-machine deployment model
 
+### 25) Published the first proof-of-work report (`G-014`)
+- Added `src/risk_api/proof_reports.py` to hold reusable static report-page data plus the HTML renderer for public proof pages.
+- Added a live public report route:
+  - `/reports/base-bluechip-bytecode-snapshot`
+- Report scope:
+  - snapshot date `2026-03-09`
+  - Base WETH `0x4200000000000000000000000000000000000006`
+  - Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+  - Base cbBTC `0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf`
+- Report shape:
+  - exact point-in-time score outputs are rendered on-page as JSON
+  - each contract includes interpretation text explaining what the bytecode score does and does not prove
+  - the page explicitly says high scores on blue-chip assets reflect mutable/admin-controlled bytecode surfaces, not a fraud accusation
+- Linked the report from the landing page under a new `Proof of Work` section and included it in `/sitemap.xml`.
+- Added request logging coverage for the report page under:
+  - `funnel_stage=proof_report_view`
+- Follow-up review fixes:
+  - the `Exact snapshot JSON` blocks now embed the full live `/analyze` response shape for each contract snapshot, including `category_scores`, finding `description`, and nested `implementation`
+  - report routing now dispatches from the `REPORT_PAGES` registry via `/reports/<slug>` instead of a single hard-coded Flask route
+  - report request logging now also keys off the report registry so future report pages are routable, logged, and discoverable together
+- Updated `docs/GrowthExecutionPlan.md` to mark `G-014` complete and record the live page path.
+- Validation:
+  - `python -m pytest tests/test_app.py -q`
+  - `python -m pytest tests/test_logging.py tests/test_app.py -q`
+
 ## Validation
 - Ran:
   - `python -m pytest tests\test_logging.py tests\test_app.py -q`
@@ -391,10 +417,10 @@
 1. Keep `G-005` and `G-006` marked done unless new evidence shows an editable external listing still points at Conway.
 2. Monitor [coinbase/x402 PR #1515](https://github.com/coinbase/x402/pull/1515) and verify `https://www.x402.org/ecosystem` after merge.
    Current blocker: Coinbase-side review/deploy gate clearance shown in the 2026-03-08 email thread.
-3. Decide whether to backfill any historical JSONL request logs into production SQLite or accept the new durable count baseline from the cutover date.
-4. If you keep this SQLite-on-volume plan, keep Fly on a single active app machine; do not scale analytics across multiple active machines without moving to shared storage.
-5. For old-domain visibility, inspect edge-layer telemetry or config rather than assuming app logs can see Conway-host `403` traffic.
-6. After durable analytics are live, return to `G-014` and publish one proof-of-work report that can reuse the buyer-intent pages as internal-link targets.
+3. Use the new live proof page in one targeted `G-015` distribution push and watch `proof_report_view`, `top_referers`, and related path traffic in `/stats` and `/dashboard`.
+4. Decide whether to backfill any historical JSONL request logs into production SQLite or accept the new durable count baseline from the cutover date.
+5. If you keep this SQLite-on-volume plan, keep Fly on a single active app machine; do not scale analytics across multiple active machines without moving to shared storage.
+6. For old-domain visibility, inspect edge-layer telemetry or config rather than assuming app logs can see Conway-host `403` traffic.
 
 ## Suggested Restart Context For Next Agent
 - `G-001`, `G-002`, `G-003`, `G-004`, `G-005`, `G-006`, `G-007`, and `G-016` are done in repo state.
@@ -409,6 +435,7 @@
 - `G-011` is done via `examples/javascript/augur-paid-call` and the README link near the top.
 - `G-012` is done via the live `/how-payment-works` route linked from the landing page and README.
 - `G-013` is done via the live `/honeypot-detection-api`, `/proxy-risk-api`, and `/deployer-reputation-api` pages, each internally linked from the landing page and sitemap.
+- `G-014` is now done via the live `/reports/base-bluechip-bytecode-snapshot` page, which publishes a 2026-03-09 Augur snapshot on Base WETH, USDC, and cbBTC with exact JSON plus interpretation.
 - `/dashboard` is now a much more usable operator UI and is live on production, and it now reads from the persistent SQLite analytics store on `/data`.
 - Current observed behavior after cutover: `/stats` and `/dashboard` survive normal Fly machine restarts and deploys on the active attached volume.
 - Repo state includes a durable SQLite analytics backend behind `ANALYTICS_DB_PATH`, and production is now cut over to mounted persistent storage.
@@ -416,7 +443,7 @@
 - `/stats` and `/dashboard` now expose which backend is active so cutover can be checked live after deploy.
 - `fly.toml` is already prepared to mount Fly volume `augur_analytics` at `/data` and use `/data/analytics.sqlite3` by default.
 - Production durable analytics is now live on Fly volume `vol_vpg0qzjp1y23o8kv`, and live `/stats` survived a machine restart with `storage_backend=sqlite`.
-- The next technical priority is historical backfill choice plus any future multi-machine analytics design, not migrating away from Fly.
+- The next growth priority is `G-015`: reuse the live proof report in one targeted distribution push and measure whether it creates qualified traffic.
 - The public GitHub repository homepage now matches the canonical site: `https://augurrisk.com`.
 - `G-008` and `G-009` are done via `docs/MCP_PACKAGING_PLAN.md` and `examples/javascript/augur-mcp`.
 - MCP wrapper guardrails: keep payer wallet addresses out of model-visible output and return explicit MCP errors for Augur `422` / API failures.
