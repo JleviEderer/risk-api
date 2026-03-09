@@ -215,7 +215,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Why now: higher-signal placement than another directory-clone optimization.
   Depends on: `G-004`.
   Done means: submission is live or blocked with a documented follow-up.
-  Status: upstream PR is open as `coinbase/x402` PR #1515. As of 2026-03-09, the prior verified-signature blocker was cleared: the PR head commit now has a GitHub-verified SSH signature and review was re-requested from `@Must-be-Ash`. Remaining dependency is Coinbase-side maintainer review/deploy clearance, then live listing verification on `https://www.x402.org/ecosystem`.
+  Status: upstream `coinbase/x402` PR #1515 was approved and merged into `main` on 2026-03-09 after the verified-signature requirement was fixed. Remaining follow-up is live listing verification on `https://www.x402.org/ecosystem` after Coinbase's site deploy/index refresh.
 
 - [x] `G-008` Define the MCP packaging approach
   Output: choose the minimum viable MCP surface: wrapper, server, or adapter.
