@@ -5,6 +5,7 @@
 **Live:** https://augurrisk.com  
 **Proof report:** https://augurrisk.com/reports/base-bluechip-bytecode-snapshot  
 **Payment guide:** https://augurrisk.com/how-payment-works  
+**MCP setup:** https://augurrisk.com/mcp  
 **Agent registry:** https://8004scan.io/agents/base/19074
 
 ## What Augur Does
@@ -51,6 +52,14 @@ npm run dry-run
 ```
 
 For the protocol flow without code, use the live guide at `https://augurrisk.com/how-payment-works`.
+
+## MCP Setup
+
+Augur also ships a working local stdio MCP wrapper for Claude Desktop, Codex-compatible clients, and other MCP tooling.
+
+Public setup page:
+
+`https://augurrisk.com/mcp`
 
 ## API
 
@@ -105,6 +114,7 @@ Risk levels:
 
 - `/` landing page
 - `/how-payment-works` payment explainer
+- `/mcp` MCP setup page
 - `/reports/base-bluechip-bytecode-snapshot` proof-of-work report
 - `/honeypot-detection-api`
 - `/proxy-risk-api`
@@ -136,6 +146,7 @@ For proxy contracts, the response can also include nested `implementation` analy
 - Python paid-call example: [`scripts/test_x402_client.py`](scripts/test_x402_client.py)
 - JavaScript paid-call example: [`examples/javascript/augur-paid-call`](examples/javascript/augur-paid-call)
 - MCP wrapper example: [`examples/javascript/augur-mcp`](examples/javascript/augur-mcp)
+- Public MCP install page: [`/mcp`](https://augurrisk.com/mcp)
 
 ## Minimal Local Development
 
