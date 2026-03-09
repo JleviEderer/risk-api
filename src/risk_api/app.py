@@ -21,7 +21,7 @@ from risk_api.analytics import (
     iter_jsonl_entries,
     iter_sqlite_entries,
 )
-from risk_api.analysis.engine import analyze_contract
+from risk_api.analysis.engine import NoBytecodeError, analyze_contract
 from risk_api.chain.rpc import RPCError, get_code
 from risk_api.config import Config, load_config
 
@@ -2625,6 +2625,10 @@ def create_app(
             result = analyze_contract(
                 address, config.base_rpc_url, config.basescan_api_key
             )
+        except NoBytecodeError as e:
+            request.environ["funnel_stage"] = "no_bytecode"
+            request.environ["analyze_error_type"] = "no_bytecode"
+            return jsonify({"error": str(e)}), 422
         except RPCError as e:
             request.environ["funnel_stage"] = "rpc_error"
             request.environ["analyze_error_type"] = "rpc_error"

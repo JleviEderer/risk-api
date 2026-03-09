@@ -36,6 +36,20 @@
 10. **[2026-03-07] Reject no-bytecode addresses before the x402 paywall**
    Do instead: run a pre-paywall Base `eth_getCode` check for `GET` and `POST` `/analyze` requests and return `422` for EOAs or undeployed addresses so they are not billed or shown as `safe`.
 
+## Scoring & Analysis
+1. **[2026-03-09] Keep Basescan soft failures distinct from real creator miss cases**
+   Do instead: treat `NOTOK`, rate-limit, invalid-key, and similar Basescan creator responses as external errors that contribute no deployer-reputation points; reserve the 3-point "creator not found" finding for true empty-result cases only.
+2. **[2026-03-09] Do not let unresolved proxies look like clean low-risk contracts**
+   Do instead: when a proxy implementation cannot be resolved, fetched, or bottoms out in another proxy hop, add an explicit proxy-risk finding so the result reflects that the executable logic was not fully analyzed.
+3. **[2026-03-09] Honeypot detection should cover blacklist controls and compiled jump shapes**
+   Do instead: treat blacklist-style transfer controls as a honeypot signal and allow common compiler scaffolding such as `ISZERO`, `PUSH*`, and `JUMPDEST` around `JUMPI`/`REVERT` so the detector catches real transfer-blocking bytecode instead of only synthetic patterns.
+4. **[2026-03-09] Raw engine callers must not treat no-bytecode addresses as safe**
+   Do instead: keep the route-level `422` precheck, and also have `analyze_contract()` raise `NoBytecodeError` for EOAs or undeployed addresses so any scripts that bypass Flask cannot publish false-safe results.
+5. **[2026-03-09] Do not cache transient Basescan creator errors**
+   Do instead: cache only stable creator lookup outcomes; if Basescan returns a soft error like rate-limit or `NOTOK`, let the next call retry rather than suppressing deployer-reputation scoring for the rest of the process.
+6. **[2026-03-09] Keep execution-based honeypot work separate from the bytecode API**
+   Do instead: treat `docs/HONEYPOT_EXECUTION_PHASE2.md` as the scoped post-`G-014` plan; prefer a separate execution endpoint with one narrow buy/sell simulation path on supported Base routers instead of folding broad swap simulation into `/analyze`.
+
 ## User Directives
 1. **[2026-03-06] Give opinionated codebase recommendations**
    Do instead: review the local repo first, use the GitHub mirror only if needed, and return concrete strengths, risks, and next-step suggestions.

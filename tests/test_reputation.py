@@ -69,6 +69,51 @@ def test_get_contract_creator_api_error():
     assert result.status == CreatorLookupStatus.ERROR
 
 
+@responses.activate
+def test_get_contract_creator_soft_error_is_error():
+    responses.get(
+        BASESCAN_API,
+        json={
+            "status": "0",
+            "message": "NOTOK",
+            "result": "Max rate limit reached",
+        },
+    )
+    result = get_contract_creator(FAKE_ADDRESS, API_KEY)
+    assert result.status == CreatorLookupStatus.ERROR
+
+
+@responses.activate
+def test_get_contract_creator_soft_error_is_not_cached():
+    responses.get(
+        BASESCAN_API,
+        json={
+            "status": "0",
+            "message": "NOTOK",
+            "result": "Max rate limit reached",
+        },
+    )
+    responses.get(
+        BASESCAN_API,
+        json={
+            "status": "1",
+            "result": [
+                {
+                    "contractCreator": FAKE_DEPLOYER,
+                    "txHash": FAKE_TX_HASH,
+                }
+            ],
+        },
+    )
+
+    result1 = get_contract_creator(FAKE_ADDRESS, API_KEY)
+    result2 = get_contract_creator(FAKE_ADDRESS, API_KEY)
+
+    assert result1.status == CreatorLookupStatus.ERROR
+    assert result2.status == CreatorLookupStatus.FOUND
+    assert len(responses.calls) == 2
+
+
 # --- get_first_tx_timestamp ---
 
 

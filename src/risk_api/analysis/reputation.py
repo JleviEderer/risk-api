@@ -40,7 +40,32 @@ class CreatorLookupResult:
     tx_hash: str = ""
 
 
-@functools.lru_cache(maxsize=256)
+_creator_cache: dict[tuple[str, str], CreatorLookupResult] = {}
+_CREATOR_CACHE_MAX_SIZE = 256
+
+
+def _looks_like_basescan_soft_error(data: object) -> bool:
+    """Return True when a 200 response body still indicates an API-side failure."""
+    if not isinstance(data, dict):
+        return True
+
+    message = str(data.get("message", "")).lower()
+    result = data.get("result")
+    result_text = result.lower() if isinstance(result, str) else ""
+
+    error_markers = (
+        "notok",
+        "rate limit",
+        "invalid api key",
+        "missing api key",
+        "api key",
+        "error",
+        "temporar",
+        "timeout",
+    )
+    return any(marker in message or marker in result_text for marker in error_markers)
+
+
 def get_contract_creator(
     address: str, api_key: str
 ) -> CreatorLookupResult:
@@ -49,6 +74,11 @@ def get_contract_creator(
     Returns a structured result that distinguishes success, not-found, and
     external error conditions.
     """
+    key = (address.lower(), api_key)
+    cached = _creator_cache.get(key)
+    if cached is not None:
+        return cached
+
     params = {
         "module": "contract",
         "action": "getcontractcreation",
@@ -63,15 +93,36 @@ def get_contract_creator(
         logger.debug("Basescan contract creator lookup failed: %s", e)
         return CreatorLookupResult(CreatorLookupStatus.ERROR)
 
-    if data.get("status") != "1" or not data.get("result"):
-        return CreatorLookupResult(CreatorLookupStatus.NOT_FOUND)
+    if data.get("status") == "1" and data.get("result"):
+        entry = data["result"][0]
+        result = CreatorLookupResult(
+            status=CreatorLookupStatus.FOUND,
+            deployer=entry["contractCreator"],
+            tx_hash=entry["txHash"],
+        )
+        _creator_cache_put(key, result)
+        return result
 
-    entry = data["result"][0]
-    return CreatorLookupResult(
-        status=CreatorLookupStatus.FOUND,
-        deployer=entry["contractCreator"],
-        tx_hash=entry["txHash"],
-    )
+    if _looks_like_basescan_soft_error(data):
+        logger.debug("Basescan contract creator lookup returned soft error: %s", data)
+        return CreatorLookupResult(CreatorLookupStatus.ERROR)
+
+    if not data.get("result"):
+        result = CreatorLookupResult(CreatorLookupStatus.NOT_FOUND)
+        _creator_cache_put(key, result)
+        return result
+
+    return CreatorLookupResult(CreatorLookupStatus.ERROR)
+
+
+def _creator_cache_put(
+    key: tuple[str, str], result: CreatorLookupResult
+) -> None:
+    """Cache only stable creator lookup outcomes."""
+    if len(_creator_cache) >= _CREATOR_CACHE_MAX_SIZE:
+        oldest_key = next(iter(_creator_cache))
+        del _creator_cache[oldest_key]
+    _creator_cache[key] = result
 
 
 @functools.lru_cache(maxsize=256)
@@ -210,6 +261,6 @@ def detect_deployer_reputation(
 
 def clear_reputation_cache() -> None:
     """Clear all reputation LRU caches (for testing)."""
-    get_contract_creator.cache_clear()
+    _creator_cache.clear()
     get_first_tx_timestamp.cache_clear()
     get_tx_count.cache_clear()

@@ -25,7 +25,7 @@ CATEGORY_CAPS: dict[str, int] = {
     "honeypot": 25,
     "fee_manipulation": 15,
     "delegatecall": 15,
-    "proxy": 10,
+    "proxy": 30,
     "reentrancy": 10,
     "suspicious_selector": 15,
     "tiny_bytecode": 10,

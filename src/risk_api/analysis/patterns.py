@@ -9,11 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from risk_api.analysis.disassembler import Instruction
-from risk_api.analysis.selectors import (
-    extract_selectors,
-    find_malicious_selectors,
-    find_suspicious_selectors,
-)
+from risk_api.analysis.selectors import extract_selectors, find_malicious_selectors
 
 
 class Severity(str, Enum):
@@ -72,7 +68,7 @@ PROXY_SLOTS = {
 
 
 def detect_selfdestruct(instructions: list[Instruction]) -> list[Finding]:
-    """Detect SELFDESTRUCT opcode (0xFF). Critical — can destroy contract."""
+    """Detect SELFDESTRUCT opcode (0xFF). Critical - can destroy contract."""
     findings: list[Finding] = []
     for instr in instructions:
         if instr.opcode == 0xFF:
@@ -134,7 +130,7 @@ def detect_delegatecall(instructions: list[Instruction]) -> list[Finding]:
 
 
 def detect_reentrancy_risk(instructions: list[Instruction]) -> list[Finding]:
-    """Detect CALL followed by SSTORE — potential reentrancy vulnerability."""
+    """Detect CALL followed by SSTORE - potential reentrancy vulnerability."""
     findings: list[Finding] = []
     for i, instr in enumerate(instructions):
         if instr.opcode == 0xF1:  # CALL
@@ -179,44 +175,71 @@ def detect_proxy_patterns(instructions: list[Instruction]) -> list[Finding]:
 
 
 def detect_honeypot_patterns(instructions: list[Instruction]) -> list[Finding]:
-    """Detect conditional REVERT patterns that could trap tokens.
-
-    Looks for: comparison (EQ/LT/GT) → JUMPI → REVERT pattern near
-    transfer-related selectors, which suggests conditional blocking.
-    """
+    """Detect selector- or control-flow-based patterns that could trap tokens."""
     findings: list[Finding] = []
     selectors = extract_selectors(instructions)
 
-    # Check if transfer-related selectors exist (keys from ERC20_SELECTORS)
     transfer_sels = {bytes.fromhex("a9059cbb"), bytes.fromhex("23b872dd")}
     has_transfer = bool(selectors & transfer_sels)
     if not has_transfer:
         return findings
 
-    # Look for conditional revert patterns
+    malicious = find_malicious_selectors(selectors)
+    blacklist_controls = {
+        v for v in malicious.values() if "blacklist" in v.lower()
+    }
+    if blacklist_controls:
+        sigs = ", ".join(sorted(blacklist_controls))
+        return [
+            Finding(
+                detector="honeypot",
+                severity=Severity.HIGH,
+                title="Blacklist-style transfer controls detected",
+                description=(
+                    f"Contract contains transfer-blocking selectors ({sigs}) "
+                    "that can selectively stop holders from transferring tokens."
+                ),
+                points=25,
+            )
+        ]
+
     comparison_ops = {0x10, 0x11, 0x12, 0x13, 0x14}  # LT, GT, SLT, SGT, EQ
     for i, instr in enumerate(instructions):
-        if instr.opcode in comparison_ops and i + 2 < len(instructions):
-            # Check if comparison leads to JUMPI → ... → REVERT
-            if instructions[i + 1].opcode == 0x57:  # JUMPI
-                # Look for REVERT in the fallthrough path (next few instructions)
-                for j in range(i + 2, min(i + 6, len(instructions))):
-                    if instructions[j].opcode == 0xFD:  # REVERT
-                        findings.append(
-                            Finding(
-                                detector="honeypot",
-                                severity=Severity.HIGH,
-                                title="Potential honeypot: conditional REVERT in transfer path",
-                                description=(
-                                    "Contract has transfer functions with conditional "
-                                    "REVERT patterns that could selectively block "
-                                    "token transfers for certain addresses."
-                                ),
-                                points=25,
-                                offset=instr.offset,
-                            )
-                        )
-                        return findings
+        if instr.opcode not in comparison_ops:
+            continue
+
+        jumpi_index: int | None = None
+        for j in range(i + 1, min(i + 6, len(instructions))):
+            candidate = instructions[j]
+            if candidate.opcode == 0x57:  # JUMPI
+                jumpi_index = j
+                break
+            if not _is_honeypot_pre_jumpi_passthrough(candidate):
+                break
+
+        if jumpi_index is None:
+            continue
+
+        for j in range(jumpi_index + 1, min(jumpi_index + 6, len(instructions))):
+            candidate = instructions[j]
+            if candidate.opcode == 0xFD:  # REVERT
+                findings.append(
+                    Finding(
+                        detector="honeypot",
+                        severity=Severity.HIGH,
+                        title="Potential honeypot: conditional REVERT in transfer path",
+                        description=(
+                            "Contract has transfer functions with conditional "
+                            "REVERT patterns that could selectively block "
+                            "token transfers for certain addresses."
+                        ),
+                        points=25,
+                        offset=instr.offset,
+                    )
+                )
+                return findings
+            if not _is_honeypot_post_jumpi_passthrough(candidate):
+                break
     return findings
 
 
@@ -298,3 +321,24 @@ def _has_proxy_slots(instructions: list[Instruction]) -> bool:
         if instr.name == "PUSH32" and instr.operand in PROXY_SLOTS:
             return True
     return False
+
+
+def _is_honeypot_pre_jumpi_passthrough(instr: Instruction) -> bool:
+    """Allow common compiler-emitted stack shaping before JUMPI."""
+    return (
+        instr.name.startswith("PUSH")
+        or instr.name.startswith("DUP")
+        or instr.name.startswith("SWAP")
+        or instr.name == "ISZERO"
+    )
+
+
+def _is_honeypot_post_jumpi_passthrough(instr: Instruction) -> bool:
+    """Allow common fallthrough scaffolding before REVERT."""
+    return (
+        instr.name.startswith("PUSH")
+        or instr.name.startswith("DUP")
+        or instr.name.startswith("SWAP")
+        or instr.name == "JUMPDEST"
+        or instr.name == "ISZERO"
+    )

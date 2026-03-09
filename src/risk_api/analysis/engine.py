@@ -1,4 +1,4 @@
-"""Analysis engine: orchestrates fetch → disassemble → detect → score."""
+"""Analysis engine: orchestrates fetch -> disassemble -> detect -> score."""
 
 from __future__ import annotations
 
@@ -12,15 +12,11 @@ from risk_api.analysis.patterns import (
     EIP_1967_IMPL_SLOT,
     Finding,
     OZ_IMPL_SLOT,
+    Severity,
     run_all_detectors,
 )
 from risk_api.analysis.reputation import detect_deployer_reputation
-from risk_api.analysis.scoring import (
-    RiskLevel,
-    ScoreResult,
-    compute_score,
-    score_to_level,
-)
+from risk_api.analysis.scoring import RiskLevel, ScoreResult, compute_score, score_to_level
 from risk_api.chain.rpc import RPCError, get_code, get_storage_at
 
 logger = logging.getLogger(__name__)
@@ -54,7 +50,15 @@ class AnalysisResult:
     implementation: ImplementationResult | None = None
 
 
-# TTL cache for analysis results: (address, rpc_url, basescan_key) → (result, timestamp)
+class NoBytecodeError(ValueError):
+    """Raised when the target address has no deployed contract bytecode."""
+
+    def __init__(self, address: str):
+        super().__init__(f"No contract bytecode found at Base address: {address}")
+        self.address = address
+
+
+# TTL cache for analysis results: (address, rpc_url, basescan_key) -> (result, timestamp)
 _analysis_cache: dict[tuple[str, str, str], tuple[AnalysisResult, float]] = {}
 _CACHE_TTL_SECONDS = 300  # 5 minutes
 _CACHE_MAX_SIZE = 128
@@ -92,11 +96,7 @@ def clear_analysis_cache() -> None:
 
 
 def resolve_implementation(address: str, rpc_url: str) -> str | None:
-    """Try each known proxy storage slot and return the implementation address.
-
-    Returns checksummed-ish hex address (0x-prefixed, 40 chars) or None.
-    Graceful: returns None on any RPC failure.
-    """
+    """Try each known proxy storage slot and return the implementation address."""
     for slot_name, slot_bytes in _IMPL_SLOTS:
         slot_hex = "0x" + slot_bytes.hex()
         try:
@@ -105,12 +105,11 @@ def resolve_implementation(address: str, rpc_url: str) -> str | None:
             logger.debug("Failed to read %s slot for %s", slot_name, address)
             continue
 
-        # Strip 0x prefix and check for zero
         value = raw[2:] if raw.startswith("0x") else raw
         if not value or value == _ZERO_WORD or all(c == "0" for c in value):
             continue
 
-        # Address is right-aligned in the 32-byte word (last 20 bytes = last 40 hex chars)
+        # Address is right-aligned in the 32-byte word.
         addr_hex = value[-40:]
         if all(c == "0" for c in addr_hex):
             continue
@@ -130,11 +129,7 @@ def resolve_implementation(address: str, rpc_url: str) -> str | None:
 def _analyze_implementation(
     impl_address: str, rpc_url: str
 ) -> ImplementationResult | None:
-    """Fetch and analyze the implementation contract behind a proxy.
-
-    Returns None if bytecode fetch fails. Filters out proxy findings
-    to avoid double-counting with the proxy contract itself.
-    """
+    """Fetch and analyze the implementation contract behind a proxy."""
     try:
         bytecode_hex = get_code(impl_address, rpc_url)
     except RPCError:
@@ -143,17 +138,30 @@ def _analyze_implementation(
 
     hex_body = bytecode_hex[2:] if bytecode_hex.startswith("0x") else bytecode_hex
     bytecode_size = len(hex_body) // 2
-
     if bytecode_size == 0:
         return None
 
     instructions = disassemble(bytecode_hex)
     findings = run_all_detectors(instructions)
+    is_nested_proxy = any(f.detector == "proxy" for f in findings)
 
-    # Filter out proxy findings — the proxy itself already reported that
+    # Replace the raw proxy flag with an explicit "stopped after one hop" signal.
     findings = [f for f in findings if f.detector != "proxy"]
+    if is_nested_proxy:
+        findings.append(
+            Finding(
+                detector="proxy",
+                severity=Severity.HIGH,
+                title="Implementation is itself a proxy",
+                description=(
+                    "Resolved implementation appears to be another proxy. "
+                    "Augur stops after one hop, so the terminal logic was not analyzed."
+                ),
+                points=20,
+            )
+        )
 
-    # Prefix detector names with impl_ for clarity in combined output
+    score_result = compute_score(findings, instructions, bytecode_hex)
     prefixed_findings = [
         Finding(
             detector=f"impl_{f.detector}",
@@ -166,8 +174,6 @@ def _analyze_implementation(
         for f in findings
     ]
 
-    score_result = compute_score(findings, instructions, bytecode_hex)
-
     return ImplementationResult(
         address=impl_address,
         bytecode_size=bytecode_size,
@@ -176,53 +182,74 @@ def _analyze_implementation(
     )
 
 
+def _unresolved_proxy_finding(title: str, description: str) -> Finding:
+    return Finding(
+        detector="proxy",
+        severity=Severity.HIGH,
+        title=title,
+        description=description,
+        points=20,
+    )
+
+
 def analyze_contract(
     address: str, rpc_url: str, basescan_api_key: str = ""
 ) -> AnalysisResult:
-    """Full analysis pipeline: fetch bytecode → disassemble → detect → score.
-
-    For proxy contracts, also resolves and analyzes the implementation (max 1 hop).
-    Results are cached for 5 minutes (TTL) to avoid redundant RPC calls.
-    Raises RPCError if bytecode fetch fails.
-    """
+    """Full analysis pipeline: fetch bytecode -> disassemble -> detect -> score."""
     cached = _cache_get(address, rpc_url, basescan_api_key)
     if cached is not None:
         return cached
 
     bytecode_hex = get_code(address, rpc_url)
-
-    # Strip 0x prefix for size calculation
     hex_body = bytecode_hex[2:] if bytecode_hex.startswith("0x") else bytecode_hex
     bytecode_size = len(hex_body) // 2
+    if bytecode_size == 0:
+        raise NoBytecodeError(address)
 
     instructions = disassemble(bytecode_hex)
     findings = run_all_detectors(instructions)
     findings.extend(detect_deployer_reputation(address, basescan_api_key))
-    score_result: ScoreResult = compute_score(findings, instructions, bytecode_hex)
 
-    # Check if this is a proxy and resolve implementation
     impl_result: ImplementationResult | None = None
     is_proxy = any(f.detector == "proxy" for f in findings)
-
     if is_proxy:
         impl_address = resolve_implementation(address, rpc_url)
-        if impl_address is not None:
+        if impl_address is None:
+            findings.append(
+                _unresolved_proxy_finding(
+                    "Proxy implementation could not be resolved",
+                    (
+                        "Contract appears to be a proxy, but Augur could not resolve "
+                        "the implementation address from known storage slots. "
+                        "The executable logic was not analyzed."
+                    ),
+                )
+            )
+        else:
             impl_result = _analyze_implementation(impl_address, rpc_url)
+            if impl_result is None:
+                findings.append(
+                    _unresolved_proxy_finding(
+                        "Proxy implementation could not be analyzed",
+                        (
+                            "Contract appears to be a proxy, but Augur could not fetch "
+                            "bytecode for the resolved implementation address. "
+                            "The executable logic was not analyzed."
+                        ),
+                    )
+                )
 
-    # Combine scores if implementation was analyzed
+    score_result: ScoreResult = compute_score(findings, instructions, bytecode_hex)
     final_score = score_result.score
     final_category_scores = dict(score_result.category_scores)
 
     if impl_result is not None:
-        # Add implementation category scores to the proxy's scores
         impl_total = sum(impl_result.category_scores.values())
         final_score = min(100, score_result.score + impl_total)
         for cat, points in impl_result.category_scores.items():
-            prefixed = f"impl_{cat}"
-            final_category_scores[prefixed] = points
+            final_category_scores[f"impl_{cat}"] = points
 
     final_level = score_to_level(final_score)
-
     result = AnalysisResult(
         address=address,
         score=final_score,

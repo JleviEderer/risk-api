@@ -3,6 +3,7 @@ import responses
 
 from risk_api.analysis.engine import (
     ImplementationResult,
+    NoBytecodeError,
     analyze_contract,
     clear_analysis_cache,
     resolve_implementation,
@@ -87,10 +88,8 @@ def test_analyze_contract_with_selfdestruct():
 @responses.activate
 def test_analyze_eoa():
     responses.post(RPC_URL, json=_rpc_response("0x"))
-    result = analyze_contract("0x" + "11" * 20, RPC_URL)
-    assert result.bytecode_size == 0
-    assert result.score == 0
-    assert result.level == RiskLevel.SAFE
+    with pytest.raises(NoBytecodeError, match="No contract bytecode found"):
+        analyze_contract("0x" + "11" * 20, RPC_URL)
 
 
 @responses.activate
@@ -111,6 +110,12 @@ def test_analyze_proxy_contract():
     dc_finding = next(f for f in result.findings if f.detector == "delegatecall")
     assert dc_finding.severity.value == "info"
     assert result.implementation is None
+    assert result.score == 40
+    assert result.level == RiskLevel.MEDIUM
+    assert any(
+        f.title == "Proxy implementation could not be resolved"
+        for f in result.findings
+    )
 
 
 @responses.activate
@@ -266,7 +271,12 @@ def test_analyze_proxy_storage_rpc_failure():
 
     assert result.implementation is None
     assert any(f.detector == "proxy" for f in result.findings)
-    assert result.score == 20  # proxy(10) + delegatecall(10)
+    assert result.score == 40
+    assert result.level == RiskLevel.MEDIUM
+    assert any(
+        f.title == "Proxy implementation could not be resolved"
+        for f in result.findings
+    )
 
 
 @responses.activate
@@ -283,10 +293,10 @@ def test_analyze_proxy_implementation_is_also_proxy():
     result = analyze_contract(proxy_addr, RPC_URL)
 
     assert result.implementation is not None
-    # Impl proxy findings are filtered out (no double-counting)
-    assert not any(f.detector == "impl_proxy" for f in result.findings)
-    # But impl delegatecall is still reported
+    assert any(f.detector == "impl_proxy" for f in result.findings)
     assert any(f.detector == "impl_delegatecall" for f in result.findings)
+    assert result.score == 50
+    assert result.level == RiskLevel.MEDIUM
 
 
 @responses.activate
@@ -303,7 +313,12 @@ def test_analyze_proxy_impl_bytecode_fetch_fails():
     result = analyze_contract(proxy_addr, RPC_URL)
 
     assert result.implementation is None
-    assert result.score == 20  # proxy(10) + delegatecall(10)
+    assert result.score == 40
+    assert result.level == RiskLevel.MEDIUM
+    assert any(
+        f.title == "Proxy implementation could not be analyzed"
+        for f in result.findings
+    )
 
 
 # --- Analysis cache tests ---

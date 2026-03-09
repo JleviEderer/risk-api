@@ -10,6 +10,7 @@
   - Untracked: `.claude/settings.local.json`, `.playwright-mcp/`, `avatar.html`, `docs/DURABLE_ANALYTICS_CUTOVER.md`, `docs/MCP_PACKAGING_PLAN.md`, `docs/agent-economy-primer.md`, `examples/javascript/augur-mcp/`, `scripts/backfill_analytics_db.py`, `scripts/check_cdp_discovery.py`, `src/risk_api/analytics.py`
 
 ## What We Worked On
+- Audited scoring and honeypot detection before `G-014` and shipped the smallest high-confidence fixes in the analysis engine.
 - Continued the growth backlog and completed `G-005`, `G-006`, `G-007`, `G-010`, `G-011`, and `G-012` from `docs/GrowthExecutionPlan.md`.
 - Aligned the public GitHub repository homepage setting with the canonical production domain.
 - Flagged the current `coinbase/x402` ecosystem PR as blocked on Coinbase-side review/deploy controls based on the 2026-03-08 email thread.
@@ -30,6 +31,33 @@
 - Created the Fly volume, deployed the app, and verified that production `/stats` is now running from persistent SQLite storage on `/data`.
 
 ## What Got Done
+
+### 0) Hardened analysis correctness before `G-014`
+- Fixed Basescan creator lookup handling so soft API failures such as `NOTOK`, rate-limit, and invalid-key responses are treated as external errors rather than true "not found" deployer states.
+- Expanded honeypot detection to catch blacklist-style transfer controls and a common compiled control-flow shape where `PUSH*` appears between the comparison and `JUMPI`.
+- Raised unresolved proxy results above the old proxy-only baseline:
+  - if a proxy implementation cannot be resolved or fetched, the result now adds an explicit high-risk proxy finding instead of quietly staying at the clean-proxy score
+  - if the resolved implementation is itself another proxy, the response now includes `impl_proxy` and scores that unresolved extra hop instead of suppressing it
+- Hardened the raw engine contract:
+  - `analyze_contract()` now raises `NoBytecodeError` for EOAs or undeployed addresses instead of returning `score=0` / `level=safe`
+  - `/analyze` still returns the same `422` no-bytecode response, and now also catches `NoBytecodeError` defensively in the route handler
+- Follow-up fixes from second-pass review:
+  - widened the honeypot control-flow matcher again so compiler-style transfer guards such as `EQ -> ISZERO -> PUSH* -> JUMPI -> JUMPDEST -> REVERT` are treated as honeypot signals
+  - stopped transient Basescan soft errors from sticking in the creator cache; only stable `FOUND` / `NOT_FOUND` creator lookups are cached now
+- Kept detector taxonomy stable where possible:
+  - blacklist selectors now contribute through the existing `honeypot` signal
+  - unresolved proxy states stay under the existing `proxy` category rather than introducing a new public detector family
+- Wrote the post-`G-014` design doc for a minimal execution-based honeypot expansion:
+  - new doc: `docs/HONEYPOT_EXECUTION_PHASE2.md`
+  - preferred shape: separate execution endpoint rather than folding simulation into the current bytecode score path
+  - explicit non-goal: do not build broad swap simulation before proving value with one narrow buy/sell path on supported Base routers
+- Added focused regression coverage in:
+  - `tests/test_patterns.py`
+  - `tests/test_engine.py`
+  - `tests/test_reputation.py`
+- Validation:
+  - `python -m pytest tests/test_engine.py tests/test_patterns.py tests/test_reputation.py tests/test_scoring.py -q`
+  - `python -m pytest tests/test_app.py -q`
 
 ### 1) Closed repo-side canonical-domain cleanup (`G-005`)
 - Re-audited the repo for `risk-api.life.conway.tech` references.

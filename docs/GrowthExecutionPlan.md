@@ -268,6 +268,7 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Why now: proof beats claims for early trust building.
   Depends on: `G-001`, `G-002`.
   Done means: one report is live and reusable in outreach.
+  Note: the scoped post-`G-014` execution-based honeypot expansion is documented separately in `docs/HONEYPOT_EXECUTION_PHASE2.md`; do not treat that design as a prerequisite for publishing the first proof-of-work report.
 
 - [ ] `G-015` Do one targeted distribution push
   Output: one post in a relevant Base or x402 community plus one supporting social or developer post.

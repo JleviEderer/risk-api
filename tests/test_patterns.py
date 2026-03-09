@@ -94,6 +94,48 @@ def test_detect_honeypot_patterns():
     assert findings[0].points == 25
 
 
+def test_detect_honeypot_patterns_with_push_between_eq_and_jumpi():
+    bytecode = (
+        "63a9059cbb"  # PUSH4 transfer(address,uint256)
+        "14"          # EQ
+        "610010"      # PUSH2 0x0010
+        "57"          # JUMPI
+        "fd"          # REVERT
+    )
+    instructions = disassemble(bytecode)
+    findings = detect_honeypot_patterns(instructions)
+    assert len(findings) == 1
+    assert findings[0].detector == "honeypot"
+
+
+def test_detect_honeypot_patterns_with_iszero_and_jumpdest():
+    bytecode = (
+        "63a9059cbb"  # PUSH4 transfer(address,uint256)
+        "14"          # EQ
+        "15"          # ISZERO
+        "610010"      # PUSH2 0x0010
+        "57"          # JUMPI
+        "5b"          # JUMPDEST
+        "fd"          # REVERT
+    )
+    instructions = disassemble(bytecode)
+    findings = detect_honeypot_patterns(instructions)
+    assert len(findings) == 1
+    assert findings[0].detector == "honeypot"
+
+
+def test_detect_honeypot_patterns_with_blacklist_selector():
+    bytecode = (
+        "63a9059cbb"  # transfer(address,uint256)
+        "6344337ea1"  # blacklist(address)
+    )
+    instructions = disassemble(bytecode)
+    findings = detect_honeypot_patterns(instructions)
+    assert len(findings) == 1
+    assert findings[0].detector == "honeypot"
+    assert "Blacklist-style" in findings[0].title
+
+
 def test_detect_honeypot_no_transfer():
     # No transfer selector → no honeypot finding
     bytecode = "1457fd"  # EQ JUMPI REVERT but no transfer selector
