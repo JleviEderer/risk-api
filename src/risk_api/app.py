@@ -1713,15 +1713,14 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 
 ## Detectors
 
-1. **Proxy Detection** - EIP-1967, EIP-1822, and OpenZeppelin proxy slots. \
-Proxy contracts auto-resolve implementation (max 1 hop).
-2. **Reentrancy** - CALL before state update patterns that enable reentrancy attacks.
-3. **Selfdestruct** - Contract contains SELFDESTRUCT opcode, allowing destruction.
-4. **Honeypot** - Transfer restriction patterns that prevent token selling.
-5. **Hidden Mint** - Unauthorized token creation functions not visible in the ABI.
-6. **Fee Manipulation** - Dynamic fee extraction patterns that can drain value.
-7. **Delegatecall** - External code execution that can change contract state.
-8. **Deployer Reputation** - Basescan deployer wallet history analysis.
+1. **Proxy Detection** - identifies upgradeable proxy behavior and can include nested implementation analysis.
+2. **Reentrancy** - surfaces bytecode patterns associated with reentrant control flow risk.
+3. **Selfdestruct** - flags contract destruction capability when present.
+4. **Honeypot** - looks for transfer restriction patterns that can trap exits.
+5. **Hidden Mint** - highlights mint-related capability that may matter for token trust decisions.
+6. **Fee Manipulation** - surfaces fee and transfer-tax related bytecode signals.
+7. **Delegatecall** - flags external code execution surfaces that may affect mutability or trust.
+8. **Deployer Reputation** - adds deployer-history context when Basescan-backed data is available.
 
 ## Error Responses
 
@@ -1742,9 +1741,9 @@ Use an x402-compatible client to handle payment automatically.
 Use any x402-compatible HTTP client. The flow is:
 
 1. `GET /analyze?address=<addr>` → receives 402 with payment details
-2. Client signs USDC `transferWithAuthorization` on Base
-3. Client retries with `PAYMENT-SIGNATURE: <proof>` header
-4. Receives 200 with risk analysis JSON
+2. The client handles the x402 payment flow
+3. The client retries with `PAYMENT-SIGNATURE`
+4. Augur returns JSON risk analysis
 
 ## Links
 

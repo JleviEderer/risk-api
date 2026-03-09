@@ -16,3 +16,9 @@ htmlcov/
 cdp_api_key.json
 .env.production
 node_modules/
+HANDOVER.local.md
+.codex/napkin.local.md
+docs/BizPlanning.local.md
+docs/DECISIONS.local.md
+docs/x402-landscape-research.local.md
+docs/autonomous-agent-operations-field-guide.local.md

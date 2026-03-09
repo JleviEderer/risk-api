@@ -6,8 +6,8 @@ Repo-level operating instructions for any agent working in `risk-api`.
 
 Before making decisions, read:
 
-1. `HANDOVER.md`
-2. `.codex/napkin.md`
+1. `HANDOVER.local.md` if present, otherwise `HANDOVER.md`
+2. `.codex/napkin.local.md` if present, otherwise `.codex/napkin.md`
 
 These are the current operator notes for the repo.
 
@@ -23,8 +23,8 @@ Primary sources:
 - production env and secrets such as `PUBLIC_URL`
 
 Secondary sources:
-- `HANDOVER.md`
-- `.codex/napkin.md`
+- `HANDOVER.local.md` or `HANDOVER.md`
+- `.codex/napkin.local.md` or `.codex/napkin.md`
 - `README.md`
 - `CLAUDE.md`
 - `docs/`
@@ -61,7 +61,7 @@ For production or discovery issues, check in this order:
 
 When the current session changes operational behavior, update:
 
-- `HANDOVER.md`
-- `.codex/napkin.md`
+- `HANDOVER.local.md` if you maintain local operator notes, otherwise `HANDOVER.md`
+- `.codex/napkin.local.md` if you maintain local operator notes, otherwise `.codex/napkin.md`
 
 Keep both short, current, and execution-focused. Keep `AGENTS.md` stable; do not use it as a session log.
