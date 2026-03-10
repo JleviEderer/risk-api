@@ -23,6 +23,9 @@
 - Added a root agent-facing skill document:
   - live doc: `https://augurrisk.com/skill.md`
   - linked from the homepage, sitemap, robots, `llms.txt`, and `llms-full.txt`
+- Tightened the homepage visual hierarchy:
+  - added a stronger brand lockup, hero stats, and denser section intros
+  - kept the same public routes and machine-readable entrypoints
 - Packaged and published the MCP wrapper as `augurrisk-mcp`:
   - npm: `https://www.npmjs.com/package/augurrisk-mcp`
   - current version: `1.0.1`

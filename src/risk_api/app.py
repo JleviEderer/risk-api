@@ -1147,7 +1147,12 @@ body{
   margin:0 auto;
   line-height:1.6;
 }
-.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:22px}
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand img{width:42px;height:42px;border-radius:12px;border:1px solid rgba(63,95,134,.38);box-shadow:0 0 0 1px rgba(255,255,255,.03),0 14px 34px rgba(0,0,0,.28)}
+.brand-name{display:block;color:#f5f8fd;font-size:1rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.brand-sub{display:block;color:#6f85a2;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;margin-top:2px}
+.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .topnav a{display:inline-block;background:rgba(15,20,29,.78);border:1px solid var(--line);border-radius:999px;
   padding:6px 12px;color:var(--blue);text-decoration:none;font-size:.82rem;letter-spacing:.02em;transition:border-color .2s,transform .2s,background .2s}
 .topnav a:hover{border-color:var(--line-strong);background:rgba(18,25,39,.95);transform:translateY(-1px)}
@@ -1156,16 +1161,21 @@ body{
 .hero-main{padding:26px 24px 24px}
 .hero-side{padding:18px}
 .eyebrow{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#6f85a2;margin-bottom:14px}
-h1{font-size:2.8rem;line-height:.96;color:#f5f8fd;margin-bottom:10px;font-weight:700;max-width:540px}
+h1{font-size:3rem;line-height:.94;color:#f5f8fd;margin-bottom:10px;font-weight:700;max-width:620px}
 h2{font-size:1.02rem;color:#d7e0ee;margin:0 0 12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 .section h2{padding-bottom:12px;border-bottom:1px solid rgba(63,95,134,.28)}
 .subtitle{color:#9ba8bb;font-size:1.03rem;max-width:560px;margin-bottom:16px}
 .hero-note{color:var(--muted);font-size:.86rem;max-width:560px}
 .hero-note a{color:var(--blue);text-decoration:none}
 .badge{display:inline-block;background:rgba(20,61,103,.52);color:var(--blue);padding:6px 12px;border:1px solid rgba(63,95,134,.42);border-radius:999px;font-size:.83rem;margin-bottom:18px}
+.hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
+.hero-stat{background:rgba(7,11,17,.72);border:1px solid rgba(63,95,134,.24);border-radius:12px;padding:12px 13px}
+.hero-stat strong{display:block;color:#f5f8fd;font-size:1.1rem;line-height:1}
+.hero-stat span{display:block;color:#75859c;font-size:.73rem;letter-spacing:.12em;text-transform:uppercase;margin-top:6px}
 .hero-side .mini-label{font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:#6f85a2;margin-bottom:10px}
 .hero-side p{color:var(--muted);font-size:.82rem;margin-top:10px}
 .section{padding:20px;margin-bottom:16px}
+.section-copy{color:var(--muted);font-size:.85rem;margin-bottom:12px}
 .detectors{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px}
 .detector{background:rgba(6,8,13,.8);border:1px solid rgba(63,95,134,.22);border-radius:10px;padding:12px 14px;font-size:.85rem}
 .detector .name{color:var(--blue);font-weight:600}
@@ -1187,27 +1197,43 @@ code{color:#d8e7fb}
 footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22);color:#5c6c82;font-size:.78rem;text-align:center}
 @media (max-width:760px){
   body{padding:16px}
+  .masthead{align-items:flex-start}
   .hero{grid-template-columns:1fr}
-  h1{font-size:2.15rem}
+  h1{font-size:2.25rem}
 }
 </style>
 </head>
 <body>
-<nav class="topnav">
-  <a href="__BASE_URL__/skill.md">Skill Doc</a>
-  <a href="__BASE_URL__/openapi.json">OpenAPI</a>
-  <a href="__BASE_URL__/.well-known/x402">x402</a>
-  <a href="__BASE_URL__/mcp">MCP</a>
-  <a href="__BASE_URL__/how-payment-works">How Payment Works</a>
-</nav>
+<div class="masthead">
+  <a class="brand" href="__BASE_URL__/">
+    <img src="__BASE_URL__/avatar.png" alt="Augur">
+    <div>
+      <span class="brand-name">Augur</span>
+      <span class="brand-sub">Base Contract Risk API</span>
+    </div>
+  </a>
+  <nav class="topnav">
+    <a href="__BASE_URL__/skill.md">Skill Doc</a>
+    <a href="__BASE_URL__/openapi.json">OpenAPI</a>
+    <a href="__BASE_URL__/.well-known/x402">x402</a>
+    <a href="__BASE_URL__/mcp">MCP</a>
+    <a href="__BASE_URL__/how-payment-works">How Payment Works</a>
+  </nav>
+</div>
 
 <section class="hero">
 <div class="hero-main">
   <div class="eyebrow">Base Mainnet  |  Deterministic Bytecode Triage  |  x402-Paid API</div>
-  <h1>Augur</h1>
-  <p class="subtitle">Score Base contract bytecode before your agent interacts with it.</p>
+  <h1>Score contract bytecode before your agent moves money.</h1>
+  <p class="subtitle">Score Base contract bytecode before your agent interacts with it. Augur gives agents a deterministic risk screen before they trade, route funds, list a token, or hand the address to a more expensive review step.</p>
   <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
   <p class="hero-note">Fastest path for integration: start with <a href="__BASE_URL__/skill.md">/skill.md</a> if you want the shortest agent-oriented workflow, use <a href="__BASE_URL__/openapi.json">/openapi.json</a> for a formal schema, or install the local wrapper from <a href="__BASE_URL__/mcp">/mcp</a>.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><strong>8</strong><span>Detectors</span></div>
+    <div class="hero-stat"><strong>0-100</strong><span>Risk Score</span></div>
+    <div class="hero-stat"><strong>Base</strong><span>Mainnet Only</span></div>
+    <div class="hero-stat"><strong>Proxy</strong><span>Impl Aware</span></div>
+  </div>
 </div>
 <aside class="hero-side">
   <div class="mini-label">Agent Entry</div>
@@ -1218,6 +1244,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 
 <div class="section">
 <h2>Start Here If You Are An Agent</h2>
+<p class="section-copy">The intent is simple: short docs first, one paid endpoint second, structured risk output last. No signups, no account provisioning, no hidden control plane.</p>
 <div class="split-callouts">
   <div class="callout">
     <div class="kicker">Step 01</div>
@@ -1237,6 +1264,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 
 <div class="section">
 <h2>What it does</h2>
+<p class="section-copy">Augur stays narrow on purpose. It is a bytecode triage layer for autonomous systems, not a simulated analyst persona and not a full audit substitute.</p>
 <p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
@@ -1270,7 +1298,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 
 <div class="section">
 <h2>Use Augur For</h2>
-<p style="color:var(--muted);font-size:.85rem">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
+<p class="section-copy">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
 <div class="links">
   <a href="__BASE_URL__/honeypot-detection-api">Honeypot Detection API <div class="path">/honeypot-detection-api</div></a>
   <a href="__BASE_URL__/proxy-risk-api">Proxy Risk API <div class="path">/proxy-risk-api</div></a>
@@ -1280,7 +1308,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 
 <div class="section">
 <h2>Proof of Work</h2>
-<p style="color:var(--muted);font-size:.85rem">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
+<p class="section-copy">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
 <div class="links">
   <a href="__BASE_URL__/reports/base-bluechip-bytecode-snapshot">Base Blue-Chip Bytecode Snapshot <div class="path">/reports/base-bluechip-bytecode-snapshot</div></a>
 </div>
@@ -1288,7 +1316,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 
 <div class="section">
 <h2>Discovery &amp; Integration</h2>
-<p style="color:var(--muted);font-size:.85rem">Install the MCP wrapper directly with <code>npx -y augurrisk-mcp</code>, or use the links below for the broader machine-readable surface.</p>
+<p class="section-copy">Install the MCP wrapper directly with <code>npx -y augurrisk-mcp</code>, or use the links below for the broader machine-readable surface.</p>
 <div class="links">
   <a href="__BASE_URL__/skill.md">Skill Doc<div class="path">/skill.md</div></a>
   <a href="__BASE_URL__/mcp">MCP Setup<div class="path">/mcp</div></a>
