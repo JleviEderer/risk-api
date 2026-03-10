@@ -13,13 +13,15 @@
    Do instead: frame the report as a dated snapshot, not a live rerun or a full product demo; use the payment explainer and dashboard as separate surfaces.
 3. **[2026-03-10] Homepage polish should preserve the agent entry path**
    Do instead: keep the brand lockup, `skill.md` entry, and one obvious paid-call path visible above the fold even when tightening the visual hierarchy.
-4. **[2026-03-10] Public MCP install copy should point at npm once published**
+4. **[2026-03-10] Public entry pages are not the detector list**
+   Do instead: label intent/SEO pages as entry pages or workflows, and keep full detector coverage described separately so agents do not confuse landing pages with product capability.
+5. **[2026-03-10] Public MCP install copy should point at npm once published**
    Do instead: use `npx -y augurrisk-mcp` on `/mcp`, the homepage, `README.md`, and machine docs now that the package is live.
-5. **[2026-03-10] MCP wrapper should stay in-repo unless it truly diverges**
+6. **[2026-03-10] MCP wrapper should stay in-repo unless it truly diverges**
    Do instead: keep `examples/javascript/augur-mcp` in this repo and treat `augurrisk-mcp` as the publish/distribution surface rather than splitting into a second codebase early.
-6. **[2026-03-10] Keep distribution posts in one outreach log**
+7. **[2026-03-10] Keep distribution posts in one outreach log**
    Do instead: record each forum/community post in `.codex/outreach.local.md` if it exists, otherwise keep `docs/outreach.md` current with date, surface, URL, status, and exact message.
-7. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
+8. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
    Do instead: test `r/OpenClaw` or OpenClaw Discord after Base/x402-first outreach, and avoid using the AI-only OpenClaw forum as the main posting surface.
 
 ## Validation

@@ -26,6 +26,11 @@
 - Tightened the homepage visual hierarchy:
   - added a stronger brand lockup, hero stats, and denser section intros
   - kept the same public routes and machine-readable entrypoints
+- Clarified homepage wording around capability vs entry pages:
+  - renamed the misleading "Use Augur For" block to "Public Entry Pages"
+  - explicitly states that those pages are task-specific fronts for the same full 8-detector `/analyze` pass
+- Brought `/mcp` into the same visual system as the homepage without adding human-first promo sections:
+  - keeps the page focused on local stdio setup, client-side x402, and canonical machine docs
 - Packaged and published the MCP wrapper as `augurrisk-mcp`:
   - npm: `https://www.npmjs.com/package/augurrisk-mcp`
   - current version: `1.0.1`

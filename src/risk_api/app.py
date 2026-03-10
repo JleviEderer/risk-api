@@ -1297,8 +1297,8 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 </div>
 
 <div class="section">
-<h2>Use Augur For</h2>
-<p class="section-copy">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
+<h2>Public Entry Pages</h2>
+<p class="section-copy">These are public task-specific entry pages, not the full detector list. All three route back to the same paid <code>/analyze</code> endpoint, which still runs the full 8-detector scoring pass shown above.</p>
 <div class="links">
   <a href="__BASE_URL__/honeypot-detection-api">Honeypot Detection API <div class="path">/honeypot-detection-api</div></a>
   <a href="__BASE_URL__/proxy-risk-api">Proxy Risk API <div class="path">/proxy-risk-api</div></a>
@@ -1345,32 +1345,116 @@ MCP_GUIDE_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Augur MCP Setup</title>
 <meta name="description" content="Install Augur as a local stdio MCP server for Claude Desktop, Codex-compatible clients, and other MCP tooling.">
+<link rel="icon" type="image/png" href="__BASE_URL__/favicon.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  background:#0f1117;color:#e0e0e0;padding:24px;max-width:860px;margin:0 auto;line-height:1.65}
-h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:8px;font-weight:600}
-h2{font-size:1.05rem;color:#a0aec0;margin:24px 0 10px;font-weight:500}
+:root{
+  --bg:#06080d;
+  --panel:#0f141d;
+  --line:#233247;
+  --line-strong:#3f5f86;
+  --text:#e8edf6;
+  --muted:#8d9cb2;
+  --blue:#8ec5ff;
+  --green:#79e2a7;
+  --glow:rgba(78,137,214,.18);
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(72,126,176,.18), transparent 30%),
+    radial-gradient(circle at top right, rgba(39,84,137,.14), transparent 28%),
+    linear-gradient(180deg, #05070b 0%, #0a0d13 45%, #06080d 100%);
+  color:var(--text);
+  padding:24px;
+  max-width:960px;
+  margin:0 auto;
+  line-height:1.65;
+}
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand img{width:42px;height:42px;border-radius:12px;border:1px solid rgba(63,95,134,.38);box-shadow:0 0 0 1px rgba(255,255,255,.03),0 14px 34px rgba(0,0,0,.28)}
+.brand-name{display:block;color:#f5f8fd;font-size:1rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.brand-sub{display:block;color:#6f85a2;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;margin-top:2px}
+.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.topnav a{display:inline-block;background:rgba(15,20,29,.78);border:1px solid var(--line);border-radius:999px;
+  padding:6px 12px;color:var(--blue);text-decoration:none;font-size:.82rem;letter-spacing:.02em;transition:border-color .2s,transform .2s,background .2s}
+.topnav a:hover{border-color:var(--line-strong);background:rgba(18,25,39,.95);transform:translateY(-1px)}
+.hero{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.95fr);gap:16px;margin-bottom:16px}
+.hero-main,.hero-side,.section{background:linear-gradient(180deg, rgba(18,25,39,.92), rgba(11,16,24,.96));border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+.hero-main{padding:26px 24px 24px}
+.hero-side{padding:18px}
+.eyebrow{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#6f85a2;margin-bottom:14px}
+h1{font-size:2.4rem;line-height:.96;color:#f5f8fd;margin-bottom:10px;font-weight:700;max-width:620px}
+h2{font-size:1.02rem;color:#d7e0ee;margin:0 0 12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.section h2{padding-bottom:12px;border-bottom:1px solid rgba(63,95,134,.28)}
 p{margin-bottom:10px}
-.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}
-code{background:#0f1117;border:1px solid #2d3148;border-radius:4px;padding:2px 6px}
-pre{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.84rem;color:#68d391;margin-top:8px}
-a{color:#f6ad55}
-a:hover{color:#fbd38d}
+.subtitle{color:#9ba8bb;font-size:1rem;max-width:580px;margin-bottom:14px}
+.hero-note{color:var(--muted);font-size:.85rem;max-width:560px}
+.hero-points{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:16px}
+.hero-point{background:rgba(7,11,17,.72);border:1px solid rgba(63,95,134,.24);border-radius:12px;padding:12px 13px}
+.hero-point strong{display:block;color:#f5f8fd;font-size:1rem;line-height:1.1}
+.hero-point span{display:block;color:#75859c;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;margin-top:6px}
+.section{padding:20px;margin-bottom:16px}
+.section-copy{color:var(--muted);font-size:.85rem;margin-bottom:12px}
+code{background:#070b11;border:1px solid rgba(63,95,134,.28);border-radius:4px;padding:2px 6px}
+pre{background:#070b11;border:1px solid rgba(63,95,134,.28);border-radius:10px;padding:14px;overflow-x:auto;font-size:.84rem;color:var(--green);margin-top:8px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+a{color:var(--blue)}
 ul{margin:8px 0 0 18px}
 .links{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:10px}
-.links a{display:block;background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;
-  color:#90cdf4;text-decoration:none;font-size:.85rem;transition:border-color .2s}
-.links a:hover{border-color:#63b3ed}
-.links a .path{color:#68d391;font-family:monospace;font-size:.8rem}
+.links a{display:block;background:rgba(7,11,17,.82);border:1px solid rgba(63,95,134,.22);border-radius:10px;padding:12px 14px;
+  color:var(--blue);text-decoration:none;font-size:.85rem;transition:border-color .2s,transform .2s,box-shadow .2s}
+.links a:hover{border-color:var(--line-strong);transform:translateY(-1px);box-shadow:0 0 0 1px var(--glow)}
+.links a .path{color:var(--green);font-family:monospace;font-size:.8rem}
+footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22);color:#5c6c82;font-size:.78rem;text-align:center}
+@media (max-width:760px){
+  body{padding:16px}
+  .masthead{align-items:flex-start}
+  .hero{grid-template-columns:1fr}
+  h1{font-size:2rem}
+}
 </style>
 </head>
 <body>
-<h1>Augur MCP Setup</h1>
-<p>Augur already ships a working local stdio MCP wrapper. Use it when you want the existing paid HTTP API surfaced as MCP tools inside Claude Desktop, Codex-compatible clients, or other MCP tooling.</p>
+<div class="masthead">
+  <a class="brand" href="__BASE_URL__/">
+    <img src="__BASE_URL__/avatar.png" alt="Augur">
+    <div>
+      <span class="brand-name">Augur</span>
+      <span class="brand-sub">MCP Setup</span>
+    </div>
+  </a>
+  <nav class="topnav">
+    <a href="__BASE_URL__/skill.md">Skill Doc</a>
+    <a href="__BASE_URL__/openapi.json">OpenAPI</a>
+    <a href="__BASE_URL__/.well-known/x402">x402</a>
+    <a href="__BASE_URL__/how-payment-works">Payment Flow</a>
+  </nav>
+</div>
+
+<section class="hero">
+<div class="hero-main">
+  <div class="eyebrow">Local MCP Wrapper  |  Stdio Transport  |  Agent-First Install</div>
+  <h1>Augur MCP Setup</h1>
+  <p class="subtitle">Use the local wrapper when you want Augur's paid HTTP API exposed as MCP tools inside Claude Desktop, Codex-compatible clients, or any MCP host that can launch a stdio server.</p>
+  <p class="hero-note">This keeps x402 payment on the client side while preserving the same `skill.md`, OpenAPI, and paid `/analyze` contract used by direct integrations.</p>
+  <div class="hero-points">
+    <div class="hero-point"><strong>stdio</strong><span>Local Server</span></div>
+    <div class="hero-point"><strong>x402</strong><span>Client Side</span></div>
+    <div class="hero-point"><strong>2 tools</strong><span>Default Set</span></div>
+    <div class="hero-point"><strong>npx</strong><span>Fast Install</span></div>
+  </div>
+</div>
+<aside class="hero-side">
+  <div class="eyebrow">Fast Install</div>
+  <pre>npx -y augurrisk-mcp</pre>
+  <p>Set <code>CLIENT_PRIVATE_KEY</code> in your MCP host environment so the local wrapper can handle x402 payments on Base.</p>
+</aside>
+</section>
 
 <div class="section">
 <h2>What this gives you</h2>
+<p class="section-copy">This wrapper is for agents that prefer MCP-native tool calling over direct HTTP. The underlying service contract does not change.</p>
 <ul>
   <li>Local stdio MCP server</li>
   <li>x402 payment stays client-side on your machine</li>
@@ -1393,6 +1477,7 @@ npm run smoke -- --paid</pre>
 
 <div class="section">
 <h2>Wire it into an MCP client</h2>
+<p class="section-copy">Point your MCP host at the local stdio entrypoint. Keep <code>AUGUR_URL</code> pointed at the canonical public deployment unless you are testing against another environment.</p>
 <p>Point your MCP client at the local stdio server entrypoint:</p>
 <pre>{
   "command": "npx",
@@ -1407,13 +1492,18 @@ npm run smoke -- --paid</pre>
 
 <div class="section">
 <h2>Read the wrapper docs</h2>
+<p class="section-copy">These links keep the MCP install page anchored to the same machine-readable surfaces as the main site.</p>
 <div class="links">
+  <a href="__BASE_URL__/skill.md">Skill Doc<div class="path">/skill.md</div></a>
   <a href="https://github.com/JleviEderer/risk-api/tree/master/examples/javascript/augur-mcp">GitHub MCP Example<div class="path">examples/javascript/augur-mcp</div></a>
   <a href="__BASE_URL__/how-payment-works">How Payment Works<div class="path">/how-payment-works</div></a>
   <a href="__BASE_URL__/openapi.json">OpenAPI Spec<div class="path">/openapi.json</div></a>
   <a href="__BASE_URL__/.well-known/x402">x402 Discovery<div class="path">/.well-known/x402</div></a>
 </div>
 </div>
+<footer>
+Augur MCP Wrapper &middot; Same paid API contract, different client surface
+</footer>
 </body>
 </html>"""
 
