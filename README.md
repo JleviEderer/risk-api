@@ -61,6 +61,16 @@ Public setup page:
 
 `https://augurrisk.com/mcp`
 
+Fastest install path:
+
+```bash
+npx -y augurrisk-mcp
+```
+
+Published package:
+
+`https://www.npmjs.com/package/augurrisk-mcp`
+
 ## API
 
 ### `GET /analyze?address={base_contract_address}`
@@ -113,6 +123,7 @@ Risk levels:
 ## Public Pages And Machine Docs
 
 - `/` landing page
+- `/skill.md` agent-first integration doc
 - `/how-payment-works` payment explainer
 - `/mcp` MCP setup page
 - `/reports/base-bluechip-bytecode-snapshot` proof-of-work report
@@ -145,7 +156,8 @@ For proxy contracts, the response can also include nested `implementation` analy
 
 - Python paid-call example: [`scripts/test_x402_client.py`](scripts/test_x402_client.py)
 - JavaScript paid-call example: [`examples/javascript/augur-paid-call`](examples/javascript/augur-paid-call)
-- MCP wrapper example: [`examples/javascript/augur-mcp`](examples/javascript/augur-mcp)
+- MCP wrapper package: [`augurrisk-mcp`](https://www.npmjs.com/package/augurrisk-mcp)
+- MCP wrapper source: [`examples/javascript/augur-mcp`](examples/javascript/augur-mcp)
 - Public MCP install page: [`/mcp`](https://augurrisk.com/mcp)
 
 ## Minimal Local Development

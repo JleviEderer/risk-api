@@ -1,9 +1,12 @@
+#!/usr/bin/env node
+
 import { config } from "dotenv";
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
 import { privateKeyToAccount } from "viem/accounts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
 config();
@@ -86,7 +89,7 @@ async function callAugur(paidFetch, baseUrl, address) {
   return data;
 }
 
-async function main() {
+export async function main() {
   const privateKey = process.env.CLIENT_PRIVATE_KEY;
   if (!privateKey) {
     throw new Error("Set CLIENT_PRIVATE_KEY before starting the Augur MCP server.");
@@ -205,7 +208,12 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch(error => {
-  console.error(error);
-  process.exit(1);
-});
+const isEntrypoint = process.argv[1]
+  && pathToFileURL(process.argv[1]).href === import.meta.url;
+
+if (isEntrypoint) {
+  main().catch(error => {
+    console.error(error);
+    process.exit(1);
+  });
+}

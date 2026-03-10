@@ -18,6 +18,7 @@ cdp_api_key.json
 node_modules/
 HANDOVER.local.md
 .codex/napkin.local.md
+.codex/outreach.local.md
 docs/BizPlanning.local.md
 docs/DECISIONS.local.md
 docs/x402-landscape-research.local.md

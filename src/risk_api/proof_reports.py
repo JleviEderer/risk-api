@@ -400,7 +400,8 @@ def render_report_page(base_url: str, path: str) -> str:
 <meta property="og:description" content="{escape(meta_description)}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="{base_url}{path}">
-<meta property="og:image" content="{base_url}/avatar.png">
+<meta property="og:image" content="{base_url}/og/base-bluechip-bytecode-snapshot.png">
+<link rel="icon" type="image/png" href="{base_url}/favicon.png">
 <script type="application/ld+json">{json_ld}</script>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}

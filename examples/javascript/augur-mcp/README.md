@@ -1,29 +1,46 @@
-# Augur MCP Server Example
+# Augur MCP Server
 
-Local stdio MCP server that pays Augur over x402 and exposes the paid API as MCP tools.
+Local stdio MCP server that pays Augur over x402 and exposes Augur's paid Base contract risk API as MCP tools.
 
-This is the minimum viable MCP packaging path for Augur:
+This package keeps Augur itself as the canonical HTTP product at `https://augurrisk.com` and uses a local MCP bridge so wallet signing stays on the operator's machine.
 
-- keep Augur itself as the canonical paid HTTP API at `https://augurrisk.com`
-- run the MCP bridge locally so wallet signing stays on the operator's machine
-- expose one MCP tool that pays Augur and returns structured risk results
+## What You Get
 
-## Install
+- local stdio MCP server
+- x402 payment stays client-side
+- no API key or signup for Augur itself
+- two tools out of the box: `analyze_base_contract_risk` and `describe_augur_service`
+
+## Package Surface
+
+Package name:
+
+```bash
+augurrisk-mcp
+```
+
+Fastest install path:
+
+```bash
+npx -y augurrisk-mcp
+```
+
+## Local Install
 
 ```bash
 cd examples/javascript/augur-mcp
 npm install
+cp .env.example .env
 ```
 
-## Configure
+Required env:
 
-1. Copy `.env.example` to `.env`
-2. Set `CLIENT_PRIVATE_KEY`
+- `CLIENT_PRIVATE_KEY`: wallet key used for the x402 payment handshake
 
-Optional overrides:
+Optional env:
 
-- `AUGUR_URL` defaults to `https://augurrisk.com`
-- `AUGUR_ADDRESS` defaults to `0x4200000000000000000000000000000000000006`
+- `AUGUR_URL`: defaults to `https://augurrisk.com`
+- `AUGUR_ADDRESS`: defaults to `0x4200000000000000000000000000000000000006`
 
 ## Run
 
@@ -31,20 +48,26 @@ Optional overrides:
 npm start
 ```
 
-The server communicates over stdio, which is the expected transport for local MCP clients such as Claude Desktop.
+The server communicates over stdio, which is the expected transport for local MCP clients such as Claude Desktop and Codex-compatible clients.
 
 ## Smoke Test
 
-This verifies the server starts and the MCP tool list is reachable from the official SDK client:
+Verify the server starts and the MCP tool list is reachable:
 
 ```bash
 npm run smoke
 ```
 
-To verify one real paid MCP tool call end-to-end:
+Verify one real paid MCP tool call end-to-end:
 
 ```bash
 npm run smoke -- --paid
+```
+
+Preview the publish payload:
+
+```bash
+npm run pack:preview
 ```
 
 ## Tools
@@ -67,7 +90,7 @@ Returns the configured Augur base URL, default example address, and payment path
 
 ## Claude Desktop Wiring
 
-Add a local MCP server entry similar to:
+### Current Local-Repo Setup
 
 ```json
 {
@@ -75,6 +98,23 @@ Add a local MCP server entry similar to:
     "augur": {
       "command": "npm",
       "args": ["start", "--prefix", "/absolute/path/to/risk-api/examples/javascript/augur-mcp"],
+      "env": {
+        "CLIENT_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY",
+        "AUGUR_URL": "https://augurrisk.com"
+      }
+    }
+  }
+}
+```
+
+### Package-Based Setup After Publish
+
+```json
+{
+  "mcpServers": {
+    "augur": {
+      "command": "npx",
+      "args": ["-y", "augurrisk-mcp"],
       "env": {
         "CLIENT_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY",
         "AUGUR_URL": "https://augurrisk.com"

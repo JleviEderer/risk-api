@@ -364,6 +364,14 @@ def test_agent_metadata_not_behind_paywall(client_with_x402):
     assert resp.get_json()["x402Support"] is True
 
 
+def test_agent_card_includes_skill_doc_and_icon(client):
+    resp = client.get("/.well-known/agent-card.json")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["documentationUrl"].endswith("/skill.md")
+    assert data["iconUrl"].endswith("/avatar.png")
+
+
 @responses.activate
 def test_analyze_proxy_response_includes_implementation(client):
     """API response includes implementation object for proxy contracts."""
@@ -601,6 +609,19 @@ def test_avatar_not_behind_paywall(client_with_x402):
     assert resp.content_type == "image/png"
 
 
+def test_favicon_returns_png(client):
+    resp = client.get("/favicon.png")
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+    assert resp.data[:4] == b"\x89PNG"
+
+
+def test_favicon_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/favicon.png")
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+
+
 def test_openapi_returns_valid_json(client):
     resp = client.get("/openapi.json")
     assert resp.status_code == 200
@@ -817,10 +838,12 @@ def test_landing_has_meta_tags(client):
 
 def test_landing_links_discovery_endpoints(client):
     resp = client.get("/")
+    assert b">Skill Doc<" in resp.data
     assert b">OpenAPI<" in resp.data
     assert b">x402<" in resp.data
     assert b">MCP<" in resp.data
     assert b">How Payment Works<" in resp.data
+    assert b"/skill.md" in resp.data
     assert b"/mcp" in resp.data
     assert b"/openapi.json" in resp.data
     assert b"/.well-known/agent-card.json" in resp.data
@@ -846,6 +869,7 @@ def test_landing_uses_public_url(app):
     app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
         resp = c.get("/")
+        assert b"https://augurrisk.com/skill.md" in resp.data
         assert b"https://augurrisk.com/openapi.json" in resp.data
         assert b"https://augurrisk.com/how-payment-works" in resp.data
         assert b"https://augurrisk.com/honeypot-detection-api" in resp.data
@@ -1044,6 +1068,7 @@ def test_robots_txt_returns_text(client):
     text = resp.data.decode()
     assert "User-agent: *" in text
     assert "Allow: /" in text
+    assert "Allow: /skill.md" in text
     assert "Disallow: /dashboard" in text
 
 
@@ -1083,6 +1108,7 @@ def test_sitemap_returns_xml(client):
 def test_sitemap_lists_public_endpoints(client):
     resp = client.get("/sitemap.xml")
     text = resp.data.decode()
+    assert "/skill.md" in text
     assert "/mcp" in text
     assert "/how-payment-works" in text
     assert "/honeypot-detection-api" in text
@@ -1185,6 +1211,7 @@ def test_llms_txt_uses_public_url(app):
     with app.test_client() as c:
         resp = c.get("/llms.txt")
         text = resp.data.decode()
+        assert "https://augurrisk.com/skill.md" in text
         assert "https://augurrisk.com/analyze" in text
         assert "https://augurrisk.com/mcp" in text
         assert "https://augurrisk.com/openapi.json" in text
@@ -1223,6 +1250,7 @@ def test_llms_full_txt_uses_public_url(app):
     with app.test_client() as c:
         resp = c.get("/llms-full.txt")
         text = resp.data.decode()
+        assert "https://augurrisk.com/skill.md" in text
         assert "https://augurrisk.com/mcp" in text
         assert "https://augurrisk.com/analyze" in text
 
@@ -1231,6 +1259,36 @@ def test_llms_full_txt_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/llms-full.txt")
     assert resp.status_code == 200
     assert b"# Augur" in resp.data
+
+
+def test_skill_md_returns_markdown(client):
+    resp = client.get("/skill.md")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+    text = resp.data.decode()
+    assert text.startswith("---")
+    assert "name: augur" in text
+    assert "/analyze" in text
+    assert "Fastest Path" in text
+    assert "PAYMENT-SIGNATURE" in text
+    assert "OpenAPI Spec" in text
+
+
+def test_skill_md_uses_public_url(app):
+    app.config["PUBLIC_URL"] = "https://augurrisk.com"
+    with app.test_client() as c:
+        resp = c.get("/skill.md")
+        text = resp.data.decode()
+        assert "homepage: https://augurrisk.com" in text
+        assert "https://augurrisk.com/analyze" in text
+        assert "https://augurrisk.com/openapi.json" in text
+        assert "https://augurrisk.com/mcp" in text
+
+
+def test_skill_md_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.get("/skill.md")
+    assert resp.status_code == 200
+    assert b"name: augur" in resp.data
 
 
 # --- OpenAPI examples tests ---
@@ -1303,6 +1361,7 @@ def test_landing_has_faqpage_schema(client):
 def test_sitemap_includes_llms(client):
     resp = client.get("/sitemap.xml")
     text = resp.data.decode()
+    assert "/skill.md" in text
     assert "/llms.txt" in text
     assert "/llms-full.txt" in text
 
@@ -1310,12 +1369,14 @@ def test_sitemap_includes_llms(client):
 def test_robots_allows_llms(client):
     resp = client.get("/robots.txt")
     text = resp.data.decode()
+    assert "Allow: /skill.md" in text
     assert "Allow: /llms.txt" in text
     assert "Allow: /llms-full.txt" in text
 
 
 def test_landing_links_llms_txt(client):
     resp = client.get("/")
+    assert b"/skill.md" in resp.data
     assert b"/llms.txt" in resp.data
 
 

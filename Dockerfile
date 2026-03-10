@@ -4,10 +4,16 @@ WORKDIR /app
 
 COPY pyproject.toml .
 COPY src/ src/
+COPY branding/avatar.png src/risk_api/
+COPY branding/favicon.png src/risk_api/
 COPY x402JobsAvatar.png src/risk_api/
+COPY base_bluechip_og.png src/risk_api/
 
 RUN pip install --no-cache-dir . \
- && cp src/risk_api/x402JobsAvatar.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/"
+ && cp src/risk_api/avatar.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/" \
+ && cp src/risk_api/favicon.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/" \
+ && cp src/risk_api/x402JobsAvatar.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/" \
+ && cp src/risk_api/base_bluechip_og.png "$(python -c 'import risk_api; import pathlib; print(pathlib.Path(risk_api.__file__).parent)')/"
 
 RUN useradd -r -s /bin/false appuser
 USER appuser

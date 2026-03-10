@@ -82,15 +82,34 @@ def _canonical_redirect_target(public_url: str) -> str | None:
     )
 
 
-# Load avatar image bytes at module level
-_AVATAR_BYTES: bytes | None = None
-for _avatar_path in [
+def _load_first_existing_bytes(*candidates: Path) -> bytes | None:
+    for path in candidates:
+        if path.exists():
+            return path.read_bytes()
+    return None
+
+
+# Load social/brand image bytes at module level.
+_AVATAR_BYTES = _load_first_existing_bytes(
+    Path(__file__).resolve().parent.parent.parent / "branding" / "avatar.png",
+    Path(__file__).resolve().parent / "avatar.png",
+    Path(__file__).resolve().parent.parent.parent / "avatar.png",
     Path(__file__).resolve().parent / "x402JobsAvatar.png",
     Path(__file__).resolve().parent.parent.parent / "x402JobsAvatar.png",
-]:
-    if _avatar_path.exists():
-        _AVATAR_BYTES = _avatar_path.read_bytes()
-        break
+)
+
+_FAVICON_BYTES = _load_first_existing_bytes(
+    Path(__file__).resolve().parent.parent.parent / "branding" / "favicon.png",
+    Path(__file__).resolve().parent / "favicon.png",
+    Path(__file__).resolve().parent.parent.parent / "favicon.png",
+    Path(__file__).resolve().parent / "avatar.png",
+    Path(__file__).resolve().parent.parent.parent / "avatar.png",
+)
+
+_BASE_BLUECHIP_OG_BYTES = _load_first_existing_bytes(
+    Path(__file__).resolve().parent / "base_bluechip_og.png",
+    Path(__file__).resolve().parent.parent.parent / "base_bluechip_og.png",
+)
 
 # OpenAPI 3.0.3 specification for the risk scoring API
 OPENAPI_SPEC: dict[str, object] = {
@@ -1099,51 +1118,127 @@ LANDING_HTML = """<!DOCTYPE html>
 <meta property="og:type" content="website">
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
+<link rel="icon" type="image/png" href="__BASE_URL__/favicon.png">
 <script type="application/ld+json">__JSON_LD__</script>
 <script type="application/ld+json">__FAQ_JSON_LD__</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  background:#0f1117;color:#e0e0e0;padding:24px;max-width:900px;margin:0 auto;line-height:1.6}
-.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:18px}
-.topnav a{display:inline-block;background:#1a1d29;border:1px solid #2d3148;border-radius:999px;
-  padding:6px 12px;color:#90cdf4;text-decoration:none;font-size:.82rem;transition:border-color .2s}
-.topnav a:hover{border-color:#63b3ed}
-h1{font-size:1.8rem;color:#e2e8f0;margin-bottom:4px;font-weight:600}
-h2{font-size:1.1rem;color:#a0aec0;margin:28px 0 12px;font-weight:500}
-.subtitle{color:#718096;font-size:1rem;margin-bottom:16px}
-.badge{display:inline-block;background:#1a365d;color:#63b3ed;padding:4px 12px;border-radius:6px;font-size:.85rem;margin-bottom:24px}
-.section{background:#1a1d29;border:1px solid #2d3148;border-radius:10px;padding:20px;margin-bottom:16px}
+:root{
+  --bg:#06080d;
+  --panel:#0f141d;
+  --panel-2:#121927;
+  --line:#233247;
+  --line-strong:#3f5f86;
+  --text:#e8edf6;
+  --muted:#8d9cb2;
+  --blue:#8ec5ff;
+  --green:#79e2a7;
+  --glow:rgba(78,137,214,.18);
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(72,126,176,.18), transparent 30%),
+    radial-gradient(circle at top right, rgba(39,84,137,.14), transparent 28%),
+    linear-gradient(180deg, #05070b 0%, #0a0d13 45%, #06080d 100%);
+  color:var(--text);
+  padding:24px;
+  max-width:980px;
+  margin:0 auto;
+  line-height:1.6;
+}
+.topnav{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:22px}
+.topnav a{display:inline-block;background:rgba(15,20,29,.78);border:1px solid var(--line);border-radius:999px;
+  padding:6px 12px;color:var(--blue);text-decoration:none;font-size:.82rem;letter-spacing:.02em;transition:border-color .2s,transform .2s,background .2s}
+.topnav a:hover{border-color:var(--line-strong);background:rgba(18,25,39,.95);transform:translateY(-1px)}
+.hero{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr);gap:16px;margin-bottom:16px}
+.hero-main,.hero-side,.section{background:linear-gradient(180deg, rgba(18,25,39,.92), rgba(11,16,24,.96));border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+.hero-main{padding:26px 24px 24px}
+.hero-side{padding:18px}
+.eyebrow{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#6f85a2;margin-bottom:14px}
+h1{font-size:2.8rem;line-height:.96;color:#f5f8fd;margin-bottom:10px;font-weight:700;max-width:540px}
+h2{font-size:1.02rem;color:#d7e0ee;margin:0 0 12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.section h2{padding-bottom:12px;border-bottom:1px solid rgba(63,95,134,.28)}
+.subtitle{color:#9ba8bb;font-size:1.03rem;max-width:560px;margin-bottom:16px}
+.hero-note{color:var(--muted);font-size:.86rem;max-width:560px}
+.hero-note a{color:var(--blue);text-decoration:none}
+.badge{display:inline-block;background:rgba(20,61,103,.52);color:var(--blue);padding:6px 12px;border:1px solid rgba(63,95,134,.42);border-radius:999px;font-size:.83rem;margin-bottom:18px}
+.hero-side .mini-label{font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:#6f85a2;margin-bottom:10px}
+.hero-side p{color:var(--muted);font-size:.82rem;margin-top:10px}
+.section{padding:20px;margin-bottom:16px}
 .detectors{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px}
-.detector{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;font-size:.85rem}
-.detector .name{color:#90cdf4;font-weight:500}
-.detector .desc{color:#718096;font-size:.78rem;margin-top:2px}
-pre{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;overflow-x:auto;font-size:.82rem;color:#68d391;margin-top:8px}
+.detector{background:rgba(6,8,13,.8);border:1px solid rgba(63,95,134,.22);border-radius:10px;padding:12px 14px;font-size:.85rem}
+.detector .name{color:var(--blue);font-weight:600}
+.detector .desc{color:var(--muted);font-size:.78rem;margin-top:3px}
+pre{background:#070b11;border:1px solid rgba(63,95,134,.28);border-radius:10px;padding:14px;overflow-x:auto;font-size:.82rem;color:var(--green);margin-top:8px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
 .links{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:8px}
-.links a{display:block;background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:10px 14px;
-  color:#90cdf4;text-decoration:none;font-size:.85rem;transition:border-color .2s}
-.links a:hover{border-color:#63b3ed}
-.links a .path{color:#68d391;font-family:monospace;font-size:.8rem}
-.price{font-size:2rem;font-weight:700;color:#68d391}
-.price-note{color:#718096;font-size:.85rem}
-footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a5568;font-size:.78rem;text-align:center}
+.links a{display:block;background:rgba(7,11,17,.82);border:1px solid rgba(63,95,134,.22);border-radius:10px;padding:12px 14px;
+  color:var(--blue);text-decoration:none;font-size:.85rem;transition:border-color .2s,transform .2s,box-shadow .2s}
+.links a:hover{border-color:var(--line-strong);transform:translateY(-1px);box-shadow:0 0 0 1px var(--glow)}
+.links a .path{color:var(--green);font-family:monospace;font-size:.8rem;margin-top:2px}
+.split-callouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.callout{background:rgba(7,11,17,.72);border:1px solid rgba(63,95,134,.22);border-radius:10px;padding:14px}
+.callout .kicker{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:#6f85a2;margin-bottom:6px}
+.callout p{font-size:.86rem;color:var(--muted)}
+.price{font-size:2.2rem;font-weight:700;color:var(--green)}
+.price-note{color:var(--muted);font-size:.85rem}
+a{color:var(--blue)}
+code{color:#d8e7fb}
+footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22);color:#5c6c82;font-size:.78rem;text-align:center}
+@media (max-width:760px){
+  body{padding:16px}
+  .hero{grid-template-columns:1fr}
+  h1{font-size:2.15rem}
+}
 </style>
 </head>
 <body>
 <nav class="topnav">
+  <a href="__BASE_URL__/skill.md">Skill Doc</a>
   <a href="__BASE_URL__/openapi.json">OpenAPI</a>
   <a href="__BASE_URL__/.well-known/x402">x402</a>
   <a href="__BASE_URL__/mcp">MCP</a>
   <a href="__BASE_URL__/how-payment-works">How Payment Works</a>
 </nav>
-<h1>Augur</h1>
-<p class="subtitle">Score Base contract bytecode before your agent interacts with it.</p>
-<span class="badge">$0.10/call via x402 &middot; No API key needed</span>
+
+<section class="hero">
+<div class="hero-main">
+  <div class="eyebrow">Base Mainnet  |  Deterministic Bytecode Triage  |  x402-Paid API</div>
+  <h1>Augur</h1>
+  <p class="subtitle">Score Base contract bytecode before your agent interacts with it.</p>
+  <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
+  <p class="hero-note">Fastest path for integration: start with <a href="__BASE_URL__/skill.md">/skill.md</a> if you want the shortest agent-oriented workflow, use <a href="__BASE_URL__/openapi.json">/openapi.json</a> for a formal schema, or install the local wrapper from <a href="__BASE_URL__/mcp">/mcp</a>.</p>
+</div>
+<aside class="hero-side">
+  <div class="mini-label">Agent Entry</div>
+  <pre>curl -s "__BASE_URL__/skill.md"</pre>
+  <p>Then call <code>/analyze</code> with an x402-capable client and use the returned <code>score</code>, <code>level</code>, and <code>findings</code> in your policy.</p>
+</aside>
+</section>
+
+<div class="section">
+<h2>Start Here If You Are An Agent</h2>
+<div class="split-callouts">
+  <div class="callout">
+    <div class="kicker">Step 01</div>
+    <p>Read <a href="__BASE_URL__/skill.md">/skill.md</a> for the shortest machine-oriented integration path, or jump straight to <a href="__BASE_URL__/openapi.json">OpenAPI</a> if your client already consumes schemas.</p>
+  </div>
+  <div class="callout">
+    <div class="kicker">Step 02</div>
+    <p>Call <code>/analyze</code> with a Base contract address, handle the `402` payment flow, and feed the resulting risk fields into your routing or review policy.</p>
+  </div>
+</div>
+<pre>curl -s "__BASE_URL__/skill.md"
+
+curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
+  -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Use Augur when your workflow needs a deterministic bytecode screen before trading, routing, or escalating to deeper review.</p>
+</div>
 
 <div class="section">
 <h2>What it does</h2>
 <p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
-<p style="margin-top:8px;color:#718096;font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
   <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
   <div class="detector"><div class="name">Reentrancy</div><div class="desc">CALL before state update patterns</div></div>
@@ -1160,7 +1255,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid #2d3148;color:#4a55
 <h2>Try it</h2>
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
-<p style="margin-top:8px;color:#718096;font-size:.82rem">
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">
 Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores for a Base mainnet contract.
 </p>
 </div>
@@ -1169,13 +1264,13 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 <h2>Pricing</h2>
 <div class="price">$0.10 <span style="font-size:1rem;color:#a0aec0;font-weight:400">per call</span></div>
 <p class="price-note">USDC &middot; Settled via x402 protocol &middot; No API key, no signup</p>
-<p style="margin-top:10px;color:#718096;font-size:.82rem">x402 is an HTTP-native payment protocol - your agent pays per call automatically, no API key or signup needed.</p>
-<p style="margin-top:10px"><a href="__BASE_URL__/how-payment-works" style="color:#90cdf4">How Augur payment works</a></p>
+<p style="margin-top:10px;color:var(--muted);font-size:.82rem">x402 is an HTTP-native payment protocol - your agent pays per call automatically, no API key or signup needed.</p>
+<p style="margin-top:10px"><a href="__BASE_URL__/how-payment-works">How Augur payment works</a></p>
 </div>
 
 <div class="section">
 <h2>Use Augur For</h2>
-<p style="color:#718096;font-size:.85rem">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
+<p style="color:var(--muted);font-size:.85rem">These public pages target common contract-triage jobs while pointing back to the same paid <code>/analyze</code> endpoint.</p>
 <div class="links">
   <a href="__BASE_URL__/honeypot-detection-api">Honeypot Detection API <div class="path">/honeypot-detection-api</div></a>
   <a href="__BASE_URL__/proxy-risk-api">Proxy Risk API <div class="path">/proxy-risk-api</div></a>
@@ -1185,7 +1280,7 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 
 <div class="section">
 <h2>Proof of Work</h2>
-<p style="color:#718096;font-size:.85rem">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
+<p style="color:var(--muted);font-size:.85rem">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
 <div class="links">
   <a href="__BASE_URL__/reports/base-bluechip-bytecode-snapshot">Base Blue-Chip Bytecode Snapshot <div class="path">/reports/base-bluechip-bytecode-snapshot</div></a>
 </div>
@@ -1193,8 +1288,11 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 
 <div class="section">
 <h2>Discovery &amp; Integration</h2>
+<p style="color:var(--muted);font-size:.85rem">Install the MCP wrapper directly with <code>npx -y augurrisk-mcp</code>, or use the links below for the broader machine-readable surface.</p>
 <div class="links">
+  <a href="__BASE_URL__/skill.md">Skill Doc<div class="path">/skill.md</div></a>
   <a href="__BASE_URL__/mcp">MCP Setup<div class="path">/mcp</div></a>
+  <a href="https://www.npmjs.com/package/augurrisk-mcp">MCP Package<div class="path">npmjs.com/package/augurrisk-mcp</div></a>
   <a href="__BASE_URL__/openapi.json">OpenAPI Spec <div class="path">/openapi.json</div></a>
   <a href="__BASE_URL__/.well-known/agent-card.json">A2A Agent Card <div class="path">/.well-known/agent-card.json</div></a>
   <a href="__BASE_URL__/.well-known/x402">x402 Discovery <div class="path">/.well-known/x402</div></a>
@@ -1255,11 +1353,13 @@ ul{margin:8px 0 0 18px}
 
 <div class="section">
 <h2>Install</h2>
+<pre>npx -y augurrisk-mcp</pre>
+<p>The package is published on npm as <code>augurrisk-mcp</code>. Set <code>CLIENT_PRIVATE_KEY</code> in your MCP client env so the local wrapper can handle x402 payments.</p>
+<p>If you want to inspect or fork the wrapper source, it still lives in the repo:</p>
 <pre>git clone https://github.com/JleviEderer/risk-api
 cd risk-api/examples/javascript/augur-mcp
-npm install</pre>
-<p>Set your wallet key in <code>.env</code> using the example file in that folder, then smoke test it:</p>
-<pre>npm run smoke
+npm install
+npm run smoke
 npm run smoke -- --paid</pre>
 </div>
 
@@ -1267,12 +1367,11 @@ npm run smoke -- --paid</pre>
 <h2>Wire it into an MCP client</h2>
 <p>Point your MCP client at the local stdio server entrypoint:</p>
 <pre>{
-  "command": "node",
-  "args": [
-    "C:/path/to/risk-api/examples/javascript/augur-mcp/index.mjs"
-  ],
+  "command": "npx",
+  "args": ["-y", "augurrisk-mcp"],
   "env": {
-    "CLIENT_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY"
+    "CLIENT_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY",
+    "AUGUR_URL": "__BASE_URL__"
   }
 }</pre>
 <p>Use the same stdio command in Claude Desktop, Codex-compatible clients, or other MCP tooling that supports local servers.</p>
@@ -1297,6 +1396,7 @@ PAYMENT_GUIDE_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How Augur Payment Works</title>
 <meta name="description" content="How to pay for Augur via x402: request, receive 402, sign payment, retry with PAYMENT-SIGNATURE, receive JSON.">
+<link rel="icon" type="image/png" href="__BASE_URL__/favicon.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -1437,6 +1537,7 @@ PUBLIC_REQUEST_STAGE_BY_PATH: dict[str, str] = {
     "/": "landing_view",
     "/mcp": "mcp_guide_view",
     "/how-payment-works": "how_payment_view",
+    "/skill.md": "skill_doc_fetch",
     "/honeypot-detection-api": "intent_honeypot_view",
     "/proxy-risk-api": "intent_proxy_view",
     "/deployer-reputation-api": "intent_deployer_view",
@@ -1451,6 +1552,7 @@ PUBLIC_REQUEST_STAGE_BY_PATH: dict[str, str] = {
 }
 
 MACHINE_DOC_STAGES = {
+    "skill_doc_fetch",
     "openapi_fetch",
     "llms_txt_fetch",
     "llms_full_fetch",
@@ -1533,6 +1635,7 @@ def _render_intent_page(base_url: str, path: str) -> str:
 <meta property="og:type" content="article">
 <meta property="og:url" content="{base_url}{path}">
 <meta property="og:image" content="{base_url}/avatar.png">
+<link rel="icon" type="image/png" href="{base_url}/favicon.png">
 <script type="application/ld+json">{json_ld}</script>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
@@ -1655,13 +1758,104 @@ Any x402-compatible HTTP client handles this automatically.
 
 ## Links
 
+- [Skill Doc](__BASE_URL__/skill.md)
 - [MCP Setup](__BASE_URL__/mcp)
+- [MCP Package](https://www.npmjs.com/package/augurrisk-mcp)
 - [OpenAPI Spec](__BASE_URL__/openapi.json)
 - [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
 - [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
 - [x402 Discovery](__BASE_URL__/.well-known/x402)
 - [API Catalog](__BASE_URL__/.well-known/api-catalog)
 - [Full Documentation](__BASE_URL__/llms-full.txt)
+"""
+
+SKILL_MD = """\
+---
+name: augur
+version: 1.0.0
+description: Deterministic Base smart contract bytecode risk scoring for agents. Analyze a contract, get a 0-100 score with findings, and pay per call with x402.
+homepage: __BASE_URL__
+license: MIT
+tags: [security, smart-contracts, base, bytecode-analysis, x402, agents]
+payment:
+  protocol: x402
+  network: eip155:8453
+  asset: USDC
+  amount: 0.10
+  endpoint: __BASE_URL__/analyze
+---
+
+# Augur
+
+Use Augur when you need a fast deterministic risk screen on a Base mainnet contract before your agent trades, routes funds, lists a token, or escalates to deeper review.
+
+## Fastest Path
+
+1. Read this file or `__BASE_URL__/openapi.json`
+2. Call `GET __BASE_URL__/analyze?address={base_contract_address}`
+3. If you receive `402`, let your x402 client pay `$0.10` USDC on Base and retry with `PAYMENT-SIGNATURE`
+4. Read `score`, `level`, `findings`, `category_scores`, and optional `implementation`
+
+## Endpoint
+
+```http
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
+POST __BASE_URL__/analyze
+Content-Type: application/json
+
+{"address":"0x4200000000000000000000000000000000000006"}
+```
+
+## Output Shape
+
+```json
+{
+  "address": "0x4200000000000000000000000000000000000006",
+  "score": 0,
+  "level": "safe",
+  "bytecode_size": 4632,
+  "findings": [],
+  "category_scores": {}
+}
+```
+
+Risk levels:
+
+- `safe` (0-15): no major bytecode-level risk signals detected in this scan; not a guarantee
+- `low` (16-35): limited concerns detected
+- `medium` (36-55): notable risks detected
+- `high` (56-75): significant risks detected
+- `critical` (76-100): severe risks detected
+
+## What Augur Checks
+
+- proxy behavior
+- reentrancy risk
+- selfdestruct capability
+- honeypot-style transfer restrictions
+- hidden mint capability
+- fee manipulation
+- delegatecall usage
+- deployer reputation
+
+Proxy contracts can include a nested `implementation` analysis so downstream policy can score both proxy shell and underlying logic consistently.
+
+## Failure Cases
+
+- `422`: missing, malformed, or non-contract Base address
+- `402`: payment required
+- `502`: upstream Base RPC failure
+
+## Machine Docs
+
+- [OpenAPI Spec](__BASE_URL__/openapi.json)
+- [Summary Doc](__BASE_URL__/llms.txt)
+- [Full Doc](__BASE_URL__/llms-full.txt)
+- [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
+- [x402 Discovery](__BASE_URL__/.well-known/x402)
+- [API Catalog](__BASE_URL__/.well-known/api-catalog)
+- [MCP Setup](__BASE_URL__/mcp)
+- [How Payment Works](__BASE_URL__/how-payment-works)
 """
 
 LLMS_FULL_TXT = """\
@@ -1829,7 +2023,9 @@ Use any x402-compatible HTTP client. The flow is:
 
 ## Links
 
+- [Skill Doc](__BASE_URL__/skill.md)
 - [MCP Setup](__BASE_URL__/mcp)
+- [MCP Package](https://www.npmjs.com/package/augurrisk-mcp)
 - [OpenAPI Spec](__BASE_URL__/openapi.json)
 - [A2A Agent Card](__BASE_URL__/.well-known/agent-card.json)
 - [AI Plugin Manifest](__BASE_URL__/.well-known/ai-plugin.json)
@@ -2391,6 +2587,7 @@ def create_app(
         body = (
             "User-agent: *\n"
             "Allow: /\n"
+            "Allow: /skill.md\n"
             "Allow: /openapi.json\n"
             "Allow: /.well-known/\n"
             "Allow: /agent-metadata.json\n"
@@ -2408,6 +2605,7 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         paths = [
             "/",
+            "/skill.md",
             "/mcp",
             "/how-payment-works",
             *INTENT_PAGES.keys(),
@@ -2445,6 +2643,13 @@ def create_app(
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
         html = MCP_GUIDE_HTML.replace("__BASE_URL__", base_url)
         return Response(html, content_type="text/html")
+
+    @app.route("/skill.md")
+    def skill_md():
+        request.environ["funnel_stage"] = "skill_doc_fetch"
+        base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
+        body = SKILL_MD.replace("__BASE_URL__", base_url)
+        return Response(body, content_type="text/plain; charset=utf-8")
 
     @app.route("/reports/<path:slug>")
     def proof_report(slug: str):
@@ -2519,6 +2724,18 @@ def create_app(
             return Response("Avatar not found", status=404)
         return Response(_AVATAR_BYTES, content_type="image/png")
 
+    @app.route("/favicon.png")
+    def favicon():
+        if _FAVICON_BYTES is None:
+            return Response("Favicon not found", status=404)
+        return Response(_FAVICON_BYTES, content_type="image/png")
+
+    @app.route("/og/base-bluechip-bytecode-snapshot.png")
+    def base_bluechip_og_image():
+        if _BASE_BLUECHIP_OG_BYTES is None:
+            return Response("OG image not found", status=404)
+        return Response(_BASE_BLUECHIP_OG_BYTES, content_type="image/png")
+
     @app.route("/openapi.json")
     def openapi_spec():
         spec = dict(OPENAPI_SPEC)
@@ -2565,6 +2782,8 @@ def create_app(
                 "Pay $0.10/call via x402 in USDC on Base."
             ),
             "provider": {"organization": "risk-api"},
+            "documentationUrl": f"{base_url}/skill.md",
+            "iconUrl": f"{base_url}/avatar.png",
             "version": "1.0.0",
             "url": base_url,
             "interfaces": [

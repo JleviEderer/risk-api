@@ -1,10 +1,43 @@
 {
-  "name": "augur-mcp-example",
-  "private": true,
+  "name": "augurrisk-mcp",
+  "version": "1.0.1",
+  "description": "Local stdio MCP server for Augur's paid Base contract risk API.",
+  "license": "MIT",
   "type": "module",
+  "bin": {
+    "augurrisk-mcp": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "smoke-test.mjs",
+    "README.md",
+    ".env.example"
+  ],
+  "keywords": [
+    "augur",
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "base",
+    "smart-contract",
+    "risk"
+  ],
+  "homepage": "https://augurrisk.com/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JleviEderer/risk-api.git",
+    "directory": "examples/javascript/augur-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/JleviEderer/risk-api/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node index.mjs",
-    "smoke": "node smoke-test.mjs"
+    "smoke": "node smoke-test.mjs",
+    "pack:preview": "npm pack --dry-run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",

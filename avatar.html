@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Scorer Avatar</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    gap: 40px;
+    flex-wrap: wrap;
+    padding: 40px;
+  }
+  .avatar-wrap {
+    width: 256px;
+    height: 256px;
+    position: relative;
+  }
+  .label {
+    color: #666;
+    font-family: monospace;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Option A: Geometric Shield with Scan Lines -->
+<div>
+<div class="avatar-wrap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d0d1a"/>
+      <stop offset="100%" stop-color="#1a0d2e"/>
+    </linearGradient>
+    <linearGradient id="shieldA" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#00ffa3"/>
+      <stop offset="100%" stop-color="#00d4ff"/>
+    </linearGradient>
+    <linearGradient id="glowA" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#00ffa3" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="shieldClipA">
+      <path d="M128 32 L200 64 L200 140 Q200 190 128 224 Q56 190 56 140 L56 64 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="32" fill="url(#bgA)"/>
+
+  <!-- Subtle grid -->
+  <g opacity="0.06">
+    <line x1="0" y1="64" x2="256" y2="64" stroke="#00ffa3" stroke-width="0.5"/>
+    <line x1="0" y1="128" x2="256" y2="128" stroke="#00ffa3" stroke-width="0.5"/>
+    <line x1="0" y1="192" x2="256" y2="192" stroke="#00ffa3" stroke-width="0.5"/>
+    <line x1="64" y1="0" x2="64" y2="256" stroke="#00ffa3" stroke-width="0.5"/>
+    <line x1="128" y1="0" x2="128" y2="256" stroke="#00ffa3" stroke-width="0.5"/>
+    <line x1="192" y1="0" x2="192" y2="256" stroke="#00ffa3" stroke-width="0.5"/>
+  </g>
+
+  <!-- Shield glow -->
+  <path d="M128 28 L204 62 L204 142 Q204 194 128 230 Q52 194 52 142 L52 62 Z" fill="url(#glowA)" opacity="0.4"/>
+
+  <!-- Shield outline -->
+  <path d="M128 36 L196 66 L196 140 Q196 186 128 220 Q60 186 60 140 L60 66 Z"
+        fill="none" stroke="url(#shieldA)" stroke-width="2.5" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Inner shield fill -->
+  <path d="M128 44 L188 70 L188 138 Q188 180 128 212 Q68 180 68 138 L68 70 Z"
+        fill="#00ffa3" opacity="0.05"/>
+
+  <!-- Bytecode scan lines inside shield -->
+  <g clip-path="url(#shieldClipA)" opacity="0.15">
+    <text x="62" y="82" font-family="monospace" font-size="9" fill="#00ffa3">6080604052</text>
+    <text x="70" y="96" font-family="monospace" font-size="9" fill="#00d4ff">348015610011</text>
+    <text x="62" y="110" font-family="monospace" font-size="9" fill="#00ffa3">57600080fd5b</text>
+    <text x="78" y="124" font-family="monospace" font-size="9" fill="#00d4ff">50610041</text>
+    <text x="62" y="138" font-family="monospace" font-size="9" fill="#00ffa3">610100526004</text>
+    <text x="70" y="152" font-family="monospace" font-size="9" fill="#00d4ff">36106100e457</text>
+    <text x="62" y="166" font-family="monospace" font-size="9" fill="#00ffa3">5b6000355af3</text>
+    <text x="78" y="180" font-family="monospace" font-size="9" fill="#00d4ff">fd5b610120</text>
+    <text x="62" y="194" font-family="monospace" font-size="9" fill="#00ffa3">52604051fd5b</text>
+    <text x="70" y="208" font-family="monospace" font-size="9" fill="#00d4ff">3d6000803e3d</text>
+  </g>
+
+  <!-- Central checkmark / scan icon -->
+  <g filter="url(#glow)">
+    <!-- Scanning circle -->
+    <circle cx="128" cy="126" r="28" fill="none" stroke="#00ffa3" stroke-width="1.5" opacity="0.6" stroke-dasharray="4 6"/>
+    <circle cx="128" cy="126" r="20" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+
+    <!-- Checkmark -->
+    <polyline points="114,126 124,136 142,116" fill="none" stroke="#00ffa3" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Score arc at bottom -->
+  <g transform="translate(128,176)">
+    <path d="M-24,0 A24,24 0 0,1 24,0" fill="none" stroke="#1a2a1a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M-24,0 A24,24 0 0,1 20,-13" fill="none" stroke="url(#shieldA)" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+  </g>
+
+  <!-- Corner accents -->
+  <g stroke="#00ffa3" stroke-width="1.5" opacity="0.3">
+    <polyline points="16,40 16,16 40,16" fill="none"/>
+    <polyline points="216,16 240,16 240,40" fill="none"/>
+    <polyline points="240,216 240,240 216,240" fill="none"/>
+    <polyline points="40,240 16,240 16,216" fill="none"/>
+  </g>
+</svg>
+</div>
+<div class="label">Option A — Shield + Bytecode Scan</div>
+</div>
+
+<!-- Option B: Hexagonal Lock -->
+<div>
+<div class="avatar-wrap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0f1e"/>
+      <stop offset="100%" stop-color="#0f0a1e"/>
+    </linearGradient>
+    <linearGradient id="hexGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fffb0"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <linearGradient id="accentB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+    <filter id="glowB">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="32" fill="url(#bgB)"/>
+
+  <!-- Ambient glow -->
+  <circle cx="128" cy="120" r="60" fill="#4fffb0" opacity="0.04" filter="url(#softGlow)"/>
+
+  <!-- Outer hexagon ring -->
+  <polygon points="128,38 194,72 194,140 128,174 62,140 62,72"
+           fill="none" stroke="#4fffb0" stroke-width="1" opacity="0.15"/>
+
+  <!-- Main hexagon -->
+  <polygon points="128,50 186,80 186,136 128,166 70,136 70,80"
+           fill="#4fffb0" opacity="0.06"/>
+  <polygon points="128,50 186,80 186,136 128,166 70,136 70,80"
+           fill="none" stroke="url(#hexGrad)" stroke-width="2" filter="url(#glowB)"/>
+
+  <!-- Inner hexagon -->
+  <polygon points="128,68 168,90 168,128 128,150 88,128 88,90"
+           fill="none" stroke="#4fffb0" stroke-width="0.75" opacity="0.3"/>
+
+  <!-- Shield icon in center -->
+  <g transform="translate(128,106)">
+    <!-- Mini shield shape -->
+    <path d="M0,-24 L20,-14 L20,6 Q20,22 0,28 Q-20,22 -20,6 L-20,-14 Z"
+          fill="#4fffb0" opacity="0.12"/>
+    <path d="M0,-24 L20,-14 L20,6 Q20,22 0,28 Q-20,22 -20,6 L-20,-14 Z"
+          fill="none" stroke="#4fffb0" stroke-width="2" filter="url(#glowB)"/>
+
+    <!-- Checkmark inside shield -->
+    <polyline points="-8,0 -2,7 10,-6" fill="none" stroke="#4fffb0" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round" filter="url(#glowB)"/>
+  </g>
+
+  <!-- Risk meter dots -->
+  <g transform="translate(128,188)">
+    <circle cx="-30" cy="0" r="4" fill="#4fffb0" opacity="0.9" filter="url(#glowB)"/>
+    <circle cx="-15" cy="0" r="4" fill="#4fffb0" opacity="0.7"/>
+    <circle cx="0" cy="0" r="4" fill="#fbbf24" opacity="0.5"/>
+    <circle cx="15" cy="0" r="4" fill="#f97316" opacity="0.3"/>
+    <circle cx="30" cy="0" r="4" fill="#ef4444" opacity="0.2"/>
+  </g>
+
+  <!-- "0-100" label -->
+  <text x="128" y="214" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace"
+        font-size="10" fill="#4fffb0" opacity="0.4" letter-spacing="2">0—100</text>
+
+  <!-- Data nodes -->
+  <g opacity="0.25">
+    <circle cx="42" cy="48" r="2" fill="#4fffb0"/>
+    <circle cx="214" cy="48" r="2" fill="#4fffb0"/>
+    <circle cx="42" cy="208" r="2" fill="#4fffb0"/>
+    <circle cx="214" cy="208" r="2" fill="#4fffb0"/>
+    <line x1="42" y1="48" x2="70" y2="72" stroke="#4fffb0" stroke-width="0.5"/>
+    <line x1="214" y1="48" x2="186" y2="72" stroke="#4fffb0" stroke-width="0.5"/>
+    <line x1="42" y1="208" x2="70" y2="140" stroke="#4fffb0" stroke-width="0.5"/>
+    <line x1="214" y1="208" x2="186" y2="140" stroke="#4fffb0" stroke-width="0.5"/>
+  </g>
+</svg>
+</div>
+<div class="label">Option B — Hex + Risk Meter</div>
+</div>
+
+<!-- Option C: Abstract Circuit Shield -->
+<div>
+<div class="avatar-wrap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgC" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#0c1220"/>
+      <stop offset="100%" stop-color="#10081e"/>
+    </linearGradient>
+    <linearGradient id="mintC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="glowC">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigGlow">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="32" fill="url(#bgC)"/>
+
+  <!-- Background glow orb -->
+  <circle cx="128" cy="118" r="50" fill="#34d399" opacity="0.06" filter="url(#bigGlow)"/>
+
+  <!-- Circuit traces -->
+  <g stroke="#34d399" stroke-width="1" opacity="0.12" fill="none">
+    <!-- Left traces -->
+    <path d="M24,80 H56 L72,96"/>
+    <path d="M24,128 H48"/>
+    <path d="M24,176 H56 L72,160"/>
+    <!-- Right traces -->
+    <path d="M232,80 H200 L184,96"/>
+    <path d="M232,128 H208"/>
+    <path d="M232,176 H200 L184,160"/>
+    <!-- Top/bottom -->
+    <path d="M104,24 V48 L112,56"/>
+    <path d="M152,24 V48 L144,56"/>
+    <path d="M104,232 V208 L112,200"/>
+    <path d="M152,232 V208 L144,200"/>
+  </g>
+
+  <!-- Circuit nodes -->
+  <g fill="#34d399" opacity="0.2">
+    <circle cx="24" cy="80" r="2.5"/>
+    <circle cx="24" cy="128" r="2.5"/>
+    <circle cx="24" cy="176" r="2.5"/>
+    <circle cx="232" cy="80" r="2.5"/>
+    <circle cx="232" cy="128" r="2.5"/>
+    <circle cx="232" cy="176" r="2.5"/>
+    <circle cx="104" cy="24" r="2.5"/>
+    <circle cx="152" cy="24" r="2.5"/>
+    <circle cx="104" cy="232" r="2.5"/>
+    <circle cx="152" cy="232" r="2.5"/>
+  </g>
+
+  <!-- Main shield - bold, thick -->
+  <path d="M128 48 L192 78 L192 142 Q192 186 128 218 Q64 186 64 142 L64 78 Z"
+        fill="#34d399" opacity="0.04"/>
+  <path d="M128 48 L192 78 L192 142 Q192 186 128 218 Q64 186 64 142 L64 78 Z"
+        fill="none" stroke="url(#mintC)" stroke-width="3" filter="url(#glowC)"/>
+
+  <!-- Shield cross / divider lines -->
+  <line x1="128" y1="60" x2="128" y2="210" stroke="#34d399" stroke-width="0.5" opacity="0.15"/>
+  <line x1="72" y1="120" x2="184" y2="120" stroke="#34d399" stroke-width="0.5" opacity="0.15"/>
+
+  <!-- Top-left quadrant: binary -->
+  <text x="88" y="92" text-anchor="middle" font-family="monospace" font-size="8" fill="#34d399" opacity="0.25">0110</text>
+  <text x="88" y="104" text-anchor="middle" font-family="monospace" font-size="8" fill="#34d399" opacity="0.2">1001</text>
+
+  <!-- Top-right quadrant: hex -->
+  <text x="162" y="92" text-anchor="middle" font-family="monospace" font-size="8" fill="#06b6d4" opacity="0.25">0xff</text>
+  <text x="162" y="104" text-anchor="middle" font-family="monospace" font-size="8" fill="#06b6d4" opacity="0.2">0xf4</text>
+
+  <!-- Center emblem: eye/scan symbol -->
+  <g transform="translate(128,128)" filter="url(#glowC)">
+    <!-- Outer eye shape -->
+    <path d="M-26,0 Q-13,-18 0,-18 Q13,-18 26,0 Q13,18 0,18 Q-13,18 -26,0 Z"
+          fill="none" stroke="#34d399" stroke-width="2"/>
+    <!-- Inner circle (iris) -->
+    <circle cx="0" cy="0" r="8" fill="none" stroke="#34d399" stroke-width="1.5"/>
+    <!-- Pupil -->
+    <circle cx="0" cy="0" r="3" fill="#34d399"/>
+  </g>
+
+  <!-- Bottom score bar -->
+  <g transform="translate(128,192)">
+    <rect x="-32" y="-3" width="64" height="6" rx="3" fill="#1a2a2a" opacity="0.5"/>
+    <rect x="-32" y="-3" width="12" height="6" rx="3" fill="#34d399" opacity="0.8" filter="url(#glowC)"/>
+    <text x="0" y="18" text-anchor="middle" font-family="monospace" font-size="9" fill="#34d399" opacity="0.35">SAFE</text>
+  </g>
+</svg>
+</div>
+<div class="label">Option C — Circuit Eye + Score Bar</div>
+</div>
+
+</body>
+</html>
