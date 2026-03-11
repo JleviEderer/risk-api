@@ -91,13 +91,9 @@ async function callAugur(paidFetch, baseUrl, address) {
 
 export async function main() {
   const privateKey = process.env.CLIENT_PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error("Set CLIENT_PRIVATE_KEY before starting the Augur MCP server.");
-  }
-
   const baseUrl = normalizeBaseUrl(process.env.AUGUR_URL || DEFAULT_URL);
   const defaultAddress = process.env.AUGUR_ADDRESS || DEFAULT_ADDRESS;
-  const { paidFetch } = createPaidFetch(privateKey);
+  const paidFetch = privateKey ? createPaidFetch(privateKey).paidFetch : null;
 
   const server = new McpServer({
     name: "augur-mcp",
@@ -128,6 +124,12 @@ export async function main() {
     },
     async ({ address }) => {
       try {
+        if (!paidFetch) {
+          throw new Error(
+            "Set CLIENT_PRIVATE_KEY before calling analyze_base_contract_risk.",
+          );
+        }
+
         const analysis = await callAugur(paidFetch, baseUrl, address);
         const findingsSummary = summarizeFindings(analysis.findings);
         const text = [

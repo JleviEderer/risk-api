@@ -33,12 +33,9 @@ npm install
 cp .env.example .env
 ```
 
-Required env:
+Env:
 
-- `CLIENT_PRIVATE_KEY`: wallet key used for the x402 payment handshake
-
-Optional env:
-
+- `CLIENT_PRIVATE_KEY`: required only for paid `analyze_base_contract_risk` calls
 - `AUGUR_URL`: defaults to `https://augurrisk.com`
 - `AUGUR_ADDRESS`: defaults to `0x4200000000000000000000000000000000000006`
 
@@ -58,11 +55,15 @@ Verify the server starts and the MCP tool list is reachable:
 npm run smoke
 ```
 
+This startup check does not require `CLIENT_PRIVATE_KEY`.
+
 Verify one real paid MCP tool call end-to-end:
 
 ```bash
 npm run smoke -- --paid
 ```
+
+This paid path does require `CLIENT_PRIVATE_KEY`.
 
 Preview the publish payload:
 

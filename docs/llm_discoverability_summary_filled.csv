@@ -1,0 +1,15 @@
+metric,value
+test_date,2026-03-10
+models_tested,ChatGPT
+blind_prompts_run,12
+clean_blind_runs,10
+ambiguous_or_contaminated_runs,2
+runs_with_entity_resolution_failure,2
+blind_prompts_with_augur_unprompted,0
+clean_blind_runs_with_augur_unprompted,0
+blind_prompts_with_augur_top_ranked,0
+most_common_augur_category,Base-only deterministic bytecode prefilter / contract-admission gate
+strongest_blind_competitor_slots,GoPlus=broad self-serve screening; Blockaid=execution-time safety; Dedaub=deep bytecode/decompiler
+most_common_missing_capability,transaction simulation and broader runtime or interaction-risk coverage
+overall_takeaway,Augur has a retrieval problem before it has a capability problem: models do not surface it blind and sometimes do not resolve it as the intended product.
+recommended_next_move,Improve entity disambiguation and narrow category ownership; add a thin decision-layer output such as recommended_policy; rerun the study with cleaner prompts.
