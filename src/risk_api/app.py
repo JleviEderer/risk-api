@@ -118,8 +118,9 @@ OPENAPI_SPEC: dict[str, object] = {
         "title": "Augur",
         "version": "1.0.0",
         "description": (
-            "Base mainnet smart contract bytecode risk scoring API for agents "
+            "Deterministic Base contract risk screening for agents on Base "
             "and the developers building them. "
+            "Screen Base contracts before your agent buys, routes funds, approves, or interacts. "
             "Analyzes Base bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
             "delegatecall, deployer reputation) and returns a composite 0-100 "
@@ -1110,11 +1111,11 @@ LANDING_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Augur - Base Contract Risk Scoring API</title>
-<meta name="description" content="Base mainnet smart contract bytecode risk scoring API for agents. 8 deterministic detectors, 0-100 score, $0.10/call via x402 in USDC on Base.">
+<title>Augur - Deterministic Base Contract Risk Screening For Agents</title>
+<meta name="description" content="Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Augur">
-<meta property="og:description" content="Base mainnet smart contract bytecode risk scoring API. 8 deterministic detectors, 0-100 risk score, $0.10/call via x402 on Base.">
+<meta property="og:description" content="Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
@@ -1209,7 +1210,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
     <img src="__BASE_URL__/avatar.png" alt="Augur">
     <div>
       <span class="brand-name">Augur</span>
-      <span class="brand-sub">Base Contract Risk API</span>
+      <span class="brand-sub">Base Risk Screen</span>
     </div>
   </a>
   <nav class="topnav">
@@ -1223,9 +1224,9 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 
 <section class="hero">
 <div class="hero-main">
-  <div class="eyebrow">Base Mainnet  |  Deterministic Bytecode Triage  |  x402-Paid API</div>
-  <h1>Score contract bytecode before your agent moves money.</h1>
-  <p class="subtitle">Score Base contract bytecode before your agent interacts with it. Augur gives agents a deterministic risk screen before they trade, route funds, list a token, or hand the address to a more expensive review step.</p>
+  <div class="eyebrow">Base Mainnet  |  Deterministic Risk Screening  |  x402-Paid API</div>
+  <h1>Screen a Base contract before your agent touches it.</h1>
+  <p class="subtitle">Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.</p>
   <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
   <p class="hero-note">Fastest path for integration: start with <a href="__BASE_URL__/skill.md">/skill.md</a> if you want the shortest agent-oriented workflow, use <a href="__BASE_URL__/openapi.json">/openapi.json</a> for a formal schema, or install the local wrapper from <a href="__BASE_URL__/mcp">/mcp</a>.</p>
   <div class="hero-stats">
@@ -1238,33 +1239,33 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 <aside class="hero-side">
   <div class="mini-label">Agent Entry</div>
   <pre>curl -s "__BASE_URL__/skill.md"</pre>
-  <p>Then call <code>/analyze</code> with an x402-capable client and use the returned <code>score</code>, <code>level</code>, and <code>findings</code> in your policy.</p>
+  <p>Then call <code>/analyze</code> with an x402-capable client and use the returned <code>score</code>, <code>level</code>, and <code>findings</code> as your first-pass screening signal.</p>
 </aside>
 </section>
 
 <div class="section">
 <h2>Start Here If You Are An Agent</h2>
-<p class="section-copy">The intent is simple: short docs first, one paid endpoint second, structured risk output last. No signups, no account provisioning, no hidden control plane.</p>
+<p class="section-copy">Start with the shortest docs, then call one paid endpoint when you need to check a contract. No API key, no signup, pay per request.</p>
 <div class="split-callouts">
   <div class="callout">
     <div class="kicker">Step 01</div>
-    <p>Read <a href="__BASE_URL__/skill.md">/skill.md</a> for the shortest machine-oriented integration path, or jump straight to <a href="__BASE_URL__/openapi.json">OpenAPI</a> if your client already consumes schemas.</p>
+    <p>Read <a href="__BASE_URL__/skill.md">/skill.md</a> for the shortest setup path, or use <a href="__BASE_URL__/openapi.json">OpenAPI</a> if your client already consumes schemas.</p>
   </div>
   <div class="callout">
     <div class="kicker">Step 02</div>
-    <p>Call <code>/analyze</code> with a Base contract address, handle the `402` payment flow, and feed the resulting risk fields into your routing or review policy.</p>
+    <p>Call <code>/analyze</code> with a Base contract address, let your x402 client handle payment, and use the returned score and findings before your workflow proceeds.</p>
   </div>
 </div>
 <pre>curl -s "__BASE_URL__/skill.md"
 
 curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
-<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Use Augur when your workflow needs a deterministic bytecode screen before trading, routing, or escalating to deeper review.</p>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Screen Base contracts before your agent buys, routes funds, approves, or interacts.</p>
 </div>
 
 <div class="section">
 <h2>What it does</h2>
-<p class="section-copy">Augur stays narrow on purpose. It is a bytecode triage layer for autonomous systems, not a simulated analyst persona and not a full audit substitute.</p>
+<p class="section-copy">Augur is a deterministic contract-risk screen for Base agents and the workflows around them. It gives you a fast first pass before you trust a contract.</p>
 <p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
@@ -1276,6 +1277,25 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
   <div class="detector"><div class="name">Fee Manipulation</div><div class="desc">Dynamic fee extraction patterns</div></div>
   <div class="detector"><div class="name">Delegatecall</div><div class="desc">External code execution risk</div></div>
   <div class="detector"><div class="name">Deployer Reputation</div><div class="desc">Basescan deployer history</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Why agents use it</h2>
+<p class="section-copy">The value is clearest at decision points where an agent is about to trust or touch a contract.</p>
+<div class="split-callouts">
+  <div class="callout">
+    <div class="kicker">Before a Buy</div>
+    <p>Screen a token contract before a trading agent buys, quotes, or routes into it.</p>
+  </div>
+  <div class="callout">
+    <div class="kicker">Before Funds Move</div>
+    <p>Screen a contract before a treasury, routing, or execution agent sends funds to it.</p>
+  </div>
+  <div class="callout">
+    <div class="kicker">Before Approval</div>
+    <p>Screen a contract before an approval, listing, or other workflow treats it as acceptable.</p>
+  </div>
 </div>
 </div>
 
@@ -1297,8 +1317,8 @@ Pay with any x402-compatible client. Returns JSON with score, level, findings, a
 </div>
 
 <div class="section">
-<h2>Public Entry Pages</h2>
-<p class="section-copy">These are public task-specific entry pages, not the full detector list. All three route back to the same paid <code>/analyze</code> endpoint, which still runs the full 8-detector scoring pass shown above.</p>
+<h2>Explore by Use Case</h2>
+<p class="section-copy">These pages show where Augur fits into common agent workflows. Each one uses the same paid <code>/analyze</code> endpoint and returns the full screening response.</p>
 <div class="links">
   <a href="__BASE_URL__/honeypot-detection-api">Honeypot Detection API <div class="path">/honeypot-detection-api</div></a>
   <a href="__BASE_URL__/proxy-risk-api">Proxy Risk API <div class="path">/proxy-risk-api</div></a>
@@ -1583,7 +1603,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
             "Base mainnet honeypot detection API for agents. Screen contract bytecode "
             "for transfer restrictions, fee traps, proxy risk, and related signals."
         ),
-        "eyebrow": "Buyer Intent",
+        "eyebrow": "Use Case",
         "summary": (
             "Use Augur when an agent needs a fast Base token screen before buying, "
             "routing, or surfacing a token to a user. Honeypot patterns are checked "
@@ -1607,7 +1627,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
             "Base mainnet proxy risk API for agents. Detect proxy contracts, inspect "
             "implementation bytecode, and score upgrade-related risk."
         ),
-        "eyebrow": "Buyer Intent",
+        "eyebrow": "Use Case",
         "summary": (
             "Use Augur when your workflow needs to know whether a Base contract is a "
             "proxy, whether upgradeable logic exists behind it, and what the "
@@ -1631,7 +1651,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
             "Base mainnet deployer reputation API for agents. Add deployer-history "
             "context to contract screening before interacting or listing."
         ),
-        "eyebrow": "Buyer Intent",
+        "eyebrow": "Use Case",
         "summary": (
             "Use Augur when contract triage needs more than raw bytecode. The deployer "
             "reputation detector adds Basescan-backed context so an agent can weigh "
@@ -1806,7 +1826,7 @@ a{{color:#90cdf4}}
 
 <div class="section">
 <h2>Call the canonical endpoint</h2>
-<p>All buyer-intent pages map back to the same paid API: <code>GET {base_url}/analyze?address=0x4200000000000000000000000000000000000006</code></p>
+<p>Call the same paid API from this page too: <code>GET {base_url}/analyze?address=0x4200000000000000000000000000000000000006</code></p>
 <pre>curl -s "{base_url}/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p>x402 payment is per-call, using USDC on Base. For the 402 flow details, see <a href="{base_url}/how-payment-works">How Augur payment works</a>.</p>
@@ -1823,7 +1843,7 @@ a{{color:#90cdf4}}
 </div>
 
 <div class="section">
-<h2>Related intent pages</h2>
+<h2>Related use cases</h2>
 <div class="links">
 {related_links}
 </div>
@@ -1835,13 +1855,13 @@ a{{color:#90cdf4}}
 LLMS_TXT = """\
 # Augur
 
-> Base mainnet smart contract bytecode risk scoring API for agents and the developers \
-building them. Returns a 0-100 risk score with findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## What It Does
 
 Augur fetches on-chain bytecode for a Base mainnet smart contract (EIP-155:8453) \
 and runs 8 deterministic detectors to produce a composite risk score from 0 (safe) to 100 (critical).
+Screen Base contracts before your agent buys, routes funds, approves, or interacts.
 A `safe` result means no major bytecode-level risk signals were detected in this scan, not that the contract is audited or guaranteed safe.
 
 ## How to Call
@@ -1891,7 +1911,7 @@ SKILL_MD = """\
 ---
 name: augur
 version: 1.0.0
-description: Deterministic Base smart contract bytecode risk scoring for agents. Analyze a contract, get a 0-100 score with findings, and pay per call with x402.
+description: Deterministic Base contract risk screening for agents. Analyze a contract, get a 0-100 score with findings, and pay per call with x402.
 homepage: __BASE_URL__
 license: MIT
 tags: [security, smart-contracts, base, bytecode-analysis, x402, agents]
@@ -1905,7 +1925,7 @@ payment:
 
 # Augur
 
-Use Augur when you need a fast deterministic risk screen on a Base mainnet contract before your agent trades, routes funds, lists a token, or escalates to deeper review.
+Use Augur when you need a fast deterministic first-pass contract screen on a Base mainnet contract. Screen Base contracts before your agent buys, routes funds, approves, or interacts.
 
 ## Fastest Path
 
@@ -1956,6 +1976,8 @@ Risk levels:
 - delegatecall usage
 - deployer reputation
 
+One `/analyze` call checks all 8 categories below.
+
 Proxy contracts can include a nested `implementation` analysis so downstream policy can score both proxy shell and underlying logic consistently.
 
 ## Failure Cases
@@ -1979,14 +2001,14 @@ Proxy contracts can include a nested `implementation` analysis so downstream pol
 LLMS_FULL_TXT = """\
 # Augur - Full Documentation
 
-> Base mainnet smart contract bytecode risk scoring API for agents and the developers \
-building them. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## Overview
 
-Augur is an agent-to-agent API that scores smart contract risk on Base (EIP-155:8453). \
+Augur is a paid HTTP API for deterministic first-pass contract risk screening on Base (EIP-155:8453). \
+Screen Base contracts before your agent buys, routes funds, approves, or interacts. \
 It uses deterministic bytecode pattern matching (no LLM) for fast, reliable results. \
-It is a fast bytecode screen, not a full security audit or guarantee. \
+It is a fast bytecode screen, not a full security audit, simulator, runtime monitor, or guarantee. \
 Payment is via the x402 HTTP payment protocol - no API key, no signup, no subscription.
 
 ## Endpoint
@@ -2588,8 +2610,8 @@ def create_app(
             "@type": "WebAPI",
             "name": "Augur",
             "description": (
-                "Base mainnet smart contract bytecode risk scoring API for agents. "
-                "Runs deterministic detectors and returns a 0-100 score with findings."
+                "Deterministic Base contract risk screening for agents on Base. "
+                "Runs deterministic bytecode detectors and returns a 0-100 score with findings."
             ),
             "url": base_url,
             "provider": {
@@ -2613,14 +2635,15 @@ def create_app(
                     "@type": "Question",
                     "name": "What does Augur do?",
                     "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": (
-                            "Augur is a Base mainnet smart contract bytecode risk scoring API "
+                    "@type": "Answer",
+                    "text": (
+                            "Augur is a deterministic Base contract risk-screening API "
                             "for agents and the developers building them. It fetches on-chain "
                             "bytecode for a contract on Base and runs "
                             "8 detectors (proxy, reentrancy, selfdestruct, honeypot, hidden mint, "
                             "fee manipulation, delegatecall, deployer reputation) to produce a "
-                            "composite 0-100 risk score with detailed findings."
+                            "composite 0-100 risk score with detailed findings before a workflow "
+                            "decides whether to proceed."
                         ),
                     },
                 },
@@ -2895,7 +2918,7 @@ def create_app(
         return jsonify({
             "name": "Augur",
             "description": (
-                "Base mainnet smart contract bytecode risk scoring API for agents. "
+                "Deterministic Base contract risk screening for agents on Base. "
                 "Analyzes bytecode patterns and returns a 0-100 risk score with findings. "
                 "Pay $0.10/call via x402 in USDC on Base."
             ),
@@ -2954,7 +2977,7 @@ def create_app(
                 f"{base_url}/analyze",
             ],
             "instructions": (
-                "# Augur - Base Smart Contract Security Analysis\n\n"
+                "# Augur - Deterministic Base Contract Risk Screening\n\n"
                 "Bytecode-level risk scoring for Base mainnet smart contracts. "
                 "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
                 "selfdestruct, reentrancy patterns, honeypot, proxy detection, "
@@ -3009,11 +3032,11 @@ def create_app(
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Augur",
             "description": (
-                "Base mainnet smart contract bytecode risk scoring API for agents. "
+                "Deterministic Base contract risk screening for agents on Base. "
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
                 "selfdestruct, honeypot, hidden mint, fee manipulation, "
                 "delegatecall, deployer reputation) and returns a composite 0-100 "
-                'risk score with findings. "safe" is not a guarantee or audit. '
+                'risk score with findings for first-pass screening decisions. "safe" is not a guarantee or audit. '
                 "Pay $0.10/call via x402 in USDC on Base. "
                 "Endpoint: GET /analyze?address={base_contract_address}"
             ),

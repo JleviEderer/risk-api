@@ -7,6 +7,9 @@ This document is the operating backlog for traffic, conversion, and revenue grow
 North star:
 - Increase organic paid calls to `/analyze`
 
+Companion strategy memo:
+- See `docs/PRODUCT_WEDGE_MEMO.md` for the current product-positioning view: Augur as a narrow Base contract admission gate, not a broad execution-security suite.
+
 Leading indicators:
 - paid conversion rate from unique visitors
 - number of real paid calls per week

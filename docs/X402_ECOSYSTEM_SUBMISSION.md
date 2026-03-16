@@ -32,7 +32,7 @@ For Augur, use slug `augur`.
 ```json
 {
   "name": "Augur",
-  "description": "Base mainnet smart contract bytecode risk scoring API for agents and the developers building them. Pay $0.10/call via x402 in USDC on Base and get deterministic findings plus a 0-100 score. \"safe\" is not an audit or guarantee.",
+  "description": "Deterministic Base contract risk screening for agents on Base. Pay $0.10/call via x402 in USDC on Base and get a 0-100 score with findings. Screen Base contracts before your agent buys, routes funds, approves, or interacts.",
   "logoUrl": "/logos/augur.png",
   "websiteUrl": "https://augurrisk.com/",
   "category": "Services/Endpoints"

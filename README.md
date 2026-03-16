@@ -1,6 +1,6 @@
 # Augur
 
-> Base mainnet smart contract bytecode risk scoring API for agents and the developers building them.
+> Deterministic Base contract risk screening for agents. x402-paid API access for fast first-pass decisions.
 
 **Live:** https://augurrisk.com  
 **Proof report:** https://augurrisk.com/reports/base-bluechip-bytecode-snapshot  
@@ -12,17 +12,32 @@
 
 Augur accepts a Base mainnet contract address and returns a structured 0-100 bytecode risk score with findings.
 
-The product is designed for agent workflows that need a fast screen before interacting with a contract. It is a deterministic bytecode analysis service, not a full security audit or guarantee.
+The product is designed for agent workflows that need a fast deterministic contract screen before interacting with a contract. It is a deterministic bytecode analysis service, not a full security audit, runtime monitor, or guarantee.
 
-## Why It Exists
+Augur focuses on one job:
 
-Augur is built for machine-native usage:
+- one paid endpoint
+- one contract check per request
+- 8 deterministic detectors in one response
+
+Screen Base contracts before your agent buys, routes funds, approves, or interacts. If a contract still needs deeper analysis after that first pass, escalate it to a heavier tool.
+
+## Common Use Cases
+
+- Screen a token contract before a trading agent buys or quotes it.
+- Screen a contract before a routing or treasury agent sends funds to it.
+- Screen a contract before an approval flow grants allowances or permissions.
+- Screen a contract before a listing, indexing, or monitoring workflow treats it as acceptable.
+
+## Why It Fits Agents
+
+Augur fits agent workflows because:
 
 - no API key
 - no signup
 - pay per request via x402 in USDC on Base
 
-That makes it usable by agents and automated workflows that cannot rely on traditional account-based APIs.
+That makes it easy to call from agents and automated workflows that do not want account-based API setup.
 
 ## Fastest Paid Call
 
@@ -139,7 +154,7 @@ Risk levels:
 
 ## Detector Coverage
 
-Augur scores contracts across these high-level categories:
+Augur's narrow risk-screening product currently scores contracts across these high-level categories:
 
 - proxy behavior
 - reentrancy risk
@@ -149,6 +164,8 @@ Augur scores contracts across these high-level categories:
 - fee manipulation
 - delegatecall usage
 - deployer reputation
+
+These detectors are not separate products. They are the current deterministic checks that feed the same paid `/analyze` screening workflow.
 
 For proxy contracts, the response can also include nested `implementation` analysis.
 

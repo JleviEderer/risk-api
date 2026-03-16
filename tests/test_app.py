@@ -311,7 +311,7 @@ def test_agent_metadata_endpoint(client):
     data = resp.get_json()
     assert data["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
     assert data["name"] == "Augur"
-    assert "Base mainnet" in data["description"]
+    assert "Deterministic Base contract risk screening for agents on Base" in data["description"]
     assert "not a guarantee or audit" in data["description"]
     assert data["x402Support"] is True
     assert data["active"] is True
@@ -696,7 +696,7 @@ def test_a2a_agent_card_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["name"] == "Augur"
-    assert "Base mainnet" in data["description"]
+    assert "Deterministic Base contract risk screening for agents on Base" in data["description"]
     assert data["version"] == "1.0.0"
     assert data["capabilities"]["streaming"] is False
     assert len(data["skills"]) == 1
@@ -817,7 +817,7 @@ def test_landing_returns_html(client):
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
     assert b"Augur" in resp.data
-    assert b"Score Base contract bytecode" in resp.data
+    assert b"Screen a Base contract before your agent touches it." in resp.data
     assert b"not a full audit or guarantee" in resp.data
 
 
@@ -1234,7 +1234,7 @@ def test_llms_full_txt_returns_markdown(client):
     assert "Reentrancy" in text
     assert "Response Schema" in text
     assert "Base mainnet contract address" in text
-    assert "not a full security audit or guarantee" in text
+    assert "not a full security audit, simulator, runtime monitor, or guarantee" in text
 
 
 def test_llms_full_txt_has_proxy_example(client):

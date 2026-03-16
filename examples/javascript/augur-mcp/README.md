@@ -1,8 +1,8 @@
 # Augur MCP Server
 
-Local stdio MCP server that pays Augur over x402 and exposes Augur's paid Base contract risk API as MCP tools.
+Local stdio MCP server that pays Augur over x402 and exposes the Augur Base contract risk API as MCP tools.
 
-This package keeps Augur itself as the canonical HTTP product at `https://augurrisk.com` and uses a local MCP bridge so wallet signing stays on the operator's machine.
+Use this package when you want Augur inside Claude Desktop or another MCP client. Wallet signing stays on your machine while Augur stays a paid HTTP API at `https://augurrisk.com`.
 
 ## What You Get
 
