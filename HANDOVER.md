@@ -1,11 +1,11 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-12
+- Date: 2026-03-16
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `6246a92`
-- Status: green; local worktree still has the uncommitted public-copy pass
+- HEAD: `9429489`
+- Status: green; local worktree has the new decision-output pass in progress
 
 ## What Changed
 - Added a strategy memo that locks the current wedge:
@@ -73,6 +73,18 @@
   - `https://augurrisk.com/skill.md`
   - `https://augurrisk.com/llms-full.txt`
   - `https://augurrisk.com/honeypot-detection-api`
+- Added a real first-pass policy layer to the live `/analyze` response:
+  - new top-level fields: `decision` and `recommended_policy`
+  - default mapping is `allow` for `safe`, `warn` for `low`, `manual_review` for `medium` or unresolved proxy logic, and `block` for `high` / `critical`
+  - `recommended_policy` now returns `action`, `summary`, and stable `reason_codes`
+- Updated all machine-readable surfaces and examples to reflect the real policy output:
+  - OpenAPI examples and `AnalysisResult` schema in `src/risk_api/app.py`
+  - x402 Bazaar discovery examples
+  - `README.md`, `skill.md`, `llms.txt`, and `llms-full.txt`
+  - proof report snapshots in `src/risk_api/proof_reports.py`
+- Added coverage for the policy layer:
+  - new unit tests in `tests/test_policy.py`
+  - engine and app tests now verify `decision` / `recommended_policy`
 
 ## Current Read
 - Current product-scope rule:
@@ -111,8 +123,9 @@
   - keep core machine surfaces (`/skill.md`, OpenAPI, `llms*.txt`, `.well-known/*`, MCP page) unless there is a clear reason to retire one
   - use-case pages are optional support surfaces; keep them only if they improve clarity or qualified traffic
 - Current product-output rule:
-  - do not claim explicit policy outputs in public copy until the API actually returns a stable field such as `recommended_policy` or `recommended_action`
-  - current truthful claim is that Augur returns policy-ready inputs (`score`, `level`, `findings`, `category_scores`, optional `implementation`)
+  - Augur now returns explicit first-pass policy outputs: `decision` and `recommended_policy`
+  - `recommended_policy` currently includes `action`, `summary`, and `reason_codes`
+  - this is a default first-pass recommendation layer, not a replacement for caller-specific policy logic
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - Current next step is still `G-015`: use the live proof report for targeted distribution and watch for qualified traffic.
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
@@ -149,7 +162,7 @@
 6. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
 7. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
 8. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
-9. If policy outputs are added next, implement the response contract first, verify behavior on real contracts, then update homepage, `skill.md`, README, and machine docs.
+9. Validate the new policy outputs on real Base contracts and tighten the mapping if any obvious blue-chip or proxy cases feel operationally wrong.
 10. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints

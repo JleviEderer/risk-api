@@ -14,6 +14,15 @@ _EXAMPLE_OUTPUT = {
     "address": "0x4200000000000000000000000000000000000006",
     "score": 0,
     "level": "safe",
+    "decision": "allow",
+    "recommended_policy": {
+        "action": "allow",
+        "summary": (
+            "Allow by default for first-pass automation. Continue only if this "
+            "matches your broader strategy and trust model."
+        ),
+        "reason_codes": [],
+    },
     "bytecode_size": 4632,
     "findings": [],
     "category_scores": {},

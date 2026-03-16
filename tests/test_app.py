@@ -135,6 +135,9 @@ def test_analyze_success(client):
     assert data["address"] == addr
     assert data["score"] == 0
     assert data["level"] == "safe"
+    assert data["decision"] == "allow"
+    assert data["recommended_policy"]["action"] == "allow"
+    assert data["recommended_policy"]["reason_codes"] == []
     assert isinstance(data["findings"], list)
     assert isinstance(data["category_scores"], dict)
 
@@ -182,6 +185,7 @@ def test_analyze_with_findings(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["score"] >= 30
+    assert data["decision"] in {"warn", "manual_review", "block"}
     assert len(data["findings"]) > 0
     assert data["findings"][0]["detector"] == "selfdestruct"
 
@@ -268,6 +272,8 @@ def test_x402_402_response_has_bazaar_extension(client_with_x402):
     example = output_data["example"]
     assert "score" in example
     assert "level" in example
+    assert "decision" in example
+    assert "recommended_policy" in example
     assert "findings" in example
 
 
@@ -395,6 +401,8 @@ def test_analyze_proxy_response_includes_implementation(client):
     data = resp.get_json()
 
     assert "implementation" in data
+    assert "decision" in data
+    assert "recommended_policy" in data
     impl = data["implementation"]
     assert impl["address"] == "0x" + impl_addr_hex
     assert impl["bytecode_size"] > 0
@@ -414,6 +422,7 @@ def test_analyze_non_proxy_no_implementation_key(client):
     data = resp.get_json()
 
     assert "implementation" not in data
+    assert data["decision"] == "allow"
 
 
 @responses.activate
@@ -430,6 +439,7 @@ def test_analyze_post_with_json_body(client):
     data = resp.get_json()
     assert data["address"] == addr
     assert data["score"] == 0
+    assert data["decision"] == "allow"
 
 
 @responses.activate
@@ -445,6 +455,7 @@ def test_analyze_post_with_query_param(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["address"] == addr
+    assert data["decision"] == "allow"
 
 
 def test_analyze_post_missing_address(client):
@@ -1234,6 +1245,8 @@ def test_llms_full_txt_returns_markdown(client):
     assert "Reentrancy" in text
     assert "Response Schema" in text
     assert "Base mainnet contract address" in text
+    assert "decision" in text
+    assert "recommended_policy" in text
     assert "not a full security audit, simulator, runtime monitor, or guarantee" in text
 
 

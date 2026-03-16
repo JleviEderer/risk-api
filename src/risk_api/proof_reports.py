@@ -38,6 +38,15 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                     "address": "0x4200000000000000000000000000000000000006",
                     "score": 25,
                     "level": "low",
+                    "decision": "warn",
+                    "recommended_policy": {
+                        "action": "warn",
+                        "summary": (
+                            "Allow with caution. Log the findings and keep the "
+                            "contract on a watchlist or secondary review path."
+                        ),
+                        "reason_codes": ["honeypot_signal"],
+                    },
                     "findings": [
                         {
                             "detector": "honeypot",
@@ -69,6 +78,22 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
                     "score": 90,
                     "level": "critical",
+                    "decision": "block",
+                    "recommended_policy": {
+                        "action": "block",
+                        "summary": (
+                            "Block automatic interaction by default. Only proceed "
+                            "with an explicit override after deeper review."
+                        ),
+                        "reason_codes": [
+                            "high_risk_score",
+                            "upgradeable_proxy",
+                            "hidden_mint_signal",
+                            "honeypot_signal",
+                            "delegatecall_surface",
+                            "suspicious_selector_signal",
+                        ],
+                    },
                     "findings": [
                         {
                             "detector": "delegatecall",
@@ -197,6 +222,22 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                     "address": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
                     "score": 75,
                     "level": "high",
+                    "decision": "block",
+                    "recommended_policy": {
+                        "action": "block",
+                        "summary": (
+                            "Block automatic interaction by default. Only proceed "
+                            "with an explicit override after deeper review."
+                        ),
+                        "reason_codes": [
+                            "high_risk_score",
+                            "upgradeable_proxy",
+                            "hidden_mint_signal",
+                            "honeypot_signal",
+                            "delegatecall_surface",
+                            "suspicious_selector_signal",
+                        ],
+                    },
                     "findings": [
                         {
                             "detector": "delegatecall",

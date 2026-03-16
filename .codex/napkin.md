@@ -27,8 +27,8 @@
    Do instead: use `Deterministic Base contract risk screening for agents` or similarly direct phrasing in public copy; keep `admission control` as internal strategy language if needed.
 4. **[2026-03-11] Explain the trigger moment, not just the category**
    Do instead: pair the public headline with a concrete sentence like `Screen Base contracts before your agent buys, routes funds, approves, or interacts`, and keep one compact use-case block on human-facing surfaces.
-5. **[2026-03-11] Do not advertise policy outputs before they exist**
-   Do instead: describe current response fields as policy-ready inputs until the API actually returns an explicit stable field like `recommended_policy` or `recommended_action`.
+5. **[2026-03-16] Keep the policy layer thin and explicit**
+   Do instead: now that `/analyze` returns `decision` and `recommended_policy`, keep it as a default first-pass action layer (`allow`, `warn`, `manual_review`, `block`) with stable `reason_codes` instead of drifting into a complex custom policy engine.
 6. **[2026-03-10] Keep proof-page claims narrower than the implementation**
    Do instead: frame the report as a dated snapshot, not a live rerun or a full product demo; use the payment explainer and dashboard as separate surfaces.
 7. **[2026-03-10] Homepage polish should preserve the agent entry path**

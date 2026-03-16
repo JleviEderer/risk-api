@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 
 from risk_api.analysis.disassembler import disassemble
+from risk_api.analysis.policy import PolicyAction, PolicyResult, derive_policy
 from risk_api.analysis.patterns import (
     EIP_1822_SLOT,
     EIP_1967_IMPL_SLOT,
@@ -44,6 +45,8 @@ class AnalysisResult:
     address: str
     score: int
     level: RiskLevel
+    decision: PolicyAction
+    recommended_policy: PolicyResult
     findings: list[Finding]
     category_scores: dict[str, int]
     bytecode_size: int
@@ -250,10 +253,19 @@ def analyze_contract(
             final_category_scores[f"impl_{cat}"] = points
 
     final_level = score_to_level(final_score)
+    policy = derive_policy(
+        score=final_score,
+        level=final_level,
+        findings=findings + (impl_result.findings if impl_result else []),
+        category_scores=final_category_scores,
+        implementation_present=impl_result is not None,
+    )
     result = AnalysisResult(
         address=address,
         score=final_score,
         level=final_level,
+        decision=policy.action,
+        recommended_policy=policy,
         findings=findings + (impl_result.findings if impl_result else []),
         category_scores=final_category_scores,
         bytecode_size=bytecode_size,

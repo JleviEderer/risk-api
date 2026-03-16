@@ -9,6 +9,7 @@ from risk_api.analysis.engine import (
     resolve_implementation,
 )
 from risk_api.analysis.patterns import EIP_1822_SLOT, EIP_1967_IMPL_SLOT
+from risk_api.analysis.policy import PolicyAction
 from risk_api.analysis.scoring import RiskLevel
 from risk_api.chain.rpc import RPCError, clear_cache
 
@@ -71,6 +72,8 @@ def test_analyze_clean_contract():
     result = analyze_contract("0x" + "ab" * 20, RPC_URL)
     assert result.score == 0
     assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.ALLOW
+    assert result.recommended_policy.reason_codes == []
     assert result.findings == []
     assert result.bytecode_size > 200
     assert result.implementation is None
@@ -82,6 +85,11 @@ def test_analyze_contract_with_selfdestruct():
     responses.post(RPC_URL, json=_rpc_response(bytecode))
     result = analyze_contract("0x" + "cd" * 20, RPC_URL)
     assert result.score >= 30
+    assert result.decision in {
+        PolicyAction.WARN,
+        PolicyAction.MANUAL_REVIEW,
+        PolicyAction.BLOCK,
+    }
     assert any(f.detector == "selfdestruct" for f in result.findings)
 
 
@@ -112,6 +120,7 @@ def test_analyze_proxy_contract():
     assert result.implementation is None
     assert result.score == 40
     assert result.level == RiskLevel.MEDIUM
+    assert result.decision == PolicyAction.MANUAL_REVIEW
     assert any(
         f.title == "Proxy implementation could not be resolved"
         for f in result.findings
@@ -199,6 +208,7 @@ def test_analyze_proxy_resolves_implementation():
     # Implementation adds selfdestruct=30
     assert result.score >= 50
     assert "impl_selfdestruct" in result.category_scores
+    assert result.decision == PolicyAction.MANUAL_REVIEW
     assert any(f.detector == "impl_selfdestruct" for f in result.findings)
 
 
@@ -220,6 +230,7 @@ def test_analyze_proxy_clean_implementation():
     # Score is just proxy + delegatecall = 20
     assert result.score == 20
     assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.WARN
 
 
 @responses.activate
@@ -237,6 +248,7 @@ def test_analyze_proxy_impl_includes_suspicious_selector_score():
     assert result.category_scores["impl_suspicious_selector"] == 5
     assert result.score == 25
     assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.WARN
 
 
 @responses.activate
@@ -254,6 +266,7 @@ def test_analyze_proxy_impl_includes_tiny_bytecode_score():
     assert result.category_scores["impl_tiny_bytecode"] == 10
     assert result.score == 30
     assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.WARN
 
 
 @responses.activate

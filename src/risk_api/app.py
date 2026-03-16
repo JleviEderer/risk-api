@@ -42,6 +42,16 @@ NO_BYTECODE_ERROR_TEMPLATE = "No contract bytecode found at Base address: {addre
 BASE_ADDRESS_DESCRIPTION = "Base mainnet contract address (0x-prefixed, 40 hex chars)"
 
 
+def _policy_example(
+    action: str, summary: str, reason_codes: list[str],
+) -> dict[str, object]:
+    return {
+        "action": action,
+        "summary": summary,
+        "reason_codes": reason_codes,
+    }
+
+
 def _extract_requested_address() -> str:
     """Read the requested address from query params or JSON body."""
     address = request.args.get("address", "").strip()
@@ -124,7 +134,7 @@ OPENAPI_SPEC: dict[str, object] = {
             "Analyzes Base bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
             "delegatecall, deployer reputation) and returns a composite 0-100 "
-            "risk score with findings. Pay $0.10/call via x402 in USDC on Base. "
+            "risk score, default decision, and findings. Pay $0.10/call via x402 in USDC on Base. "
             '"safe" means no major bytecode-level risk signals detected in this '
             "scan, not a security audit or guarantee."
         ),
@@ -141,8 +151,8 @@ OPENAPI_SPEC: dict[str, object] = {
                     "Fetches on-chain bytecode for the given Base mainnet "
                     "contract address and runs 8 detectors (proxy, reentrancy, selfdestruct, "
                     "honeypot, hidden mint, fee manipulation, delegatecall, "
-                    "deployer reputation). Returns a composite 0-100 risk score "
-                    'with findings. "safe" is a low-risk bytecode bucket, not a '
+                    "deployer reputation). Returns a composite 0-100 risk score, "
+                    'default decision, and findings. "safe" is a low-risk bytecode bucket, not a '
                     "security guarantee."
                 ),
                 "parameters": [
@@ -172,6 +182,12 @@ OPENAPI_SPEC: dict[str, object] = {
                                             "address": SAFE_EXAMPLE_ADDRESS,
                                             "score": 0,
                                             "level": "safe",
+                                            "decision": "allow",
+                                            "recommended_policy": _policy_example(
+                                                "allow",
+                                                "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+                                                [],
+                                            ),
                                             "bytecode_size": 4632,
                                             "findings": [],
                                             "category_scores": {},
@@ -185,6 +201,19 @@ OPENAPI_SPEC: dict[str, object] = {
                                             "address": PROXY_EXAMPLE_ADDRESS,
                                             "score": 60,
                                             "level": "high",
+                                            "decision": "block",
+                                            "recommended_policy": _policy_example(
+                                                "block",
+                                                "Block automatic interaction by default. Only proceed with an explicit override after deeper review.",
+                                                [
+                                                    "high_risk_score",
+                                                    "upgradeable_proxy",
+                                                    "hidden_mint_signal",
+                                                    "honeypot_signal",
+                                                    "delegatecall_surface",
+                                                    "suspicious_selector_signal",
+                                                ],
+                                            ),
                                             "bytecode_size": 1485,
                                             "findings": [
                                                 {
@@ -334,6 +363,12 @@ OPENAPI_SPEC: dict[str, object] = {
                                     "address": SAFE_EXAMPLE_ADDRESS,
                                     "score": 0,
                                     "level": "safe",
+                                    "decision": "allow",
+                                    "recommended_policy": _policy_example(
+                                        "allow",
+                                        "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+                                        [],
+                                    ),
                                     "bytecode_size": 4632,
                                     "findings": [],
                                     "category_scores": {},
@@ -462,6 +497,19 @@ OPENAPI_SPEC: dict[str, object] = {
                             "high (56-75), critical (76-100)."
                         ),
                     },
+                    "decision": {
+                        "type": "string",
+                        "enum": ["allow", "warn", "manual_review", "block"],
+                        "description": (
+                            "Default first-pass action Augur recommends for agent workflows."
+                        ),
+                    },
+                    "recommended_policy": {
+                        "$ref": "#/components/schemas/PolicyRecommendation",
+                        "description": (
+                            "Policy-ready recommendation derived from the score and findings."
+                        ),
+                    },
                     "bytecode_size": {
                         "type": "integer",
                         "description": "Size of the contract bytecode in bytes.",
@@ -488,9 +536,34 @@ OPENAPI_SPEC: dict[str, object] = {
                     },
                 },
                 "required": [
-                    "address", "score", "level", "bytecode_size",
-                    "findings", "category_scores",
+                    "address", "score", "level", "decision",
+                    "recommended_policy", "bytecode_size", "findings",
+                    "category_scores",
                 ],
+            },
+            "PolicyRecommendation": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["allow", "warn", "manual_review", "block"],
+                        "description": "Recommended default action for the calling workflow.",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": (
+                            "Short explanation of how the caller should treat this result."
+                        ),
+                    },
+                    "reason_codes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Stable machine-readable reasons that explain the recommendation."
+                        ),
+                    },
+                },
+                "required": ["action", "summary", "reason_codes"],
             },
         },
         "securitySchemes": {
@@ -1304,7 +1377,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">
-Pay with any x402-compatible client. Returns JSON with score, level, findings, and category_scores for a Base mainnet contract.
+Pay with any x402-compatible client. Returns JSON with score, level, decision, recommended_policy, findings, and category_scores for a Base mainnet contract.
 </p>
 </div>
 
@@ -1560,7 +1633,7 @@ ul{margin:8px 0 0 18px}
 <div class="step"><strong>1. Request analysis</strong><br>Call <code>GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006</code>.</div>
 <div class="step"><strong>2. Receive a 402</strong><br>Augur returns <code>402 Payment Required</code> with a base64-encoded <code>Payment-Required</code> header describing the exact USDC payment on Base.</div>
 <div class="step"><strong>3. Sign and attach payment</strong><br>Your x402 client signs the payment authorization from your wallet and retries the same request with a <code>PAYMENT-SIGNATURE</code> header.</div>
-<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the contract score, level, findings, and proxy details if present.</div>
+<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the contract score, level, decision, recommended_policy, findings, and proxy details if present.</div>
 </div>
 
 <div class="section">
@@ -1855,7 +1928,7 @@ a{{color:#90cdf4}}
 LLMS_TXT = """\
 # Augur
 
-> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score, a default decision, and findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## What It Does
 
@@ -1880,6 +1953,12 @@ Any x402-compatible HTTP client handles this automatically.
   "address": "0x4200000000000000000000000000000000000006",
   "score": 0,
   "level": "safe",
+  "decision": "allow",
+  "recommended_policy": {
+    "action": "allow",
+    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+    "reason_codes": []
+  },
   "bytecode_size": 4632,
   "findings": [],
   "category_scores": {}
@@ -1911,7 +1990,7 @@ SKILL_MD = """\
 ---
 name: augur
 version: 1.0.0
-description: Deterministic Base contract risk screening for agents. Analyze a contract, get a 0-100 score with findings, and pay per call with x402.
+description: Deterministic Base contract risk screening for agents. Analyze a contract, get a 0-100 score plus a first-pass policy recommendation, and pay per call with x402.
 homepage: __BASE_URL__
 license: MIT
 tags: [security, smart-contracts, base, bytecode-analysis, x402, agents]
@@ -1932,7 +2011,7 @@ Use Augur when you need a fast deterministic first-pass contract screen on a Bas
 1. Read this file or `__BASE_URL__/openapi.json`
 2. Call `GET __BASE_URL__/analyze?address={base_contract_address}`
 3. If you receive `402`, let your x402 client pay `$0.10` USDC on Base and retry with `PAYMENT-SIGNATURE`
-4. Read `score`, `level`, `findings`, `category_scores`, and optional `implementation`
+4. Read `score`, `level`, `decision`, `recommended_policy`, `findings`, `category_scores`, and optional `implementation`
 
 ## Endpoint
 
@@ -1951,6 +2030,12 @@ Content-Type: application/json
   "address": "0x4200000000000000000000000000000000000006",
   "score": 0,
   "level": "safe",
+  "decision": "allow",
+  "recommended_policy": {
+    "action": "allow",
+    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+    "reason_codes": []
+  },
   "bytecode_size": 4632,
   "findings": [],
   "category_scores": {}
@@ -2001,7 +2086,7 @@ Proxy contracts can include a nested `implementation` analysis so downstream pol
 LLMS_FULL_TXT = """\
 # Augur - Full Documentation
 
-> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score with findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score, a default decision, and findings. Pay $0.10/call via x402 in USDC on Base.
 
 ## Overview
 
@@ -2034,6 +2119,12 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
   "address": "0x4200000000000000000000000000000000000006",
   "score": 0,
   "level": "safe",
+  "decision": "allow",
+  "recommended_policy": {
+    "action": "allow",
+    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+    "reason_codes": []
+  },
   "bytecode_size": 4632,
   "findings": [],
   "category_scores": {}
@@ -2047,6 +2138,19 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   "score": 60,
   "level": "high",
+  "decision": "block",
+  "recommended_policy": {
+    "action": "block",
+    "summary": "Block automatic interaction by default. Only proceed with an explicit override after deeper review.",
+    "reason_codes": [
+      "high_risk_score",
+      "upgradeable_proxy",
+      "hidden_mint_signal",
+      "honeypot_signal",
+      "delegatecall_surface",
+      "suspicious_selector_signal"
+    ]
+  },
   "bytecode_size": 1485,
   "findings": [
     {
@@ -2102,6 +2206,8 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 | address          | string  | The analyzed contract address |
 | score            | integer | Composite risk score, 0-100 |
 | level            | string  | Risk bucket: safe, low, medium, high, critical (`safe` is not a guarantee) |
+| decision         | string  | Default first-pass action: allow, warn, manual_review, or block |
+| recommended_policy | object | Policy recommendation with action, summary, and stable reason_codes |
 | bytecode_size    | integer | Contract bytecode size in bytes |
 | findings         | array   | List of risk findings from detectors |
 | category_scores  | object  | Risk points by detector category |
@@ -2282,6 +2388,12 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
             "address": SAFE_EXAMPLE_ADDRESS,
             "score": 0,
             "level": "safe",
+            "decision": "allow",
+            "recommended_policy": _policy_example(
+                "allow",
+                "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+                [],
+            ),
             "bytecode_size": 4632,
             "findings": [],
             "category_scores": {},
@@ -2611,7 +2723,8 @@ def create_app(
             "name": "Augur",
             "description": (
                 "Deterministic Base contract risk screening for agents on Base. "
-                "Runs deterministic bytecode detectors and returns a 0-100 score with findings."
+                "Runs deterministic bytecode detectors and returns a 0-100 score, "
+                "decision, and findings."
             ),
             "url": base_url,
             "provider": {
@@ -2895,13 +3008,15 @@ def create_app(
                 "Base mainnet smart contract bytecode risk scoring via x402. "
                 "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
                 "honeypot, hidden mint, fee manipulation, delegatecall, and "
-                "deployer reputation patterns. Returns a 0-100 risk score with findings."
+                "deployer reputation patterns. Returns a 0-100 risk score, "
+                "findings, and a first-pass policy recommendation."
             ),
             "description_for_model": (
                 "Analyze Base mainnet smart contract bytecode. "
                 "Send a Base contract address to /analyze and receive a 0-100 "
-                'risk score with detailed findings from 8 detectors. "safe" is '
-                "not a guarantee or audit result. Requires x402 payment of $0.10 USDC on Base."
+                "risk score, a default decision, and detailed findings from 8 "
+                'detectors. "safe" is not a guarantee or audit result. '
+                "Requires x402 payment of $0.10 USDC on Base."
             ),
             "auth": {"type": "none"},
             "api": {
@@ -2919,7 +3034,8 @@ def create_app(
             "name": "Augur",
             "description": (
                 "Deterministic Base contract risk screening for agents on Base. "
-                "Analyzes bytecode patterns and returns a 0-100 risk score with findings. "
+                "Analyzes bytecode patterns and returns a 0-100 risk score, "
+                "decision, and findings. "
                 "Pay $0.10/call via x402 in USDC on Base."
             ),
             "provider": {"organization": "risk-api"},
@@ -2989,6 +3105,8 @@ def create_app(
                 "## Output\n\n"
                 "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
                 "high=56-75, critical=76-100)\n"
+                "- `decision`: allow, warn, manual_review, or block\n"
+                "- `recommended_policy`: action, summary, and machine-readable reason codes\n"
                 '- `safe`: no major bytecode-level risk signals detected in this scan, not a guarantee\n'
                 "- `findings`: array of detector results with severity and points\n"
                 "- `category_scores`: per-category breakdown\n"
@@ -3036,7 +3154,7 @@ def create_app(
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
                 "selfdestruct, honeypot, hidden mint, fee manipulation, "
                 "delegatecall, deployer reputation) and returns a composite 0-100 "
-                'risk score with findings for first-pass screening decisions. "safe" is not a guarantee or audit. '
+                'risk score, default decision, and findings for first-pass screening decisions. "safe" is not a guarantee or audit. '
                 "Pay $0.10/call via x402 in USDC on Base. "
                 "Endpoint: GET /analyze?address={base_contract_address}"
             ),
@@ -3124,6 +3242,12 @@ def create_app(
             "address": result.address,
             "score": result.score,
             "level": result.level.value,
+            "decision": result.decision.value,
+            "recommended_policy": {
+                "action": result.recommended_policy.action.value,
+                "summary": result.recommended_policy.summary,
+                "reason_codes": result.recommended_policy.reason_codes,
+            },
             "bytecode_size": result.bytecode_size,
             "findings": [
                 {
