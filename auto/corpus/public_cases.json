@@ -1,0 +1,288 @@
+[
+  {
+    "id": "clean-contract-allow",
+    "name": "Clean bytecode stays allow",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["smoke", "policy"],
+    "bytecode": "0x608060405200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "expected": {
+      "score": 0,
+      "level": "safe",
+      "decision": "allow",
+      "reason_codes": [],
+      "findings_exclude": ["delegatecall", "proxy"]
+    }
+  },
+  {
+    "id": "raw-delegatecall-manual-review",
+    "name": "Raw delegatecall does not auto-allow at score 15",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "delegatecall"],
+    "blind_spot": "raw_delegatecall_allow_regression",
+    "bytecode": "0xf400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "expected": {
+      "decision": "manual_review",
+      "reason_codes_include": ["delegatecall_surface", "raw_delegatecall_surface"],
+      "findings_include": ["delegatecall"],
+      "category_scores_include": {
+        "delegatecall": 15
+      }
+    }
+  },
+  {
+    "id": "proxy-unresolved-manual-review",
+    "name": "Unresolved proxy logic forces manual review",
+    "kind": "policy",
+    "source": "public",
+    "tags": ["policy", "proxy"],
+    "blind_spot": "proxy_resolution_gap",
+    "input": {
+      "score": 20,
+      "level": "low",
+      "proxy_resolution_status": "unresolved",
+      "category_scores": {
+        "proxy": 20
+      },
+      "findings": [
+        {
+          "detector": "proxy",
+          "severity": "high",
+          "title": "Proxy implementation could not be resolved",
+          "description": "Augur could not resolve proxy logic.",
+          "points": 20
+        }
+      ]
+    },
+    "expected": {
+      "decision": "manual_review",
+      "reason_codes_include": ["proxy_logic_unresolved"]
+    }
+  },
+  {
+    "id": "proxy-nested-manual-review",
+    "name": "Nested proxy stop case forces manual review",
+    "kind": "policy",
+    "source": "public",
+    "tags": ["policy", "proxy"],
+    "blind_spot": "nested_proxy_stop",
+    "input": {
+      "score": 20,
+      "level": "low",
+      "proxy_resolution_status": "nested_proxy",
+      "category_scores": {
+        "proxy": 10,
+        "impl_proxy": 20
+      },
+      "findings": [
+        {
+          "detector": "proxy",
+          "severity": "info",
+          "title": "Proxy contract detected",
+          "description": "Proxy shell detected.",
+          "points": 10
+        },
+        {
+          "detector": "impl_proxy",
+          "severity": "high",
+          "title": "Implementation is itself a proxy",
+          "description": "Terminal logic was not analyzed.",
+          "points": 20
+        }
+      ]
+    },
+    "expected": {
+      "decision": "manual_review",
+      "reason_codes_include": [
+        "proxy_logic_unresolved",
+        "proxy_logic_nested_proxy"
+      ]
+    }
+  },
+  {
+    "id": "serialization-non-proxy-omits-implementation",
+    "name": "Non-proxy snapshots omit implementation instead of null",
+    "kind": "serialization",
+    "source": "public",
+    "tags": ["serializer", "docs"],
+    "blind_spot": "implementation_null_drift",
+    "snapshot": {
+      "address": "0x4200000000000000000000000000000000000006",
+      "score": 0,
+      "level": "safe",
+      "decision": "allow",
+      "recommended_policy": {
+        "action": "allow",
+        "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+        "reason_codes": []
+      },
+      "bytecode_size": 4632,
+      "findings": [],
+      "category_scores": {},
+      "implementation": null
+    },
+    "expected": {
+      "decision": "allow",
+      "missing_keys": ["implementation"]
+    }
+  },
+  {
+    "id": "serialization-impl-scores-stay-unprefixed",
+    "name": "Nested implementation category scores stay unprefixed",
+    "kind": "serialization",
+    "source": "public",
+    "tags": ["serializer", "docs"],
+    "blind_spot": "impl_category_prefix_drift",
+    "snapshot": {
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "score": 50,
+      "level": "medium",
+      "decision": "manual_review",
+      "recommended_policy": {
+        "action": "manual_review",
+        "summary": "Escalate before interaction. Use a human review step or a heavier tool before the workflow proceeds.",
+        "reason_codes": [
+          "elevated_risk_score",
+          "upgradeable_proxy",
+          "selfdestruct_signal",
+          "delegatecall_surface"
+        ]
+      },
+      "bytecode_size": 234,
+      "findings": [
+        {
+          "detector": "delegatecall",
+          "severity": "info",
+          "title": "DELEGATECALL in proxy pattern",
+          "description": "Expected proxy delegatecall.",
+          "points": 10
+        },
+        {
+          "detector": "proxy",
+          "severity": "info",
+          "title": "Proxy contract detected",
+          "description": "Proxy shell detected.",
+          "points": 10
+        },
+        {
+          "detector": "impl_selfdestruct",
+          "severity": "critical",
+          "title": "SELFDESTRUCT opcode found",
+          "description": "Implementation selfdestruct detected.",
+          "points": 30
+        }
+      ],
+      "category_scores": {
+        "delegatecall": 10,
+        "proxy": 10,
+        "impl_selfdestruct": 30
+      },
+      "implementation": {
+        "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
+        "bytecode_size": 201,
+        "findings": [
+          {
+            "detector": "impl_selfdestruct",
+            "severity": "critical",
+            "title": "SELFDESTRUCT opcode found",
+            "description": "Implementation selfdestruct detected.",
+            "points": 30
+          }
+        ],
+        "category_scores": {
+          "selfdestruct": 30
+        }
+      }
+    },
+    "expected": {
+      "present_keys": ["implementation"],
+      "implementation_category_scores_include": {
+        "selfdestruct": 30
+      },
+      "implementation_category_scores_exclude": ["impl_selfdestruct"]
+    }
+  },
+  {
+    "id": "hidden-mint-block",
+    "name": "Hidden mint blocks first-pass automation",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "hidden_mint"],
+    "blind_spot": "hidden_mint_permissive_policy",
+    "bytecode": "0x63a0712d68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "expected": {
+      "decision": "block",
+      "reason_codes_include": ["hidden_mint_signal"]
+    }
+  },
+  {
+    "id": "honeypot-blacklist-block",
+    "name": "Blacklist-style honeypot blocks first-pass automation",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "honeypot"],
+    "blind_spot": "honeypot_permissive_policy",
+    "bytecode": "0x63a9059cbb6344337ea10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "expected": {
+      "decision": "block",
+      "reason_codes_include": ["honeypot_signal"]
+    }
+  },
+  {
+    "id": "selfdestruct-manual-review",
+    "name": "Raw selfdestruct requires manual review",
+    "kind": "policy",
+    "source": "public",
+    "tags": ["policy", "selfdestruct"],
+    "blind_spot": "selfdestruct_warn_regression",
+    "input": {
+      "score": 30,
+      "level": "low",
+      "category_scores": {
+        "selfdestruct": 30
+      },
+      "findings": [
+        {
+          "detector": "selfdestruct",
+          "severity": "critical",
+          "title": "SELFDESTRUCT opcode found",
+          "description": "Contract contains SELFDESTRUCT.",
+          "points": 30
+        }
+      ]
+    },
+    "expected": {
+      "decision": "manual_review",
+      "reason_codes_include": ["selfdestruct_signal"]
+    }
+  },
+  {
+    "id": "fee-manipulation-warn",
+    "name": "Owner fee controls do not auto-allow",
+    "kind": "policy",
+    "source": "public",
+    "tags": ["policy", "fee_manipulation"],
+    "blind_spot": "fee_manipulation_safe_allow",
+    "input": {
+      "score": 15,
+      "level": "safe",
+      "category_scores": {
+        "fee_manipulation": 15
+      },
+      "findings": [
+        {
+          "detector": "fee_manipulation",
+          "severity": "high",
+          "title": "Fee/limit manipulation functions detected",
+          "description": "Owner can change fees or transaction limits.",
+          "points": 15
+        }
+      ]
+    },
+    "expected": {
+      "decision": "warn",
+      "reason_codes_include": ["fee_manipulation_signal"]
+    }
+  }
+]

@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from flask import Flask, Response, current_app, jsonify, redirect, request
 
+from risk_api.api_contract import normalize_analysis_snapshot, serialize_analysis_result
 from risk_api.analytics import (
     append_sqlite_entry,
     build_stats_payload,
@@ -22,6 +23,7 @@ from risk_api.analytics import (
     iter_sqlite_entries,
 )
 from risk_api.analysis.engine import NoBytecodeError, analyze_contract
+from risk_api.analysis.policy import PolicyReasonCode
 from risk_api.chain.rpc import RPCError, get_code
 from risk_api.config import Config, load_config
 from risk_api.proof_reports import REPORT_PAGES, render_report_page
@@ -50,6 +52,108 @@ def _policy_example(
         "summary": summary,
         "reason_codes": reason_codes,
     }
+
+
+SAFE_ANALYSIS_EXAMPLE = normalize_analysis_snapshot({
+    "address": SAFE_EXAMPLE_ADDRESS,
+    "score": 0,
+    "level": "safe",
+    "decision": "allow",
+    "recommended_policy": _policy_example(
+        "allow",
+        "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+        [],
+    ),
+    "bytecode_size": 4632,
+    "findings": [],
+    "category_scores": {},
+})
+
+PROXY_ANALYSIS_EXAMPLE = normalize_analysis_snapshot({
+    "address": PROXY_EXAMPLE_ADDRESS,
+    "score": 50,
+    "level": "medium",
+    "decision": "manual_review",
+    "recommended_policy": _policy_example(
+        "manual_review",
+        "Escalate before interaction. Use a human review step or a heavier tool before the workflow proceeds.",
+        [
+            PolicyReasonCode.ELEVATED_RISK_SCORE.value,
+            PolicyReasonCode.UPGRADEABLE_PROXY.value,
+            PolicyReasonCode.SELFDESTRUCT_SIGNAL.value,
+            PolicyReasonCode.DELEGATECALL_SURFACE.value,
+        ],
+    ),
+    "bytecode_size": 234,
+    "findings": [
+        {
+            "detector": "delegatecall",
+            "severity": "info",
+            "title": "DELEGATECALL in proxy pattern",
+            "description": (
+                "Contract uses DELEGATECALL with standard proxy storage slots "
+                "(EIP-1967/1822). This is expected proxy behavior."
+            ),
+            "points": 10,
+        },
+        {
+            "detector": "proxy",
+            "severity": "info",
+            "title": "Proxy contract detected",
+            "description": (
+                "Contract uses standard proxy storage slots (EIP-1967 or EIP-1822). "
+                "The implementation contract should also be analyzed."
+            ),
+            "points": 10,
+        },
+        {
+            "detector": "impl_selfdestruct",
+            "severity": "critical",
+            "title": "SELFDESTRUCT opcode found",
+            "description": (
+                "Contract contains SELFDESTRUCT which allows the owner to destroy "
+                "the contract and drain all funds."
+            ),
+            "points": 30,
+        },
+    ],
+    "category_scores": {
+        "delegatecall": 10,
+        "proxy": 10,
+        "impl_selfdestruct": 30,
+    },
+    "implementation": {
+        "address": PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS,
+        "bytecode_size": 201,
+        "findings": [
+            {
+                "detector": "impl_selfdestruct",
+                "severity": "critical",
+                "title": "SELFDESTRUCT opcode found",
+                "description": (
+                    "Contract contains SELFDESTRUCT which allows the owner to "
+                    "destroy the contract and drain all funds."
+                ),
+                "points": 30,
+            }
+        ],
+        "category_scores": {
+            "selfdestruct": 30,
+        },
+    },
+    "proxy_resolution_status": "resolved",
+})
+
+SAFE_ANALYSIS_EXAMPLE_JSON = json.dumps(SAFE_ANALYSIS_EXAMPLE, indent=2)
+PROXY_ANALYSIS_EXAMPLE_JSON = json.dumps(PROXY_ANALYSIS_EXAMPLE, indent=2)
+
+
+def _render_machine_doc(template: str, base_url: str) -> str:
+    return (
+        template.replace("__BASE_URL__", base_url)
+        .replace("__SAFE_ANALYSIS_EXAMPLE_JSON__", SAFE_ANALYSIS_EXAMPLE_JSON)
+        .replace("__PROXY_ANALYSIS_EXAMPLE_JSON__", PROXY_ANALYSIS_EXAMPLE_JSON)
+    )
 
 
 def _extract_requested_address() -> str:
@@ -178,90 +282,13 @@ OPENAPI_SPEC: dict[str, object] = {
                                         "summary": (
                                             "Simple Base contract - no risk findings in this scan"
                                         ),
-                                        "value": {
-                                            "address": SAFE_EXAMPLE_ADDRESS,
-                                            "score": 0,
-                                            "level": "safe",
-                                            "decision": "allow",
-                                            "recommended_policy": _policy_example(
-                                                "allow",
-                                                "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
-                                                [],
-                                            ),
-                                            "bytecode_size": 4632,
-                                            "findings": [],
-                                            "category_scores": {},
-                                        },
+                                        "value": SAFE_ANALYSIS_EXAMPLE,
                                     },
                                     "proxy_contract": {
                                         "summary": (
-                                            "Proxy contract - high risk with implementation analysis"
+                                            "Proxy contract - resolved implementation requires manual review"
                                         ),
-                                        "value": {
-                                            "address": PROXY_EXAMPLE_ADDRESS,
-                                            "score": 60,
-                                            "level": "high",
-                                            "decision": "block",
-                                            "recommended_policy": _policy_example(
-                                                "block",
-                                                "Block automatic interaction by default. Only proceed with an explicit override after deeper review.",
-                                                [
-                                                    "high_risk_score",
-                                                    "upgradeable_proxy",
-                                                    "hidden_mint_signal",
-                                                    "honeypot_signal",
-                                                    "delegatecall_surface",
-                                                    "suspicious_selector_signal",
-                                                ],
-                                            ),
-                                            "bytecode_size": 1485,
-                                            "findings": [
-                                                {
-                                                    "detector": "proxy",
-                                                    "severity": "medium",
-                                                    "title": "EIP-1967 Proxy Detected",
-                                                    "description": "Contract uses the EIP-1967 transparent proxy pattern. Logic resides in a separate implementation contract that can be upgraded.",
-                                                    "points": 20,
-                                                },
-                                                {
-                                                    "detector": "delegatecall",
-                                                    "severity": "medium",
-                                                    "title": "Delegatecall Usage",
-                                                    "description": "Contract uses DELEGATECALL to execute code from another contract.",
-                                                    "points": 15,
-                                                },
-                                            ],
-                                            "category_scores": {
-                                                "proxy": 20,
-                                                "delegatecall": 15,
-                                                "impl_delegatecall": 15,
-                                                "impl_hidden_mint": 10,
-                                            },
-                                            "implementation": {
-                                                "address": PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS,
-                                                "bytecode_size": 24576,
-                                                "findings": [
-                                                    {
-                                                        "detector": "impl_delegatecall",
-                                                        "severity": "medium",
-                                                        "title": "Implementation Uses Delegatecall",
-                                                        "description": "The implementation contract also uses DELEGATECALL.",
-                                                        "points": 15,
-                                                    },
-                                                    {
-                                                        "detector": "impl_hidden_mint",
-                                                        "severity": "medium",
-                                                        "title": "Implementation Has Hidden Mint",
-                                                        "description": "The implementation contract contains patterns consistent with unauthorized token minting.",
-                                                        "points": 10,
-                                                    },
-                                                ],
-                                                "category_scores": {
-                                                    "impl_delegatecall": 15,
-                                                    "impl_hidden_mint": 10,
-                                                },
-                                            },
-                                        },
+                                        "value": PROXY_ANALYSIS_EXAMPLE,
                                     },
                                 },
                             }
@@ -359,20 +386,7 @@ OPENAPI_SPEC: dict[str, object] = {
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
-                                "example": {
-                                    "address": SAFE_EXAMPLE_ADDRESS,
-                                    "score": 0,
-                                    "level": "safe",
-                                    "decision": "allow",
-                                    "recommended_policy": _policy_example(
-                                        "allow",
-                                        "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
-                                        [],
-                                    ),
-                                    "bytecode_size": 4632,
-                                    "findings": [],
-                                    "category_scores": {},
-                                },
+                                "example": SAFE_ANALYSIS_EXAMPLE,
                             }
                         },
                     },
@@ -557,13 +571,21 @@ OPENAPI_SPEC: dict[str, object] = {
                     },
                     "reason_codes": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {"$ref": "#/components/schemas/PolicyReasonCode"},
                         "description": (
                             "Stable machine-readable reasons that explain the recommendation."
                         ),
                     },
                 },
                 "required": ["action", "summary", "reason_codes"],
+            },
+            "PolicyReasonCode": {
+                "type": "string",
+                "enum": [reason_code.value for reason_code in PolicyReasonCode],
+                "description": (
+                    "Stable machine-readable policy reason code emitted in "
+                    "recommended_policy.reason_codes."
+                ),
             },
         },
         "securitySchemes": {
@@ -1949,20 +1971,7 @@ Any x402-compatible HTTP client handles this automatically.
 ## Example Response
 
 ```json
-{
-  "address": "0x4200000000000000000000000000000000000006",
-  "score": 0,
-  "level": "safe",
-  "decision": "allow",
-  "recommended_policy": {
-    "action": "allow",
-    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
-    "reason_codes": []
-  },
-  "bytecode_size": 4632,
-  "findings": [],
-  "category_scores": {}
-}
+__SAFE_ANALYSIS_EXAMPLE_JSON__
 ```
 
 ## Risk Levels
@@ -2026,20 +2035,7 @@ Content-Type: application/json
 ## Output Shape
 
 ```json
-{
-  "address": "0x4200000000000000000000000000000000000006",
-  "score": 0,
-  "level": "safe",
-  "decision": "allow",
-  "recommended_policy": {
-    "action": "allow",
-    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
-    "reason_codes": []
-  },
-  "bytecode_size": 4632,
-  "findings": [],
-  "category_scores": {}
-}
+__SAFE_ANALYSIS_EXAMPLE_JSON__
 ```
 
 Risk levels:
@@ -2131,72 +2127,10 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 }
 ```
 
-## Example: High-Risk Proxy Contract
+## Example: Proxy Contract With Resolved Implementation
 
 ```json
-{
-  "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "score": 60,
-  "level": "high",
-  "decision": "block",
-  "recommended_policy": {
-    "action": "block",
-    "summary": "Block automatic interaction by default. Only proceed with an explicit override after deeper review.",
-    "reason_codes": [
-      "high_risk_score",
-      "upgradeable_proxy",
-      "hidden_mint_signal",
-      "honeypot_signal",
-      "delegatecall_surface",
-      "suspicious_selector_signal"
-    ]
-  },
-  "bytecode_size": 1485,
-  "findings": [
-    {
-      "detector": "proxy",
-      "severity": "medium",
-      "title": "EIP-1967 Proxy Detected",
-      "description": "Contract uses the EIP-1967 transparent proxy pattern.",
-      "points": 20
-    },
-    {
-      "detector": "delegatecall",
-      "severity": "medium",
-      "title": "Delegatecall Usage",
-      "description": "Contract uses DELEGATECALL to execute code from another contract.",
-      "points": 15
-    }
-  ],
-  "category_scores": {
-    "proxy": 20,
-    "delegatecall": 15,
-    "impl_delegatecall": 15,
-    "impl_hidden_mint": 10
-  },
-  "implementation": {
-    "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
-    "bytecode_size": 24576,
-    "findings": [
-      {
-        "detector": "impl_delegatecall",
-        "severity": "medium",
-        "title": "Implementation Uses Delegatecall",
-        "points": 15
-      },
-      {
-        "detector": "impl_hidden_mint",
-        "severity": "medium",
-        "title": "Implementation Has Hidden Mint",
-        "points": 10
-      }
-    ],
-    "category_scores": {
-      "impl_delegatecall": 15,
-      "impl_hidden_mint": 10
-    }
-  }
-}
+__PROXY_ANALYSIS_EXAMPLE_JSON__
 ```
 
 ## Response Schema
@@ -2383,21 +2317,7 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
             "required": ["address"],
         }
         example_input = {"address": SAFE_EXAMPLE_ADDRESS}
-
-        example_output = {
-            "address": SAFE_EXAMPLE_ADDRESS,
-            "score": 0,
-            "level": "safe",
-            "decision": "allow",
-            "recommended_policy": _policy_example(
-                "allow",
-                "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
-                [],
-            ),
-            "bytecode_size": 4632,
-            "findings": [],
-            "category_scores": {},
-        }
+        example_output = SAFE_ANALYSIS_EXAMPLE
 
         get_bazaar = declare_discovery_extension(
             input=example_input,
@@ -2902,7 +2822,7 @@ def create_app(
     def skill_md():
         request.environ["funnel_stage"] = "skill_doc_fetch"
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
-        body = SKILL_MD.replace("__BASE_URL__", base_url)
+        body = _render_machine_doc(SKILL_MD, base_url)
         return Response(body, content_type="text/plain; charset=utf-8")
 
     @app.route("/reports/<path:slug>")
@@ -3074,13 +2994,13 @@ def create_app(
     @app.route("/llms.txt")
     def llms_txt():
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
-        body = LLMS_TXT.replace("__BASE_URL__", base_url)
+        body = _render_machine_doc(LLMS_TXT, base_url)
         return Response(body, content_type="text/plain; charset=utf-8")
 
     @app.route("/llms-full.txt")
     def llms_full_txt():
         base_url = app.config.get("PUBLIC_URL") or request.url_root.rstrip("/")
-        body = LLMS_FULL_TXT.replace("__BASE_URL__", base_url)
+        body = _render_machine_doc(LLMS_FULL_TXT, base_url)
         return Response(body, content_type="text/plain; charset=utf-8")
 
     @app.route("/.well-known/x402")
@@ -3238,48 +3158,6 @@ def create_app(
         else:
             request.environ["funnel_stage"] = "analyze_success"
 
-        response_data: dict[str, object] = {
-            "address": result.address,
-            "score": result.score,
-            "level": result.level.value,
-            "decision": result.decision.value,
-            "recommended_policy": {
-                "action": result.recommended_policy.action.value,
-                "summary": result.recommended_policy.summary,
-                "reason_codes": result.recommended_policy.reason_codes,
-            },
-            "bytecode_size": result.bytecode_size,
-            "findings": [
-                {
-                    "detector": f.detector,
-                    "severity": f.severity.value,
-                    "title": f.title,
-                    "description": f.description,
-                    "points": f.points,
-                }
-                for f in result.findings
-            ],
-            "category_scores": result.category_scores,
-        }
-
-        if result.implementation is not None:
-            impl = result.implementation
-            response_data["implementation"] = {
-                "address": impl.address,
-                "bytecode_size": impl.bytecode_size,
-                "findings": [
-                    {
-                        "detector": f.detector,
-                        "severity": f.severity.value,
-                        "title": f.title,
-                        "description": f.description,
-                        "points": f.points,
-                    }
-                    for f in impl.findings
-                ],
-                "category_scores": impl.category_scores,
-            }
-
-        return jsonify(response_data)
+        return jsonify(serialize_analysis_result(result))
 
     return app

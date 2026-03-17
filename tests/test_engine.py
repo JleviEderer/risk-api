@@ -9,7 +9,7 @@ from risk_api.analysis.engine import (
     resolve_implementation,
 )
 from risk_api.analysis.patterns import EIP_1822_SLOT, EIP_1967_IMPL_SLOT
-from risk_api.analysis.policy import PolicyAction
+from risk_api.analysis.policy import PolicyAction, PolicyReasonCode, ProxyResolutionStatus
 from risk_api.analysis.scoring import RiskLevel
 from risk_api.chain.rpc import RPCError, clear_cache
 
@@ -85,12 +85,61 @@ def test_analyze_contract_with_selfdestruct():
     responses.post(RPC_URL, json=_rpc_response(bytecode))
     result = analyze_contract("0x" + "cd" * 20, RPC_URL)
     assert result.score >= 30
-    assert result.decision in {
-        PolicyAction.WARN,
-        PolicyAction.MANUAL_REVIEW,
-        PolicyAction.BLOCK,
-    }
+    assert result.decision == PolicyAction.MANUAL_REVIEW
+    assert PolicyReasonCode.SELFDESTRUCT_SIGNAL.value in result.recommended_policy.reason_codes
     assert any(f.detector == "selfdestruct" for f in result.findings)
+
+
+@responses.activate
+def test_analyze_raw_delegatecall_requires_manual_review_even_when_score_is_safe():
+    bytecode = "0x" + "f4" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "de" * 20, RPC_URL)
+
+    assert result.score == 15
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.MANUAL_REVIEW
+    assert PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
+def test_analyze_hidden_mint_blocks_even_when_level_is_low():
+    bytecode = "0x63a0712d68" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "ba" * 20, RPC_URL)
+
+    assert result.score == 25
+    assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.BLOCK
+    assert PolicyReasonCode.HIDDEN_MINT_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
+def test_analyze_honeypot_blacklist_blocks_even_when_level_is_low():
+    bytecode = "0x63a9059cbb6344337ea1" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "ac" * 20, RPC_URL)
+
+    assert result.score == 25
+    assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.BLOCK
+    assert PolicyReasonCode.HONEYPOT_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
+def test_analyze_fee_manipulation_warns_even_when_score_is_safe():
+    bytecode = "0x6369fe0e2d" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "f1" * 20, RPC_URL)
+
+    assert result.score == 15
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.WARN
+    assert PolicyReasonCode.FEE_MANIPULATION_SIGNAL.value in result.recommended_policy.reason_codes
 
 
 @responses.activate
@@ -121,6 +170,8 @@ def test_analyze_proxy_contract():
     assert result.score == 40
     assert result.level == RiskLevel.MEDIUM
     assert result.decision == PolicyAction.MANUAL_REVIEW
+    assert result.proxy_resolution_status == ProxyResolutionStatus.UNRESOLVED
+    assert PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value in result.recommended_policy.reason_codes
     assert any(
         f.title == "Proxy implementation could not be resolved"
         for f in result.findings
@@ -209,6 +260,7 @@ def test_analyze_proxy_resolves_implementation():
     assert result.score >= 50
     assert "impl_selfdestruct" in result.category_scores
     assert result.decision == PolicyAction.MANUAL_REVIEW
+    assert result.proxy_resolution_status == ProxyResolutionStatus.RESOLVED
     assert any(f.detector == "impl_selfdestruct" for f in result.findings)
 
 
@@ -286,6 +338,7 @@ def test_analyze_proxy_storage_rpc_failure():
     assert any(f.detector == "proxy" for f in result.findings)
     assert result.score == 40
     assert result.level == RiskLevel.MEDIUM
+    assert result.proxy_resolution_status == ProxyResolutionStatus.UNRESOLVED
     assert any(
         f.title == "Proxy implementation could not be resolved"
         for f in result.findings
@@ -310,6 +363,9 @@ def test_analyze_proxy_implementation_is_also_proxy():
     assert any(f.detector == "impl_delegatecall" for f in result.findings)
     assert result.score == 50
     assert result.level == RiskLevel.MEDIUM
+    assert result.proxy_resolution_status == ProxyResolutionStatus.NESTED_PROXY
+    assert PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value in result.recommended_policy.reason_codes
+    assert PolicyReasonCode.PROXY_LOGIC_NESTED_PROXY.value in result.recommended_policy.reason_codes
 
 
 @responses.activate
@@ -328,8 +384,31 @@ def test_analyze_proxy_impl_bytecode_fetch_fails():
     assert result.implementation is None
     assert result.score == 40
     assert result.level == RiskLevel.MEDIUM
+    assert result.proxy_resolution_status == ProxyResolutionStatus.FETCH_FAILED
+    assert PolicyReasonCode.PROXY_LOGIC_FETCH_FAILED.value in result.recommended_policy.reason_codes
     assert any(
         f.title == "Proxy implementation could not be analyzed"
+        for f in result.findings
+    )
+
+
+@responses.activate
+def test_analyze_proxy_impl_address_has_no_code():
+    """Implementation address resolved but eth_getCode returns 0x."""
+    proxy_addr = "0x" + "c4" * 20
+    responses.post(RPC_URL, json=_rpc_response(_proxy_bytecode()))
+    responses.post(RPC_URL, json=_rpc_response(IMPL_ADDR_PADDED))
+    responses.post(RPC_URL, json=_rpc_response("0x"))
+
+    result = analyze_contract(proxy_addr, RPC_URL)
+
+    assert result.implementation is None
+    assert result.score == 40
+    assert result.level == RiskLevel.MEDIUM
+    assert result.proxy_resolution_status == ProxyResolutionStatus.NO_CODE
+    assert PolicyReasonCode.PROXY_LOGIC_NO_CODE.value in result.recommended_policy.reason_codes
+    assert any(
+        f.title == "Proxy implementation has no bytecode"
         for f in result.findings
     )
 

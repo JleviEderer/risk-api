@@ -23,3 +23,6 @@ docs/BizPlanning.local.md
 docs/DECISIONS.local.md
 docs/x402-landscape-research.local.md
 docs/autonomous-agent-operations-field-guide.local.md
+auto/**/*.local.json
+auto/runs/
+auto/notes.local.md

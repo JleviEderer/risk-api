@@ -4,8 +4,8 @@
 - Date: 2026-03-16
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `9429489`
-- Status: green; local worktree has the new decision-output pass in progress
+- HEAD: `9cf5e0f`
+- Status: green; local worktree is clean except for untracked local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`)
 
 ## What Changed
 - Added a strategy memo that locks the current wedge:
@@ -75,7 +75,11 @@
   - `https://augurrisk.com/honeypot-detection-api`
 - Added a real first-pass policy layer to the live `/analyze` response:
   - new top-level fields: `decision` and `recommended_policy`
-  - default mapping is `allow` for `safe`, `warn` for `low`, `manual_review` for `medium` or unresolved proxy logic, and `block` for `high` / `critical`
+  - default mapping is now rule-based rather than score-band-only:
+    - `allow` only for clean `safe` results with no reason codes
+    - `warn` for `low` results and `safe` results that still carry non-blocking signals
+    - `manual_review` for `medium`, unresolved proxy logic, raw `DELEGATECALL`, or `SELFDESTRUCT`
+    - `block` for `high` / `critical`, hidden mint, or honeypot signals
   - `recommended_policy` now returns `action`, `summary`, and stable `reason_codes`
 - Updated all machine-readable surfaces and examples to reflect the real policy output:
   - OpenAPI examples and `AnalysisResult` schema in `src/risk_api/app.py`
@@ -85,6 +89,60 @@
 - Added coverage for the policy layer:
   - new unit tests in `tests/test_policy.py`
   - engine and app tests now verify `decision` / `recommended_policy`
+- Tightened the first-pass policy and example contract after review:
+  - raw singleton `delegatecall` now forces at least `manual_review` via a policy override instead of slipping through as `allow`
+  - proxy handling now carries structured resolution status (`resolved`, `unresolved`, `fetch_failed`, `nested_proxy`) from the engine into policy/reason-code derivation
+  - OpenAPI examples, machine docs, and proof-report snapshot JSON now round-trip through the live serializer so `implementation` omission and nested implementation shapes stay aligned
+  - OpenAPI now publishes a `PolicyReasonCode` enum for `recommended_policy.reason_codes`
+- Put the new autoresearch harness to work with hidden local corpora:
+  - added local ignored files `auto/corpus/holdout.local.json` and `auto/candidates/discovered-2026-03-16.local.json`
+  - first run surfaced four real policy blind spots: `hidden_mint_permissive_policy`, `honeypot_permissive_policy`, `selfdestruct_warn_regression`, and `fee_manipulation_safe_allow`
+  - after tightening `derive_policy()`, `python auto/bench.py --json-out auto/runs/latest.json` is green again with those local holdouts loaded
+- Tightened first-pass policy precedence from the autoresearch findings:
+  - `hidden_mint` and `honeypot` now block even when the numeric score is only `low`
+  - `SELFDESTRUCT` now forces at least `manual_review` even when the numeric score is only `low`
+  - `safe` results with residual non-blocking reason codes now warn instead of auto-allowing
+  - added targeted regressions in `tests/test_policy.py`, `tests/test_engine.py`, and `tests/test_app.py`
+- Added a bounded local autoresearch harness for detector and API-contract regressions:
+  - entrypoint: `python auto/bench.py`
+  - latest known-good run: `python auto/bench.py --json-out auto/runs/latest.json`
+  - tracked starter corpus: `auto/corpus/public_cases.json`
+  - agent prompt: `auto/program.md`
+  - reusable benchmark logic: `src/risk_api/auto_bench.py`
+  - local holdouts and candidate discoveries live in ignored `*.local.json` files under `auto/corpus/` and `auto/candidates/`
+  - built-in checks cover policy regressions, serializer/doc drift, OpenAPI examples, machine docs, and proof-report shape
+- Closed a proof-report semantic drift gap after independent review:
+  - `src/risk_api/proof_reports.py` now aligns the embedded WETH and USDC snapshot policy output with current `derive_policy()` semantics
+  - `src/risk_api/auto_bench.py` now fails if any proof-report snapshot embeds stale `decision` / `recommended_policy` values relative to current policy logic
+  - `tests/test_app.py` now asserts proof-report snapshots still match live policy semantics
+  - `tests/test_auto_bench.py` now proves the bench catches stale proof-report policy examples
+- Wired the tracked public autoresearch corpus into GitHub Actions:
+  - `.github/workflows/typecheck.yml` now runs `python auto/bench.py auto/corpus/public_cases.json` in CI
+  - local verification passed with 11/11 public checks green
+- Added a thin autoresearch loop runner for day-to-day use:
+  - new wrapper: `python auto/loop.py`
+  - implementation: `src/risk_api/auto_loop.py`
+  - writes `auto/runs/latest.json` by default and prints a compact failure summary grouped by blind spot
+  - supports `--allow-failures`, `--skip-app-contract-checks`, optional custom case paths, and optional `--json-out`
+  - covered by `tests/test_auto_loop.py`
+- Split resolved-proxy `eth_getCode == 0x` from transport failures:
+  - `ProxyResolutionStatus` now includes `no_code`
+  - `PolicyReasonCode` now includes `proxy_logic_no_code`
+  - resolved implementation addresses with no deployed bytecode still map to `manual_review`, but no longer collapse into `fetch_failed`
+  - engine/app/policy tests now cover the `Proxy implementation has no bytecode` path
+- Promoted the four highest-signal local policy blind spots into the tracked public corpus:
+  - promoted to `auto/corpus/public_cases.json`: hidden mint -> `block`, honeypot -> `block`, selfdestruct -> `manual_review`, fee manipulation -> `warn`
+  - intentionally left the low-score resolved-proxy `warn` case in local holdouts because the tracked corpus already covers unresolved and nested proxy semantics and should stay compact
+- Committed and deployed the policy-output pass:
+  - commit: `9cf5e0f` (`Add first-pass policy decisions to analyze`)
+  - verified live `https://augurrisk.com/skill.md`
+  - verified live `https://augurrisk.com/llms-full.txt`
+  - verified live `https://augurrisk.com/openapi.json`
+  - verified live `402` discovery output from `GET /analyze`
+- Checked the live dashboard/stats surfaces after deployment:
+  - `/stats` and `/dashboard` are still instance-local operational views, not canonical analytics
+  - the most recent visible `402` row can be polluted by our own verification probes
+  - `curl/...` user agents are a useful intentional CLI/script signal, but they do not prove a human was manually at the keyboard
 
 ## Current Read
 - Current product-scope rule:
@@ -125,7 +183,23 @@
 - Current product-output rule:
   - Augur now returns explicit first-pass policy outputs: `decision` and `recommended_policy`
   - `recommended_policy` currently includes `action`, `summary`, and `reason_codes`
+  - `allow` should be reserved for clean `safe` outputs with no reason codes
+  - `hidden_mint` and `honeypot` should block even at `low`
+  - raw non-proxy `delegatecall` and `SELFDESTRUCT` should never auto-allow or stay at plain `warn` just because the numeric score is low
+  - unresolved proxy logic should be carried as structured engine state and stable reason codes, not inferred from human-readable finding titles
+  - treat `fetch_failed` (RPC/lookup failure) separately from `no_code` (implementation address resolved but has no deployed bytecode)
+  - machine-facing examples should be produced through the same serializer as the live `/analyze` route
   - this is a default first-pass recommendation layer, not a replacement for caller-specific policy logic
+- Current detector-research rule:
+  - use `auto/bench.py` as the bounded local harness for adversarial bytecode, policy edge cases, and API-contract drift
+  - prefer adding a reproducible case before changing implementation
+  - keep local holdout corpora untracked so the loop cannot merely overfit the visible tracked corpus
+  - current tracked corpus is intentionally small; the next useful work is adding real hidden holdout cases under `auto/corpus/*.local.json`
+  - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
+- Current analytics read:
+  - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
+  - interpret recent `402` rows carefully if you have just run your own probes against `/analyze`
+  - treat `curl/...` as intentional CLI or scripted traffic, not as hard proof of human-origin traffic
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - Current next step is still `G-015`: use the live proof report for targeted distribution and watch for qualified traffic.
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
@@ -146,6 +220,12 @@
   - `vault-synth` now excludes its own saved notes from default retrieval so synthesis output does not become a self-referential source on later runs
 
 ## Recommended Next Steps
+### Autoresearch Todo
+- [x] Objective 1: put the public autoresearch bench in CI with `python auto/bench.py auto/corpus/public_cases.json`
+- [x] Objective 2: add a thin `auto/loop.py` runner that writes `auto/runs/latest.json` and prints a compact failure summary
+- [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
+- [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
+
 1. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
 2. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
@@ -163,7 +243,12 @@
 7. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
 8. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
 9. Validate the new policy outputs on real Base contracts and tighten the mapping if any obvious blue-chip or proxy cases feel operationally wrong.
-10. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
+10. Use real `/stats` and paid-call observations to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
+11. In the next session, put the new autoresearch harness to work:
+   - decide which of the new local hidden-mint / honeypot / selfdestruct / fee-policy cases deserve promotion into `auto/corpus/public_cases.json`
+   - add the next batch of real hidden holdouts under `auto/corpus/*.local.json`
+   - keep using `python auto/bench.py` before detector or policy edits
+12. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback

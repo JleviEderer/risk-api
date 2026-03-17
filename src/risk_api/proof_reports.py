@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from html import escape
 
+from risk_api.api_contract import normalize_analysis_snapshot
+
 REPORT_PAGES: dict[str, dict[str, object]] = {
     "/reports/base-bluechip-bytecode-snapshot": {
         "title": "Base Blue-Chip Bytecode Snapshot",
@@ -38,12 +40,12 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                     "address": "0x4200000000000000000000000000000000000006",
                     "score": 25,
                     "level": "low",
-                    "decision": "warn",
+                    "decision": "block",
                     "recommended_policy": {
-                        "action": "warn",
+                        "action": "block",
                         "summary": (
-                            "Allow with caution. Log the findings and keep the "
-                            "contract on a watchlist or secondary review path."
+                            "Block automatic interaction by default. Only proceed "
+                            "with an explicit override after deeper review."
                         ),
                         "reason_codes": ["honeypot_signal"],
                     },
@@ -68,8 +70,10 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                 "interpretation": (
                     "Augur assigns a low score, not a clean zero. That matters because it "
                     "shows the engine is conservative around transfer-path control flow. "
-                    "For a blue-chip wrapped asset, this should trigger human review rather "
-                    "than automatic rejection."
+                    "Under the current first-pass policy layer, that still maps to a default "
+                    "block. For a blue-chip wrapped asset, this should be read as a "
+                    "conservative bytecode flag that demands context and override logic, not "
+                    "as a naive fraud label."
                 ),
             },
             {
@@ -91,6 +95,7 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                             "hidden_mint_signal",
                             "honeypot_signal",
                             "delegatecall_surface",
+                            "raw_delegatecall_surface",
                             "suspicious_selector_signal",
                         ],
                     },
@@ -368,7 +373,7 @@ def render_report_page(base_url: str, path: str) -> str:
     contract_sections: list[str] = []
     for contract in report["contracts"]:
         contract_name = str(contract["name"])
-        snapshot = dict(contract["snapshot"])
+        snapshot = normalize_analysis_snapshot(dict(contract["snapshot"]))
         address = str(snapshot["address"])
         score = int(snapshot["score"])
         level = str(snapshot["level"])

@@ -16,6 +16,35 @@ class PolicyAction(str, Enum):
     BLOCK = "block"
 
 
+class ProxyResolutionStatus(str, Enum):
+    NOT_PROXY = "not_proxy"
+    RESOLVED = "resolved"
+    UNRESOLVED = "unresolved"
+    FETCH_FAILED = "fetch_failed"
+    NO_CODE = "no_code"
+    NESTED_PROXY = "nested_proxy"
+
+
+class PolicyReasonCode(str, Enum):
+    PROXY_LOGIC_UNRESOLVED = "proxy_logic_unresolved"
+    PROXY_LOGIC_FETCH_FAILED = "proxy_logic_fetch_failed"
+    PROXY_LOGIC_NO_CODE = "proxy_logic_no_code"
+    PROXY_LOGIC_NESTED_PROXY = "proxy_logic_nested_proxy"
+    HIGH_RISK_SCORE = "high_risk_score"
+    ELEVATED_RISK_SCORE = "elevated_risk_score"
+    UPGRADEABLE_PROXY = "upgradeable_proxy"
+    HIDDEN_MINT_SIGNAL = "hidden_mint_signal"
+    HONEYPOT_SIGNAL = "honeypot_signal"
+    SELFDESTRUCT_SIGNAL = "selfdestruct_signal"
+    DELEGATECALL_SURFACE = "delegatecall_surface"
+    RAW_DELEGATECALL_SURFACE = "raw_delegatecall_surface"
+    FEE_MANIPULATION_SIGNAL = "fee_manipulation_signal"
+    REENTRANCY_SIGNAL = "reentrancy_signal"
+    DEPLOYER_REPUTATION_SIGNAL = "deployer_reputation_signal"
+    SUSPICIOUS_SELECTOR_SIGNAL = "suspicious_selector_signal"
+    TINY_BYTECODE_SIGNAL = "tiny_bytecode_signal"
+
+
 @dataclass(frozen=True, slots=True)
 class PolicyResult:
     action: PolicyAction
@@ -23,58 +52,91 @@ class PolicyResult:
     reason_codes: list[str]
 
 
+_BLOCK_REASON_CODES = {
+    PolicyReasonCode.HIDDEN_MINT_SIGNAL.value,
+    PolicyReasonCode.HONEYPOT_SIGNAL.value,
+}
+
+_MANUAL_REVIEW_REASON_CODES = {
+    PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
+    PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value,
+    PolicyReasonCode.SELFDESTRUCT_SIGNAL.value,
+}
+
+
 def _has_category(category_scores: dict[str, int], category: str) -> bool:
     return category in category_scores or f"impl_{category}" in category_scores
 
 
-def _has_proxy_resolution_gap(
-    findings: list[Finding], implementation_present: bool,
-) -> bool:
-    if implementation_present:
-        return False
-
-    unresolved_titles = {
-        "Proxy implementation could not be resolved",
-        "Proxy implementation could not be analyzed",
-        "Implementation is itself a proxy",
-    }
+def _has_raw_delegatecall(findings: list[Finding]) -> bool:
     return any(
-        finding.detector == "proxy" and finding.title in unresolved_titles
+        finding.detector.endswith("delegatecall")
+        and finding.severity.value in {"high", "critical"}
         for finding in findings
     )
+
+
+def _proxy_resolution_reason_codes(
+    proxy_resolution_status: ProxyResolutionStatus,
+) -> list[str]:
+    if proxy_resolution_status == ProxyResolutionStatus.UNRESOLVED:
+        return [
+            PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
+        ]
+    if proxy_resolution_status == ProxyResolutionStatus.FETCH_FAILED:
+        return [
+            PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
+            PolicyReasonCode.PROXY_LOGIC_FETCH_FAILED.value,
+        ]
+    if proxy_resolution_status == ProxyResolutionStatus.NO_CODE:
+        return [
+            PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
+            PolicyReasonCode.PROXY_LOGIC_NO_CODE.value,
+        ]
+    if proxy_resolution_status == ProxyResolutionStatus.NESTED_PROXY:
+        return [
+            PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
+            PolicyReasonCode.PROXY_LOGIC_NESTED_PROXY.value,
+        ]
+    return []
 
 
 def _reason_codes(
     score: int,
     category_scores: dict[str, int],
     findings: list[Finding],
-    implementation_present: bool,
+    proxy_resolution_status: ProxyResolutionStatus,
 ) -> list[str]:
+    reason_codes = _proxy_resolution_reason_codes(proxy_resolution_status)
     checks = [
+        (PolicyReasonCode.HIGH_RISK_SCORE.value, score >= 56),
+        (PolicyReasonCode.ELEVATED_RISK_SCORE.value, 36 <= score <= 55),
+        (PolicyReasonCode.UPGRADEABLE_PROXY.value, _has_category(category_scores, "proxy")),
+        (PolicyReasonCode.HIDDEN_MINT_SIGNAL.value, _has_category(category_scores, "hidden_mint")),
+        (PolicyReasonCode.HONEYPOT_SIGNAL.value, _has_category(category_scores, "honeypot")),
+        (PolicyReasonCode.SELFDESTRUCT_SIGNAL.value, _has_category(category_scores, "selfdestruct")),
+        (PolicyReasonCode.DELEGATECALL_SURFACE.value, _has_category(category_scores, "delegatecall")),
+        (PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value, _has_raw_delegatecall(findings)),
         (
-            "proxy_logic_unresolved",
-            _has_proxy_resolution_gap(findings, implementation_present),
+            PolicyReasonCode.FEE_MANIPULATION_SIGNAL.value,
+            _has_category(category_scores, "fee_manipulation"),
         ),
-        ("high_risk_score", score >= 56),
-        ("elevated_risk_score", 36 <= score <= 55),
-        ("upgradeable_proxy", _has_category(category_scores, "proxy")),
-        ("hidden_mint_signal", _has_category(category_scores, "hidden_mint")),
-        ("honeypot_signal", _has_category(category_scores, "honeypot")),
-        ("selfdestruct_signal", _has_category(category_scores, "selfdestruct")),
-        ("delegatecall_surface", _has_category(category_scores, "delegatecall")),
-        ("fee_manipulation_signal", _has_category(category_scores, "fee_manipulation")),
-        ("reentrancy_signal", _has_category(category_scores, "reentrancy")),
+        (PolicyReasonCode.REENTRANCY_SIGNAL.value, _has_category(category_scores, "reentrancy")),
         (
-            "deployer_reputation_signal",
+            PolicyReasonCode.DEPLOYER_REPUTATION_SIGNAL.value,
             _has_category(category_scores, "deployer_reputation"),
         ),
         (
-            "suspicious_selector_signal",
+            PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value,
             _has_category(category_scores, "suspicious_selector"),
         ),
-        ("tiny_bytecode_signal", _has_category(category_scores, "tiny_bytecode")),
+        (
+            PolicyReasonCode.TINY_BYTECODE_SIGNAL.value,
+            _has_category(category_scores, "tiny_bytecode"),
+        ),
     ]
-    return [code for code, enabled in checks if enabled]
+    reason_codes.extend(code for code, enabled in checks if enabled)
+    return reason_codes
 
 
 def derive_policy(
@@ -82,16 +144,18 @@ def derive_policy(
     level: RiskLevel,
     findings: list[Finding],
     category_scores: dict[str, int],
-    implementation_present: bool,
+    proxy_resolution_status: ProxyResolutionStatus = ProxyResolutionStatus.NOT_PROXY,
 ) -> PolicyResult:
     reason_codes = _reason_codes(
         score=score,
         category_scores=category_scores,
         findings=findings,
-        implementation_present=implementation_present,
+        proxy_resolution_status=proxy_resolution_status,
     )
 
-    if level in {RiskLevel.HIGH, RiskLevel.CRITICAL}:
+    if level in {RiskLevel.HIGH, RiskLevel.CRITICAL} or any(
+        code in _BLOCK_REASON_CODES for code in reason_codes
+    ):
         return PolicyResult(
             action=PolicyAction.BLOCK,
             summary=(
@@ -101,7 +165,10 @@ def derive_policy(
             reason_codes=reason_codes,
         )
 
-    if level == RiskLevel.MEDIUM or "proxy_logic_unresolved" in reason_codes:
+    if (
+        level == RiskLevel.MEDIUM
+        or any(code in _MANUAL_REVIEW_REASON_CODES for code in reason_codes)
+    ):
         return PolicyResult(
             action=PolicyAction.MANUAL_REVIEW,
             summary=(
@@ -111,7 +178,7 @@ def derive_policy(
             reason_codes=reason_codes,
         )
 
-    if level == RiskLevel.LOW:
+    if level == RiskLevel.LOW or reason_codes:
         return PolicyResult(
             action=PolicyAction.WARN,
             summary=(

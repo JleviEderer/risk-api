@@ -5,8 +5,14 @@ import responses
 from flask import Response, request
 from unittest.mock import patch
 
-from risk_api.app import create_app
+from risk_api.api_contract import analysis_result_from_snapshot
+from risk_api.app import (
+    PROXY_ANALYSIS_EXAMPLE,
+    PROXY_EXAMPLE_ADDRESS,
+    create_app,
+)
 from risk_api.analysis.engine import clear_analysis_cache
+from risk_api.analysis.policy import derive_policy
 from risk_api.chain.rpc import clear_cache
 from risk_api.proof_reports import REPORT_PAGES
 
@@ -408,6 +414,10 @@ def test_analyze_proxy_response_includes_implementation(client):
     assert impl["bytecode_size"] > 0
     assert isinstance(impl["findings"], list)
     assert isinstance(impl["category_scores"], dict)
+    assert impl["category_scores"] == {"selfdestruct": 30}
+    assert any(
+        finding["detector"] == "impl_selfdestruct" for finding in data["findings"]
+    )
 
 
 @responses.activate
@@ -423,6 +433,80 @@ def test_analyze_non_proxy_no_implementation_key(client):
 
     assert "implementation" not in data
     assert data["decision"] == "allow"
+
+
+@responses.activate
+def test_analyze_raw_delegatecall_response_requires_manual_review(client):
+    bytecode = "0x" + "f4" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "de" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 15
+    assert data["level"] == "safe"
+    assert data["decision"] == "manual_review"
+    assert "raw_delegatecall_surface" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
+def test_analyze_hidden_mint_response_blocks(client):
+    bytecode = "0x63a0712d68" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "ba" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 25
+    assert data["level"] == "low"
+    assert data["decision"] == "block"
+    assert "hidden_mint_signal" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
+def test_analyze_fee_manipulation_response_warns_even_when_score_is_safe(client):
+    bytecode = "0x6369fe0e2d" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "f1" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 15
+    assert data["level"] == "safe"
+    assert data["decision"] == "warn"
+    assert "fee_manipulation_signal" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
+def test_analyze_proxy_no_code_response_requires_manual_review(client):
+    eip1967 = "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+    proxy_bytecode = "0x7f" + eip1967 + "f4" + "00" * 200
+    impl_addr_hex = "cd" * 20
+    impl_addr_padded = "0x" + "0" * 24 + impl_addr_hex
+
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": proxy_bytecode})
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": impl_addr_padded})
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": "0x"})
+
+    addr = "0x" + "c4" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 40
+    assert data["level"] == "medium"
+    assert data["decision"] == "manual_review"
+    assert "proxy_logic_no_code" in data["recommended_policy"]["reason_codes"]
+    assert any(
+        finding["title"] == "Proxy implementation has no bytecode"
+        for finding in data["findings"]
+    )
 
 
 @responses.activate
@@ -964,7 +1048,26 @@ def test_proof_report_page(client):
         in resp.data
     )
     assert b"&quot;implementation&quot;: {" in resp.data
+    assert b"&quot;implementation&quot;: null" not in resp.data
     assert b"&quot;implementation_address&quot;" not in resp.data
+    assert b'&quot;decision&quot;: &quot;block&quot;' in resp.data
+
+
+def test_proof_report_snapshots_match_current_policy_semantics():
+    for report in REPORT_PAGES.values():
+        for contract in report["contracts"]:
+            snapshot = contract["snapshot"]
+            result = analysis_result_from_snapshot(snapshot)
+            expected_policy = derive_policy(
+                score=result.score,
+                level=result.level,
+                findings=result.findings,
+                category_scores=result.category_scores,
+                proxy_resolution_status=result.proxy_resolution_status,
+            )
+
+            assert result.decision == expected_policy.action
+            assert result.recommended_policy == expected_policy
 
 
 def test_proof_report_uses_public_url(app):
@@ -1253,8 +1356,9 @@ def test_llms_full_txt_returns_markdown(client):
 def test_llms_full_txt_has_proxy_example(client):
     resp = client.get("/llms-full.txt")
     text = resp.data.decode()
-    assert '"score": 60' in text
-    assert '"level": "high"' in text
+    assert '"score": 50' in text
+    assert '"level": "medium"' in text
+    assert '"decision": "manual_review"' in text
     assert "implementation" in text
 
 
@@ -1315,8 +1419,36 @@ def test_openapi_get_200_has_examples(client):
     assert examples["safe_contract"]["value"]["score"] == 0
     assert examples["safe_contract"]["value"]["level"] == "safe"
     assert "proxy_contract" in examples
-    assert examples["proxy_contract"]["value"]["score"] == 60
-    assert "implementation" in examples["proxy_contract"]["value"]
+    assert examples["proxy_contract"]["value"]["score"] == 50
+    assert examples["proxy_contract"]["value"]["level"] == "medium"
+    assert examples["proxy_contract"]["value"]["decision"] == "manual_review"
+    assert examples["proxy_contract"]["value"]["implementation"]["category_scores"] == {
+        "selfdestruct": 30
+    }
+
+
+@responses.activate
+def test_openapi_proxy_example_matches_mocked_route_output(client):
+    eip1967 = "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+    proxy_bytecode = "0x7f" + eip1967 + "f4" + "00" * 200
+    impl_addr_hex = PROXY_ANALYSIS_EXAMPLE["implementation"]["address"][2:]
+    impl_addr_padded = "0x" + "0" * 24 + impl_addr_hex
+    impl_bytecode = "0x" + "ff" + "00" * 200
+
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": proxy_bytecode})
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": impl_addr_padded})
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": impl_bytecode})
+
+    resp = client.get(f"/analyze?address={PROXY_EXAMPLE_ADDRESS}")
+    assert resp.status_code == 200
+
+    route_output = resp.get_json()
+    openapi = client.get("/openapi.json").get_json()
+    example_output = openapi["paths"]["/analyze"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["examples"]["proxy_contract"]["value"]
+
+    assert route_output == example_output
 
 
 def test_openapi_get_422_has_example(client):
@@ -1352,6 +1484,9 @@ def test_openapi_schemas_have_descriptions(client):
     assert "not an audit or guarantee" in level["description"]
     # category_scores has description
     assert "description" in schemas["AnalysisResult"]["properties"]["category_scores"]
+    assert "raw_delegatecall_surface" in schemas["PolicyReasonCode"]["enum"]
+    assert "proxy_logic_no_code" in schemas["PolicyReasonCode"]["enum"]
+    assert "proxy_logic_nested_proxy" in schemas["PolicyReasonCode"]["enum"]
 
 
 # --- FAQPage structured data tests ---

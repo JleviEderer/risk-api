@@ -99,39 +99,63 @@ Example response:
 ```json
 {
   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "score": 60,
-  "level": "high",
-  "decision": "block",
+  "score": 50,
+  "level": "medium",
+  "decision": "manual_review",
   "recommended_policy": {
-    "action": "block",
-    "summary": "Block automatic interaction by default. Only proceed with an explicit override after deeper review.",
+    "action": "manual_review",
+    "summary": "Escalate before interaction. Use a human review step or a heavier tool before the workflow proceeds.",
     "reason_codes": [
-      "high_risk_score",
+      "elevated_risk_score",
       "upgradeable_proxy",
-      "hidden_mint_signal",
-      "honeypot_signal",
-      "delegatecall_surface",
-      "suspicious_selector_signal"
+      "selfdestruct_signal",
+      "delegatecall_surface"
     ]
   },
-  "bytecode_size": 1485,
+  "bytecode_size": 234,
   "findings": [
     {
+      "detector": "delegatecall",
+      "severity": "info",
+      "title": "DELEGATECALL in proxy pattern",
+      "description": "Contract uses DELEGATECALL with standard proxy storage slots (EIP-1967/1822). This is expected proxy behavior.",
+      "points": 10
+    },
+    {
       "detector": "proxy",
-      "severity": "medium",
-      "title": "EIP-1967 Proxy Detected",
-      "description": "Contract uses the EIP-1967 transparent proxy pattern. Logic resides in a separate implementation contract that can be upgraded.",
-      "points": 20
+      "severity": "info",
+      "title": "Proxy contract detected",
+      "description": "Contract uses standard proxy storage slots (EIP-1967 or EIP-1822). The implementation contract should also be analyzed.",
+      "points": 10
+    },
+    {
+      "detector": "impl_selfdestruct",
+      "severity": "critical",
+      "title": "SELFDESTRUCT opcode found",
+      "description": "Contract contains SELFDESTRUCT which allows the owner to destroy the contract and drain all funds.",
+      "points": 30
     }
   ],
   "category_scores": {
-    "proxy": 20
+    "delegatecall": 10,
+    "proxy": 10,
+    "impl_selfdestruct": 30
   },
   "implementation": {
     "address": "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779",
-    "bytecode_size": 24576,
-    "findings": [],
-    "category_scores": {}
+    "bytecode_size": 201,
+    "findings": [
+      {
+        "detector": "impl_selfdestruct",
+        "severity": "critical",
+        "title": "SELFDESTRUCT opcode found",
+        "description": "Contract contains SELFDESTRUCT which allows the owner to destroy the contract and drain all funds.",
+        "points": 30
+      }
+    ],
+    "category_scores": {
+      "selfdestruct": 30
+    }
   }
 }
 ```
@@ -150,12 +174,12 @@ Risk levels:
 
 Default first-pass policy actions:
 
-| Level | Decision |
+| Condition | Decision |
 |-------|----------|
-| safe | allow |
-| low | warn |
-| medium | manual_review |
-| high / critical | block |
+| `safe` with no reason codes | allow |
+| `low`, or `safe` with non-blocking signals such as fee controls or suspicious selectors | warn |
+| `medium`, unresolved proxy logic, raw `DELEGATECALL`, or `SELFDESTRUCT` | manual_review |
+| `high` / `critical`, hidden mint, or honeypot signals | block |
 
 ## Public Pages And Machine Docs
 

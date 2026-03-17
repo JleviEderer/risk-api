@@ -28,24 +28,32 @@
 4. **[2026-03-11] Explain the trigger moment, not just the category**
    Do instead: pair the public headline with a concrete sentence like `Screen Base contracts before your agent buys, routes funds, approves, or interacts`, and keep one compact use-case block on human-facing surfaces.
 5. **[2026-03-16] Keep the policy layer thin and explicit**
-   Do instead: now that `/analyze` returns `decision` and `recommended_policy`, keep it as a default first-pass action layer (`allow`, `warn`, `manual_review`, `block`) with stable `reason_codes` instead of drifting into a complex custom policy engine.
-6. **[2026-03-10] Keep proof-page claims narrower than the implementation**
+   Do instead: keep `allow` for clean `safe` outputs only, `warn` for residual non-blocking signals, `manual_review` for unresolved proxy/raw `DELEGATECALL`/`SELFDESTRUCT`, and `block` for `hidden_mint` or `honeypot` rather than drifting into a complex custom policy engine.
+6. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
+   Do instead: if a contract has high-severity non-proxy `delegatecall`, force at least `manual_review` in policy even when the numeric score is only `15`.
+7. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
+   Do instead: put reproducible cases in `auto/corpus/public_cases.json` or local `*.local.json` files, run `python auto/bench.py`, and only change implementation after the failure is locked into the corpus or pytest.
+8. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
+   Do instead: use `auto/corpus/public_cases.json` for durable regressions, but keep the real search pressure in hidden `auto/corpus/*.local.json` holdouts and `auto/candidates/*.local.json` discoveries so the loop cannot simply memorize the public cases.
+9. **[2026-03-10] Keep proof-page claims narrower than the implementation**
    Do instead: frame the report as a dated snapshot, not a live rerun or a full product demo; use the payment explainer and dashboard as separate surfaces.
-7. **[2026-03-10] Homepage polish should preserve the agent entry path**
+10. **[2026-03-10] Homepage polish should preserve the agent entry path**
    Do instead: keep the brand lockup, `skill.md` entry, and one obvious paid-call path visible above the fold even when tightening the visual hierarchy.
-8. **[2026-03-10] Public entry pages are not the detector list**
+
+## Distribution
+1. **[2026-03-10] Public entry pages are not the detector list**
    Do instead: label intent/SEO pages as entry pages or workflows, and keep full detector coverage described separately so agents do not confuse landing pages with product capability.
-9. **[2026-03-10] Augur public surfaces stay agent-first**
+2. **[2026-03-10] Augur public surfaces stay agent-first**
    Do instead: prefer machine docs, direct call patterns, MCP setup, and x402/payment clarity over social-proof, testimonials, or human-first promo sections.
-10. **[2026-03-10] Public MCP install copy should point at npm once published**
+3. **[2026-03-10] Public MCP install copy should point at npm once published**
    Do instead: use `npx -y augurrisk-mcp` on `/mcp`, the homepage, `README.md`, and machine docs now that the package is live.
-11. **[2026-03-10] MCP wrapper should stay in-repo unless it truly diverges**
+4. **[2026-03-10] MCP wrapper should stay in-repo unless it truly diverges**
    Do instead: keep `examples/javascript/augur-mcp` in this repo and treat `augurrisk-mcp` as the publish/distribution surface rather than splitting into a second codebase early.
-12. **[2026-03-10] MCP startup should not require a wallet for read-only paths**
+5. **[2026-03-10] MCP startup should not require a wallet for read-only paths**
    Do instead: keep `examples/javascript/augur-mcp` usable for tool discovery and smoke startup without `CLIENT_PRIVATE_KEY`; require the key only when the paid analyze tool is invoked.
-13. **[2026-03-10] Keep distribution posts in one outreach log**
+6. **[2026-03-10] Keep distribution posts in one outreach log**
    Do instead: record each forum/community post in `.codex/outreach.local.md` if it exists, otherwise keep `docs/outreach.md` current with date, surface, URL, status, and exact message.
-14. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
+7. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
    Do instead: test `r/OpenClaw` or OpenClaw Discord after Base/x402-first outreach, and avoid using the AI-only OpenClaw forum as the main posting surface.
 
 ## Research Hygiene
@@ -65,3 +73,19 @@
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
 3. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
+4. **[2026-03-16] Treat `/dashboard` and `/stats` recent `402` rows as probe-sensitive**
+   Do instead: when you inspect recent `402` attempts after testing `/analyze` yourself, assume your own curl/script checks may be the newest rows; use them for operational clues, not naive attribution.
+5. **[2026-03-16] `curl/...` user agents are intent signals, not human proof**
+   Do instead: read `curl/...` as likely intentional CLI or scripted traffic, but do not claim it proves a human manually made the call without additional evidence.
+6. **[2026-03-16] Public examples must round-trip through the live serializer**
+   Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
+7. **[2026-03-16] Keep private detector holdouts out of git**
+   Do instead: store hidden autoresearch cases as `auto/corpus/*.local.json` or `auto/candidates/*.local.json`; load them locally with `python auto/bench.py` but do not promote them until they are ready to become public regressions.
+8. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
+   Do instead: keep `auto/bench.py` checking proof-report `decision` and `recommended_policy` against current `derive_policy()` semantics; a dated snapshot can keep old scores/findings, but stale policy recommendations should fail loudly unless you intentionally preserve historical policy and relax the check.
+9. **[2026-03-16] Keep only the tracked public autoresearch corpus in CI**
+   Do instead: run `python auto/bench.py auto/corpus/public_cases.json` in GitHub Actions; let local `*.local.json` holdouts stay workstation-only so CI stays reproducible while hidden pressure remains private.
+10. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
+   Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint.
+11. **[2026-03-16] Do not collapse proxy `no_code` into transport failure**
+   Do instead: if a proxy implementation address resolves but `eth_getCode` returns `0x`, emit `ProxyResolutionStatus.NO_CODE` plus `proxy_logic_no_code`; keep the action at `manual_review`, but preserve the distinction from RPC/lookup `fetch_failed`.

@@ -7,7 +7,12 @@ import time
 from dataclasses import dataclass
 
 from risk_api.analysis.disassembler import disassemble
-from risk_api.analysis.policy import PolicyAction, PolicyResult, derive_policy
+from risk_api.analysis.policy import (
+    PolicyAction,
+    PolicyResult,
+    ProxyResolutionStatus,
+    derive_policy,
+)
 from risk_api.analysis.patterns import (
     EIP_1822_SLOT,
     EIP_1967_IMPL_SLOT,
@@ -51,6 +56,7 @@ class AnalysisResult:
     category_scores: dict[str, int]
     bytecode_size: int
     implementation: ImplementationResult | None = None
+    proxy_resolution_status: ProxyResolutionStatus = ProxyResolutionStatus.NOT_PROXY
 
 
 class NoBytecodeError(ValueError):
@@ -131,18 +137,18 @@ def resolve_implementation(address: str, rpc_url: str) -> str | None:
 
 def _analyze_implementation(
     impl_address: str, rpc_url: str
-) -> ImplementationResult | None:
+) -> tuple[ImplementationResult | None, ProxyResolutionStatus]:
     """Fetch and analyze the implementation contract behind a proxy."""
     try:
         bytecode_hex = get_code(impl_address, rpc_url)
     except RPCError:
         logger.debug("Failed to fetch implementation bytecode for %s", impl_address)
-        return None
+        return None, ProxyResolutionStatus.FETCH_FAILED
 
     hex_body = bytecode_hex[2:] if bytecode_hex.startswith("0x") else bytecode_hex
     bytecode_size = len(hex_body) // 2
     if bytecode_size == 0:
-        return None
+        return None, ProxyResolutionStatus.NO_CODE
 
     instructions = disassemble(bytecode_hex)
     findings = run_all_detectors(instructions)
@@ -177,11 +183,18 @@ def _analyze_implementation(
         for f in findings
     ]
 
-    return ImplementationResult(
-        address=impl_address,
-        bytecode_size=bytecode_size,
-        findings=prefixed_findings,
-        category_scores=score_result.category_scores,
+    return (
+        ImplementationResult(
+            address=impl_address,
+            bytecode_size=bytecode_size,
+            findings=prefixed_findings,
+            category_scores=score_result.category_scores,
+        ),
+        (
+            ProxyResolutionStatus.NESTED_PROXY
+            if is_nested_proxy
+            else ProxyResolutionStatus.RESOLVED
+        ),
     )
 
 
@@ -214,8 +227,10 @@ def analyze_contract(
     findings.extend(detect_deployer_reputation(address, basescan_api_key))
 
     impl_result: ImplementationResult | None = None
+    proxy_resolution_status = ProxyResolutionStatus.NOT_PROXY
     is_proxy = any(f.detector == "proxy" for f in findings)
     if is_proxy:
+        proxy_resolution_status = ProxyResolutionStatus.UNRESOLVED
         impl_address = resolve_implementation(address, rpc_url)
         if impl_address is None:
             findings.append(
@@ -229,18 +244,32 @@ def analyze_contract(
                 )
             )
         else:
-            impl_result = _analyze_implementation(impl_address, rpc_url)
+            impl_result, proxy_resolution_status = _analyze_implementation(
+                impl_address, rpc_url
+            )
             if impl_result is None:
-                findings.append(
-                    _unresolved_proxy_finding(
-                        "Proxy implementation could not be analyzed",
-                        (
-                            "Contract appears to be a proxy, but Augur could not fetch "
-                            "bytecode for the resolved implementation address. "
-                            "The executable logic was not analyzed."
-                        ),
+                if proxy_resolution_status == ProxyResolutionStatus.NO_CODE:
+                    findings.append(
+                        _unresolved_proxy_finding(
+                            "Proxy implementation has no bytecode",
+                            (
+                                "Contract appears to be a proxy, and Augur resolved an "
+                                "implementation address, but that address currently has "
+                                "no deployed bytecode. The executable logic was not analyzed."
+                            ),
+                        )
                     )
-                )
+                else:
+                    findings.append(
+                        _unresolved_proxy_finding(
+                            "Proxy implementation could not be analyzed",
+                            (
+                                "Contract appears to be a proxy, but Augur could not fetch "
+                                "bytecode for the resolved implementation address. "
+                                "The executable logic was not analyzed."
+                            ),
+                        )
+                    )
 
     score_result: ScoreResult = compute_score(findings, instructions, bytecode_hex)
     final_score = score_result.score
@@ -258,7 +287,7 @@ def analyze_contract(
         level=final_level,
         findings=findings + (impl_result.findings if impl_result else []),
         category_scores=final_category_scores,
-        implementation_present=impl_result is not None,
+        proxy_resolution_status=proxy_resolution_status,
     )
     result = AnalysisResult(
         address=address,
@@ -270,6 +299,7 @@ def analyze_contract(
         category_scores=final_category_scores,
         bytecode_size=bytecode_size,
         implementation=impl_result,
+        proxy_resolution_status=proxy_resolution_status,
     )
     _cache_put(address, rpc_url, basescan_api_key, result)
     return result
