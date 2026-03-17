@@ -156,6 +156,20 @@ def test_analyze_pause_selector_warns_even_when_score_is_safe():
 
 
 @responses.activate
+def test_analyze_blacklist_selector_without_transfer_warns():
+    bytecode = "0x6344337ea1" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "f3" * 20, RPC_URL)
+
+    assert result.score == 5
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.WARN
+    assert result.findings == []
+    assert PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
 def test_analyze_eoa():
     responses.post(RPC_URL, json=_rpc_response("0x"))
     with pytest.raises(NoBytecodeError, match="No contract bytecode found"):

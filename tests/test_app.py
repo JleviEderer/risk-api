@@ -500,6 +500,23 @@ def test_analyze_pause_selector_response_warns_even_when_score_is_safe(client):
 
 
 @responses.activate
+def test_analyze_blacklist_selector_without_transfer_warns(client):
+    bytecode = "0x6344337ea1" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "f3" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 5
+    assert data["level"] == "safe"
+    assert data["decision"] == "warn"
+    assert data["findings"] == []
+    assert "suspicious_selector_signal" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
 def test_analyze_proxy_no_code_response_requires_manual_review(client):
     eip1967 = "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
     proxy_bytecode = "0x7f" + eip1967 + "f4" + "00" * 200

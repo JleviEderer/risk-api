@@ -103,6 +103,11 @@
   - moved `pause()` onto the existing suspicious-selector path so it now warns with `suspicious_selector_signal` instead of passing clean
   - expanded the private local corpora with fresh `pause()`, `reentrancy`, and proxy `fetch_failed` holdouts/candidates
   - `python auto/loop.py --allow-failures` is green again at `26/26` checks
+- Ran a second hidden holdout pass after deploying `fccbbb0`:
+  - found a follow-on selector gap where raw `blacklist(address)` / `addToBlacklist(address)` selectors still returned `allow` if no transfer path was visible
+  - kept full honeypot blocking unchanged when transfer selectors are present, but now routes orphan blacklist controls through the existing suspicious-selector warning path
+  - expanded the private local corpora again with blacklist-without-transfer holdouts/candidates
+  - `python auto/loop.py --allow-failures` is green again at `28/28` checks
 - Tightened first-pass policy precedence from the autoresearch findings:
   - `hidden_mint` and `honeypot` now block even when the numeric score is only `low`
   - `SELFDESTRUCT` now forces at least `manual_review` even when the numeric score is only `low`
@@ -205,6 +210,7 @@
   - keep local holdout corpora untracked so the loop cannot merely overfit the visible tracked corpus
   - current tracked corpus is intentionally small; the next useful work is adding real hidden holdout cases under `auto/corpus/*.local.json`
   - keep `pause()` on the suspicious-selector path for now; it should warn instead of silently allowing, but it does not yet justify a dedicated public detector or automatic block
+  - if a known malicious selector is present but no concrete detector surfaces it, prefer warning through the suspicious-selector path over silently allowing it
   - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
 - Current analytics read:
   - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
@@ -257,7 +263,7 @@
 11. In the next session, start a fresh hidden holdout discovery batch:
    - use `python auto/loop.py` as the default runner
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
-   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, and proxy `fetch_failed` manual-review behavior
+   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, and blacklist-controls-without-transfer warning behavior
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
 12. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:

@@ -7,7 +7,11 @@ from enum import Enum
 
 from risk_api.analysis.disassembler import Instruction
 from risk_api.analysis.patterns import Finding
-from risk_api.analysis.selectors import extract_selectors, find_suspicious_selectors
+from risk_api.analysis.selectors import (
+    extract_selectors,
+    find_malicious_selectors,
+    find_suspicious_selectors,
+)
 
 
 class RiskLevel(str, Enum):
@@ -33,6 +37,44 @@ CATEGORY_CAPS: dict[str, int] = {
 }
 
 SUSPICIOUS_SELECTOR_POINTS = 5
+
+
+def _orphan_malicious_selectors(
+    selectors: set[bytes], findings: list[Finding],
+) -> dict[bytes, str]:
+    """Return malicious selectors not already surfaced by a concrete finding."""
+    malicious = find_malicious_selectors(selectors)
+    if not malicious:
+        return {}
+
+    surfaced_detectors = {finding.detector for finding in findings}
+    remaining = dict(malicious)
+
+    if "hidden_mint" in surfaced_detectors:
+        remaining = {
+            selector: label
+            for selector, label in remaining.items()
+            if "mint" not in label.lower()
+        }
+
+    if "fee_manipulation" in surfaced_detectors:
+        remaining = {
+            selector: label
+            for selector, label in remaining.items()
+            if not any(
+                term in label.lower()
+                for term in ("fee", "tax", "maxtx", "maxwallet")
+            )
+        }
+
+    if "honeypot" in surfaced_detectors:
+        remaining = {
+            selector: label
+            for selector, label in remaining.items()
+            if "blacklist" not in label.lower()
+        }
+
+    return remaining
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,9 +107,11 @@ def compute_score(
     # Suspicious selectors (separate from malicious)
     selectors = extract_selectors(instructions)
     suspicious = find_suspicious_selectors(selectors)
-    if suspicious:
+    orphan_malicious = _orphan_malicious_selectors(selectors, findings)
+    suspicious_count = len(set(suspicious) | set(orphan_malicious))
+    if suspicious_count:
         sus_points = min(
-            len(suspicious) * SUSPICIOUS_SELECTOR_POINTS,
+            suspicious_count * SUSPICIOUS_SELECTOR_POINTS,
             CATEGORY_CAPS["suspicious_selector"],
         )
         category_points["suspicious_selector"] = sus_points

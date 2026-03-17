@@ -7,6 +7,8 @@
    Do instead: use report-specific OG images for proof pages when promoting them; the generic `/avatar.png` reads like stock security art in social previews.
 3. **[2026-03-16] Treat `pause()` as suspicious admin control, not silent allow**
    Do instead: keep `pause()` on the `suspicious_selector` path so transfer-freeze authority warns via `suspicious_selector_signal` without inventing a new detector or auto-block rule yet.
+4. **[2026-03-16] Do not let orphan malicious selectors silently pass**
+   Do instead: if a selector is in the malicious table but no concrete detector surfaces it, route it through the `suspicious_selector` warning path instead of returning clean `allow`.
 
 ## Local Tooling
 1. **[2026-03-12] On this 8 GB Intel iGPU laptop, QMD's safest high-quality mode is structured `lex+vec`**
