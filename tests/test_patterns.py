@@ -170,6 +170,19 @@ def test_detect_fee_manipulation():
     assert findings[0].points == 15
 
 
+def test_detect_fee_manipulation_on_limit_aliases():
+    bytecode = (
+        "63e99c9d09"  # setMaxSellAmount(uint256)
+        "63f1d5f517"  # setWalletLimit(uint256)
+    )
+    instructions = disassemble(bytecode)
+    findings = detect_fee_manipulation(instructions)
+    assert len(findings) == 1
+    assert findings[0].detector == "fee_manipulation"
+    assert "setMaxSellAmount" in findings[0].description
+    assert "setWalletLimit" in findings[0].description
+
+
 def test_detect_fee_manipulation_absent():
     instructions = disassemble("6080604052")
     assert detect_fee_manipulation(instructions) == []

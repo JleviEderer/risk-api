@@ -8,6 +8,15 @@ from __future__ import annotations
 
 from risk_api.analysis.disassembler import Instruction
 
+FEE_MANIPULATION_LABEL_TERMS = (
+    "fee",
+    "tax",
+    "maxtx",
+    "maxwallet",
+    "maxsell",
+    "walletlimit",
+)
+
 # Malicious selectors — presence is a strong negative signal
 MALICIOUS_SELECTORS: dict[bytes, str] = {
     # mint(address,uint256) — hidden mint capability
@@ -26,6 +35,10 @@ MALICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("ec28438a"): "setMaxTxAmount(uint256)",
     # setMaxWalletSize(uint256)
     bytes.fromhex("b6c52324"): "setMaxWalletSize(uint256)",
+    # setMaxSellAmount(uint256)
+    bytes.fromhex("e99c9d09"): "setMaxSellAmount(uint256)",
+    # setWalletLimit(uint256)
+    bytes.fromhex("f1d5f517"): "setWalletLimit(uint256)",
 }
 
 # Suspicious selectors — risky but context-dependent
@@ -84,3 +97,9 @@ def find_suspicious_selectors(
     return {
         s: SUSPICIOUS_SELECTORS[s] for s in selectors if s in SUSPICIOUS_SELECTORS
     }
+
+
+def is_fee_manipulation_label(label: str) -> bool:
+    """Return whether a selector label maps to the fee/limit manipulation family."""
+    lowered = label.lower()
+    return any(term in lowered for term in FEE_MANIPULATION_LABEL_TERMS)

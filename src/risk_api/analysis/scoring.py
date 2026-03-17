@@ -11,6 +11,7 @@ from risk_api.analysis.selectors import (
     extract_selectors,
     find_malicious_selectors,
     find_suspicious_selectors,
+    is_fee_manipulation_label,
 )
 
 
@@ -61,10 +62,7 @@ def _orphan_malicious_selectors(
         remaining = {
             selector: label
             for selector, label in remaining.items()
-            if not any(
-                term in label.lower()
-                for term in ("fee", "tax", "maxtx", "maxwallet")
-            )
+            if not is_fee_manipulation_label(label)
         }
 
     if "honeypot" in surfaced_detectors:

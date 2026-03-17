@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from enum import Enum
 
 from risk_api.analysis.disassembler import Instruction
-from risk_api.analysis.selectors import extract_selectors, find_malicious_selectors
+from risk_api.analysis.selectors import (
+    extract_selectors,
+    find_malicious_selectors,
+    is_fee_manipulation_label,
+)
 
 
 class Severity(str, Enum):
@@ -279,7 +283,7 @@ def detect_fee_manipulation(instructions: list[Instruction]) -> list[Finding]:
     fee_selectors = {
         k: v
         for k, v in malicious.items()
-        if any(term in v.lower() for term in ("fee", "tax", "maxtx", "maxwallet"))
+        if is_fee_manipulation_label(v)
     }
 
     if fee_selectors:

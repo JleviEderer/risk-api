@@ -484,6 +484,24 @@ def test_analyze_fee_manipulation_response_warns_even_when_score_is_safe(client)
 
 
 @responses.activate
+def test_analyze_limit_alias_response_warns_without_double_count(client):
+    bytecode = "0x63e99c9d0963f1d5f517" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "f4" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 15
+    assert data["level"] == "safe"
+    assert data["decision"] == "warn"
+    assert data["category_scores"]["fee_manipulation"] == 15
+    assert "suspicious_selector" not in data["category_scores"]
+    assert "fee_manipulation_signal" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
 def test_analyze_pause_selector_response_warns_even_when_score_is_safe(client):
     bytecode = "0x638456cb59" + "00" * 200
     responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})

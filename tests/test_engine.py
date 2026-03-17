@@ -143,6 +143,21 @@ def test_analyze_fee_manipulation_warns_even_when_score_is_safe():
 
 
 @responses.activate
+def test_analyze_limit_alias_warns_without_suspicious_double_count():
+    bytecode = "0x63e99c9d0963f1d5f517" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "f4" * 20, RPC_URL)
+
+    assert result.score == 15
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.WARN
+    assert result.category_scores["fee_manipulation"] == 15
+    assert "suspicious_selector" not in result.category_scores
+    assert PolicyReasonCode.FEE_MANIPULATION_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
 def test_analyze_pause_selector_warns_even_when_score_is_safe():
     bytecode = "0x638456cb59" + "00" * 200
     responses.post(RPC_URL, json=_rpc_response(bytecode))

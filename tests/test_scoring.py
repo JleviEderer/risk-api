@@ -110,6 +110,17 @@ def test_blacklist_selector_without_transfer_still_scores_as_suspicious():
     assert result.category_scores.get("suspicious_selector", 0) == 5
 
 
+def test_limit_aliases_score_as_fee_manipulation_without_suspicious_double_count():
+    bytecode = "63e99c9d0963f1d5f517" + "00" * 200
+    instructions = disassemble(bytecode)
+    findings = run_all_detectors(instructions)
+    result = compute_score(findings, instructions, bytecode)
+    assert result.score == 15
+    assert result.level == RiskLevel.SAFE
+    assert result.category_scores["fee_manipulation"] == 15
+    assert "suspicious_selector" not in result.category_scores
+
+
 def test_deployer_reputation_category_cap():
     # Multiple deployer_reputation findings should cap at 10
     findings = [
