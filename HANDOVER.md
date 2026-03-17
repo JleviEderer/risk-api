@@ -4,10 +4,19 @@
 - Date: 2026-03-17
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `09a75f6`
-- Status: local worktree contains the batch 5 deployer-reputation pass plus operator-note edits and local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`). Four serial hidden holdout discovery batches remain the latest committed/deployed baseline at `09a75f6`; the deployer-reputation patch is implemented and locally verified but still needs commit/push/deploy decisions informed by the Etherscan key-plan blocker below.
+- HEAD: `a0547a4`
+- Status: green on `a0547a4`; the batch 5 deployer-reputation pass is committed, pushed, and deployed. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`). Remaining risk is operational: the explorer key/plan still needs confirmation for live Base coverage.
 
 ## What Changed
+- Landed the batch 5 deployer-reputation migration:
+  - commit: `a0547a4` (`Move deployer reputation to Etherscan V2`)
+  - `src/risk_api/analysis/reputation.py` now uses Etherscan V2 on Base (`chainid=8453`) with light throttling/retry and clearer soft-error handling
+  - `src/risk_api/config.py` now prefers `ETHERSCAN_API_KEY` and falls back to legacy `BASESCAN_API_KEY`
+  - `tests/test_reputation.py` and `tests/test_config.py` now lock the V2 request shape, retry behavior, and env-var preference
+  - `src/risk_api/app.py`, `CLAUDE.md`, and `scripts/register_moltmart.py` now say Etherscan-backed instead of Basescan-backed
+  - pushed to `origin/master`
+  - `flyctl deploy --remote-only` succeeded for `augurrisk`
+  - live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, `https://augurrisk.com/`, and `https://augurrisk.com/deployer-reputation-api`
 - Added a strategy memo that locks the current wedge:
   - `docs/PRODUCT_WEDGE_MEMO.md`
   - frames Augur as `Base contract admission control for agents`
@@ -251,7 +260,7 @@
   - `reentrancy` is also structurally narrow (`CALL` then nearby `SSTORE`) and should be treated as heuristic coverage, not deep semantic analysis
   - `deployer_reputation` is the weakest detector operationally because it depends on explorer APIs; failures can erase signal even when bytecode analysis is healthy
 - Current deployer-reputation fix read:
-  - the smallest safe code pass is now implemented locally:
+  - the smallest safe code pass is now landed:
     - `src/risk_api/analysis/reputation.py` now uses Etherscan V2 (`https://api.etherscan.io/v2/api`) with `chainid=8453`
     - preserves the repo rule that external API failure stays distinct from true `NOT_FOUND`
     - adds request throttling plus light retry/backoff for retryable soft errors
@@ -327,9 +336,10 @@
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
 
 ## Tomorrow Start Here
-1. Confirm the baseline and local verification state:
-   - latest committed/deployed baseline is still `09a75f6`
-   - local reputation patch should still have `python auto/loop.py --allow-failures` green and `python -m pytest -q` green
+1. Confirm the new baseline and deployment state:
+   - latest committed/deployed baseline is `a0547a4`
+   - `python auto/loop.py --allow-failures` was green and `python -m pytest -q` was green before deploy
+   - live `https://augurrisk.com/health` and `https://augurrisk.com/openapi.json` were healthy after deploy
 2. Start with credentials, not detector widening:
    - provision or locate a paid/eligible `ETHERSCAN_API_KEY` for Base chain coverage
    - remember `src/risk_api/config.py` already falls back to legacy `BASESCAN_API_KEY`, but the value itself still needs to be an Etherscan V2-capable key
@@ -337,9 +347,8 @@
    - hit `getcontractcreation` on Base (`chainid=8453`) with the configured key
    - confirm the response is real data, not `Free API access is not supported for this chain...`
    - remember the old BaseScan V1 path now returns a deprecation error too
-4. If the key works, finish the landing sequence:
-   - commit the local reputation/docs/test changes
-   - push
-   - deploy
-   - live-verify `/health`, `/openapi.json`, and one real reputation-backed analysis path if payment/key access allows it
-5. Only after the reputation path is either fully landed with a working key or explicitly deferred should batch 5 continue into a new hidden discovery probe.
+4. If the key works, finish the runtime follow-up:
+   - update the production secret if needed
+   - verify one real reputation-backed analysis path if payment/key access allows it
+   - record whether deployer-reputation findings are flowing again or still degrading gracefully
+5. Only after the reputation key path is either confirmed working or explicitly deferred should batch 5 continue into a new hidden discovery probe.
