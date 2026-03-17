@@ -5,6 +5,8 @@
    Do instead: add new proof reports in `src/risk_api/proof_reports.py` and let `REPORT_PAGES` drive routing, sitemap inclusion, and request logging.
 2. **[2026-03-10] Keep proof-report assets explicit**
    Do instead: use report-specific OG images for proof pages when promoting them; the generic `/avatar.png` reads like stock security art in social previews.
+3. **[2026-03-16] Treat `pause()` as suspicious admin control, not silent allow**
+   Do instead: keep `pause()` on the `suspicious_selector` path so transfer-freeze authority warns via `suspicious_selector_signal` without inventing a new detector or auto-block rule yet.
 
 ## Local Tooling
 1. **[2026-03-12] On this 8 GB Intel iGPU laptop, QMD's safest high-quality mode is structured `lex+vec`**
@@ -73,19 +75,17 @@
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
 3. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
-4. **[2026-03-16] Treat `/dashboard` and `/stats` recent `402` rows as probe-sensitive**
-   Do instead: when you inspect recent `402` attempts after testing `/analyze` yourself, assume your own curl/script checks may be the newest rows; use them for operational clues, not naive attribution.
-5. **[2026-03-16] `curl/...` user agents are intent signals, not human proof**
-   Do instead: read `curl/...` as likely intentional CLI or scripted traffic, but do not claim it proves a human manually made the call without additional evidence.
-6. **[2026-03-16] Public examples must round-trip through the live serializer**
+4. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+   Do instead: when you inspect `/dashboard` or `/stats` after testing `/analyze` yourself, assume the newest rows may be your own probes and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
+5. **[2026-03-16] Public examples must round-trip through the live serializer**
    Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
-7. **[2026-03-16] Keep private detector holdouts out of git**
+6. **[2026-03-16] Keep private detector holdouts out of git**
    Do instead: store hidden autoresearch cases as `auto/corpus/*.local.json` or `auto/candidates/*.local.json`; load them locally with `python auto/bench.py` but do not promote them until they are ready to become public regressions.
-8. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
+7. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
    Do instead: keep `auto/bench.py` checking proof-report `decision` and `recommended_policy` against current `derive_policy()` semantics; a dated snapshot can keep old scores/findings, but stale policy recommendations should fail loudly unless you intentionally preserve historical policy and relax the check.
-9. **[2026-03-16] Keep only the tracked public autoresearch corpus in CI**
+8. **[2026-03-16] Keep only the tracked public autoresearch corpus in CI**
    Do instead: run `python auto/bench.py auto/corpus/public_cases.json` in GitHub Actions; let local `*.local.json` holdouts stay workstation-only so CI stays reproducible while hidden pressure remains private.
-10. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
+9. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
    Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint.
-11. **[2026-03-16] Do not collapse proxy `no_code` into transport failure**
+10. **[2026-03-16] Do not collapse proxy `no_code` into transport failure**
    Do instead: if a proxy implementation address resolves but `eth_getCode` returns `0x`, emit `ProxyResolutionStatus.NO_CODE` plus `proxy_logic_no_code`; keep the action at `manual_review`, but preserve the distinction from RPC/lookup `fetch_failed`.

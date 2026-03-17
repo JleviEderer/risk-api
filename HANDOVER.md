@@ -4,8 +4,8 @@
 - Date: 2026-03-16
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `9cf5e0f`
-- Status: green; local worktree is clean except for untracked local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`)
+- HEAD: `71ba517`
+- Status: green; latest autoresearch/policy pass is committed, pushed, and deployed. Local worktree is clean except for untracked local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`)
 
 ## What Changed
 - Added a strategy memo that locks the current wedge:
@@ -98,6 +98,11 @@
   - added local ignored files `auto/corpus/holdout.local.json` and `auto/candidates/discovered-2026-03-16.local.json`
   - first run surfaced four real policy blind spots: `hidden_mint_permissive_policy`, `honeypot_permissive_policy`, `selfdestruct_warn_regression`, and `fee_manipulation_safe_allow`
   - after tightening `derive_policy()`, `python auto/bench.py --json-out auto/runs/latest.json` is green again with those local holdouts loaded
+- Ran the next hidden holdout discovery batch locally:
+  - found a new selector gap where `pause()` silently returned `allow` because it never reached a detector or policy signal
+  - moved `pause()` onto the existing suspicious-selector path so it now warns with `suspicious_selector_signal` instead of passing clean
+  - expanded the private local corpora with fresh `pause()`, `reentrancy`, and proxy `fetch_failed` holdouts/candidates
+  - `python auto/loop.py --allow-failures` is green again at `26/26` checks
 - Tightened first-pass policy precedence from the autoresearch findings:
   - `hidden_mint` and `honeypot` now block even when the numeric score is only `low`
   - `SELFDESTRUCT` now forces at least `manual_review` even when the numeric score is only `low`
@@ -133,6 +138,10 @@
 - Promoted the four highest-signal local policy blind spots into the tracked public corpus:
   - promoted to `auto/corpus/public_cases.json`: hidden mint -> `block`, honeypot -> `block`, selfdestruct -> `manual_review`, fee manipulation -> `warn`
   - intentionally left the low-score resolved-proxy `warn` case in local holdouts because the tracked corpus already covers unresolved and nested proxy semantics and should stay compact
+- Committed, pushed, and deployed the autoresearch/policy-hardening batch:
+  - commit: `71ba517` (`Add autoresearch harness and tighten policy semantics`)
+  - pushed to `origin/master`
+  - `flyctl deploy --remote-only` succeeded for `augurrisk`
 - Committed and deployed the policy-output pass:
   - commit: `9cf5e0f` (`Add first-pass policy decisions to analyze`)
   - verified live `https://augurrisk.com/skill.md`
@@ -195,6 +204,7 @@
   - prefer adding a reproducible case before changing implementation
   - keep local holdout corpora untracked so the loop cannot merely overfit the visible tracked corpus
   - current tracked corpus is intentionally small; the next useful work is adding real hidden holdout cases under `auto/corpus/*.local.json`
+  - keep `pause()` on the suspicious-selector path for now; it should warn instead of silently allowing, but it does not yet justify a dedicated public detector or automatic block
   - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
 - Current analytics read:
   - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
@@ -244,10 +254,12 @@
 8. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
 9. Validate the new policy outputs on real Base contracts and tighten the mapping if any obvious blue-chip or proxy cases feel operationally wrong.
 10. Use real `/stats` and paid-call observations to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
-11. In the next session, put the new autoresearch harness to work:
-   - decide which of the new local hidden-mint / honeypot / selfdestruct / fee-policy cases deserve promotion into `auto/corpus/public_cases.json`
-   - add the next batch of real hidden holdouts under `auto/corpus/*.local.json`
-   - keep using `python auto/bench.py` before detector or policy edits
+11. In the next session, start a fresh hidden holdout discovery batch:
+   - use `python auto/loop.py` as the default runner
+   - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
+   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, and proxy `fetch_failed` manual-review behavior
+   - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
+   - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
 12. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints

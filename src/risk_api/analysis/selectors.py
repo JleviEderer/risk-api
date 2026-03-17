@@ -26,8 +26,6 @@ MALICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("ec28438a"): "setMaxTxAmount(uint256)",
     # setMaxWalletSize(uint256)
     bytes.fromhex("b6c52324"): "setMaxWalletSize(uint256)",
-    # pause() — owner can freeze all transfers
-    bytes.fromhex("8456cb59"): "pause()",
 }
 
 # Suspicious selectors — risky but context-dependent
@@ -44,6 +42,8 @@ SUSPICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("e01af92c"): "setSwapEnabled(bool)",
     # excludeFromFee(address) — selective fee bypass
     bytes.fromhex("437823ec"): "excludeFromFee(address)",
+    # pause() — common enough to warn on, but not to hard-block by itself
+    bytes.fromhex("8456cb59"): "pause()",
 }
 
 # Standard ERC-20 selectors (for reference / false-positive filtering)

@@ -143,6 +143,19 @@ def test_analyze_fee_manipulation_warns_even_when_score_is_safe():
 
 
 @responses.activate
+def test_analyze_pause_selector_warns_even_when_score_is_safe():
+    bytecode = "0x638456cb59" + "00" * 200
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "f2" * 20, RPC_URL)
+
+    assert result.score == 5
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.WARN
+    assert PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
 def test_analyze_eoa():
     responses.post(RPC_URL, json=_rpc_response("0x"))
     with pytest.raises(NoBytecodeError, match="No contract bytecode found"):

@@ -93,6 +93,14 @@ def test_suspicious_selectors_scored():
     assert result.category_scores.get("suspicious_selector", 0) == 5
 
 
+def test_pause_selector_scored_as_suspicious():
+    bytecode = "638456cb59" + "00" * 200
+    instructions = disassemble(bytecode)
+    findings = run_all_detectors(instructions)
+    result = compute_score(findings, instructions, bytecode)
+    assert result.category_scores.get("suspicious_selector", 0) == 5
+
+
 def test_deployer_reputation_category_cap():
     # Multiple deployer_reputation findings should cap at 10
     findings = [

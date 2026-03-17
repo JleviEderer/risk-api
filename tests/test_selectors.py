@@ -42,11 +42,13 @@ def test_find_malicious_selectors():
 def test_find_suspicious_selectors():
     selectors = {
         bytes.fromhex("715018a6"),  # renounceOwnership
+        bytes.fromhex("8456cb59"),  # pause
         bytes.fromhex("18160ddd"),  # totalSupply — standard
     }
     suspicious = find_suspicious_selectors(selectors)
-    assert len(suspicious) == 1
+    assert len(suspicious) == 2
     assert bytes.fromhex("715018a6") in suspicious
+    assert bytes.fromhex("8456cb59") in suspicious
 
 
 def test_no_false_positives_on_clean_erc20():
