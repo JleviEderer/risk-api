@@ -11,8 +11,11 @@ from risk_api.analysis.disassembler import Instruction
 FEE_MANIPULATION_LABEL_TERMS = (
     "fee",
     "tax",
+    "maxbuy",
     "maxtx",
+    "maxtxn",
     "maxwallet",
+    "txlimit",
     "maxsell",
     "walletlimit",
 )
@@ -35,6 +38,12 @@ MALICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("ec28438a"): "setMaxTxAmount(uint256)",
     # setMaxWalletSize(uint256)
     bytes.fromhex("b6c52324"): "setMaxWalletSize(uint256)",
+    # setMaxBuyAmount(uint256)
+    bytes.fromhex("f34eb0b8"): "setMaxBuyAmount(uint256)",
+    # setTxLimit(uint256)
+    bytes.fromhex("5c85974f"): "setTxLimit(uint256)",
+    # setMaxTxnAmount(uint256)
+    bytes.fromhex("74010ece"): "setMaxTxnAmount(uint256)",
     # setMaxSellAmount(uint256)
     bytes.fromhex("e99c9d09"): "setMaxSellAmount(uint256)",
     # setWalletLimit(uint256)

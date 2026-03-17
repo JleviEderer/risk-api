@@ -144,7 +144,7 @@ def test_analyze_fee_manipulation_warns_even_when_score_is_safe():
 
 @responses.activate
 def test_analyze_limit_alias_warns_without_suspicious_double_count():
-    bytecode = "0x63e99c9d0963f1d5f517" + "00" * 200
+    bytecode = "0x63f34eb0b8635c85974f6374010ece63e99c9d0963f1d5f517" + "00" * 200
     responses.post(RPC_URL, json=_rpc_response(bytecode))
 
     result = analyze_contract("0x" + "f4" * 20, RPC_URL)

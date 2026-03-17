@@ -111,7 +111,7 @@ def test_blacklist_selector_without_transfer_still_scores_as_suspicious():
 
 
 def test_limit_aliases_score_as_fee_manipulation_without_suspicious_double_count():
-    bytecode = "63e99c9d0963f1d5f517" + "00" * 200
+    bytecode = "63f34eb0b8635c85974f6374010ece63e99c9d0963f1d5f517" + "00" * 200
     instructions = disassemble(bytecode)
     findings = run_all_detectors(instructions)
     result = compute_score(findings, instructions, bytecode)
