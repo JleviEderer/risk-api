@@ -1,11 +1,11 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-16
+- Date: 2026-03-17
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `71ba517`
-- Status: green; latest autoresearch/policy pass is committed, pushed, and deployed. Local worktree is clean except for untracked local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`)
+- HEAD: `09a75f6`
+- Status: local worktree contains the batch 5 deployer-reputation pass plus operator-note edits and local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`). Four serial hidden holdout discovery batches remain the latest committed/deployed baseline at `09a75f6`; the deployer-reputation patch is implemented and locally verified but still needs commit/push/deploy decisions informed by the Etherscan key-plan blocker below.
 
 ## What Changed
 - Added a strategy memo that locks the current wedge:
@@ -108,6 +108,36 @@
   - kept full honeypot blocking unchanged when transfer selectors are present, but now routes orphan blacklist controls through the existing suspicious-selector warning path
   - expanded the private local corpora again with blacklist-without-transfer holdouts/candidates
   - `python auto/loop.py --allow-failures` is green again at `28/28` checks
+- Committed, pushed, and deployed two more hidden-holdout batches:
+  - commit: `fccbbb0` (`Warn on pause selectors in autoresearch batch`)
+  - change: `pause()` now warns via `suspicious_selector_signal` instead of silently allowing
+  - commit: `a3fb26d` (`Warn on orphan blacklist selectors`)
+  - change: orphan `blacklist(address)` / `addToBlacklist(address)` selectors now warn via the suspicious-selector path when no concrete detector surfaces them
+  - both commits were pushed to `origin/master`
+  - both `flyctl deploy --remote-only` runs succeeded for `augurrisk`
+  - live checks passed for `https://augurrisk.com/health` and `https://augurrisk.com/openapi.json`
+- Ran a third hidden holdout pass after deploying `a3fb26d`:
+  - found a fee/limit alias gap where raw `setMaxSellAmount(uint256)` and `setWalletLimit(uint256)` selectors still returned clean `allow`
+  - added those aliases to the fee-manipulation family and shared the label matcher between detector surfacing and orphan-selector suppression so they warn at score `15` without extra suspicious-selector points
+  - expanded the private local candidate corpus with the new limit-control cases
+  - `python auto/loop.py --allow-failures` is green again at `30/30` checks
+- Committed, pushed, and deployed the third hidden-holdout batch:
+  - commit: `71a394c` (`Warn on fee-limit selector aliases`)
+  - change: `setMaxSellAmount(uint256)` and `setWalletLimit(uint256)` now surface as `fee_manipulation` rather than silently allowing
+  - pushed to `origin/master`
+  - `flyctl deploy --remote-only` succeeded for `augurrisk`
+  - live checks passed for `https://augurrisk.com/health` and `https://augurrisk.com/openapi.json`
+- Ran a fourth hidden holdout pass after deploying `71a394c`:
+  - found a follow-on transaction-limit alias gap where raw `setMaxBuyAmount(uint256)`, `setTxLimit(uint256)`, and `setMaxTxnAmount(uint256)` selectors still returned clean `allow`
+  - extended the shared fee/limit alias family so these common anti-whale selectors now surface as `fee_manipulation`
+  - expanded the private local candidate corpus with the new transaction-limit cases
+  - `python auto/loop.py --allow-failures` is green again at `32/32` checks
+- Committed, pushed, and deployed the fourth hidden-holdout batch:
+  - commit: `09a75f6` (`Warn on tx-limit selector aliases`)
+  - change: `setMaxBuyAmount(uint256)`, `setTxLimit(uint256)`, and `setMaxTxnAmount(uint256)` now warn through the fee-manipulation path instead of silently allowing
+  - pushed to `origin/master`
+  - `flyctl deploy --remote-only` succeeded for `augurrisk`
+  - live checks passed for `https://augurrisk.com/health` and `https://augurrisk.com/openapi.json`
 - Tightened first-pass policy precedence from the autoresearch findings:
   - `hidden_mint` and `honeypot` now block even when the numeric score is only `low`
   - `SELFDESTRUCT` now forces at least `manual_review` even when the numeric score is only `low`
@@ -206,12 +236,32 @@
   - this is a default first-pass recommendation layer, not a replacement for caller-specific policy logic
 - Current detector-research rule:
   - use `auto/bench.py` as the bounded local harness for adversarial bytecode, policy edge cases, and API-contract drift
+  - run hidden discovery batches serially; let each batch land, deploy, and become the new baseline before starting the next one
   - prefer adding a reproducible case before changing implementation
   - keep local holdout corpora untracked so the loop cannot merely overfit the visible tracked corpus
   - current tracked corpus is intentionally small; the next useful work is adding real hidden holdout cases under `auto/corpus/*.local.json`
+  - keep fee/limit selector alias matching shared between detector surfacing and orphan-selector filtering so limit controls warn at `15` instead of double-counting as `suspicious_selector`
+  - keep transaction-limit aliases like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` in that same shared fee/limit family
   - keep `pause()` on the suspicious-selector path for now; it should warn instead of silently allowing, but it does not yet justify a dedicated public detector or automatic block
   - if a known malicious selector is present but no concrete detector surfaces it, prefer warning through the suspicious-selector path over silently allowing it
   - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
+- Current detector weakness read:
+  - observed hidden-batch misses have been concentrated in `fee_manipulation` alias coverage and `suspicious_selector` fallback coverage, not repeated core `honeypot` misses
+  - the main `honeypot` issue found so far was policy severity on blacklist-style cases; the detector itself is still structurally narrow and remains a future research target rather than the current dominant failure source
+  - `reentrancy` is also structurally narrow (`CALL` then nearby `SSTORE`) and should be treated as heuristic coverage, not deep semantic analysis
+  - `deployer_reputation` is the weakest detector operationally because it depends on explorer APIs; failures can erase signal even when bytecode analysis is healthy
+- Current deployer-reputation fix read:
+  - the smallest safe code pass is now implemented locally:
+    - `src/risk_api/analysis/reputation.py` now uses Etherscan V2 (`https://api.etherscan.io/v2/api`) with `chainid=8453`
+    - preserves the repo rule that external API failure stays distinct from true `NOT_FOUND`
+    - adds request throttling plus light retry/backoff for retryable soft errors
+    - `src/risk_api/config.py` now prefers `ETHERSCAN_API_KEY` and falls back to legacy `BASESCAN_API_KEY`
+    - `tests/test_reputation.py` and `tests/test_config.py` now cover the V2 request shape, retries, and key preference/fallback
+  - real environment check found an operational blocker:
+    - current local key against Etherscan V2 on Base returns `Free API access is not supported for this chain...`
+    - current BaseScan V1 path also returns a deprecation error, so the old live path is likely already degraded rather than healthy
+    - practical next step is provisioning a paid/eligible Etherscan key, then re-running a real creator lookup before trusting live deployer-reputation findings again
+  - optional later improvement: evaluate the paid `fundedby` endpoint as a better wallet-provenance signal than the current first-transaction heuristic once the key-plan issue is settled
 - Current analytics read:
   - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
   - interpret recent `402` rows carefully if you have just run your own probes against `/analyze`
@@ -262,11 +312,34 @@
 10. Use real `/stats` and paid-call observations to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
 11. In the next session, start a fresh hidden holdout discovery batch:
    - use `python auto/loop.py` as the default runner
+   - run one batch at a time; do not queue multiple hidden discovery batches before you know what the previous one changed
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
-   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, and blacklist-controls-without-transfer warning behavior
+   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, blacklist-controls-without-transfer warning behavior, fee/limit alias warning behavior, and transaction-limit alias warning behavior
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
-12. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
+12. Automation follow-up:
+   - keep serial hidden-batch runs manual for now while the fixes are still shaping the research workflow
+   - later, build a guarded local orchestrator that can run `N` serial batches end-to-end: hidden batch -> validation -> commit -> push -> deploy -> live verify -> next batch
+   - first version should stay constrained to narrow selector/policy research surfaces and fail closed on ambiguous results
+13. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
+
+## Tomorrow Start Here
+1. Confirm the baseline and local verification state:
+   - latest committed/deployed baseline is still `09a75f6`
+   - local reputation patch should still have `python auto/loop.py --allow-failures` green and `python -m pytest -q` green
+2. Start with credentials, not detector widening:
+   - provision or locate a paid/eligible `ETHERSCAN_API_KEY` for Base chain coverage
+   - remember `src/risk_api/config.py` already falls back to legacy `BASESCAN_API_KEY`, but the value itself still needs to be an Etherscan V2-capable key
+3. Re-run the real reputation smoke check before deciding on deploy:
+   - hit `getcontractcreation` on Base (`chainid=8453`) with the configured key
+   - confirm the response is real data, not `Free API access is not supported for this chain...`
+   - remember the old BaseScan V1 path now returns a deprecation error too
+4. If the key works, finish the landing sequence:
+   - commit the local reputation/docs/test changes
+   - push
+   - deploy
+   - live-verify `/health`, `/openapi.json`, and one real reputation-backed analysis path if payment/key access allows it
+5. Only after the reputation path is either fully landed with a working key or explicitly deferred should batch 5 continue into a new hidden discovery probe.

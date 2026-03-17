@@ -9,6 +9,18 @@
    Do instead: keep `pause()` on the `suspicious_selector` path so transfer-freeze authority warns via `suspicious_selector_signal` without inventing a new detector or auto-block rule yet.
 4. **[2026-03-16] Do not let orphan malicious selectors silently pass**
    Do instead: if a selector is in the malicious table but no concrete detector surfaces it, route it through the `suspicious_selector` warning path instead of returning clean `allow`.
+5. **[2026-03-16] Run hidden discovery batches serially**
+   Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable.
+6. **[2026-03-16] Keep fee/limit alias matching shared**
+   Do instead: when you add fee-control selector aliases, reuse one label matcher across `detect_fee_manipulation()` and orphan-selector filtering so known limit controls warn at `15` instead of double-counting as `suspicious_selector`.
+7. **[2026-03-16] Treat transaction-limit aliases as the same fee/limit family**
+   Do instead: keep selectors like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` in the same shared fee/limit path as `setMaxSellAmount` and `setWalletLimit` so common anti-whale aliases do not slip through as clean `allow`.
+8. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
+   Do instead: keep the human in the loop between hidden batches while the research loop is still shaping itself; only automate commit/push/deploy-to-next-batch chaining after the allowed fix surfaces and stop conditions are explicit.
+9. **[2026-03-17] `deployer_reputation` should use Etherscan V2 with a Base-capable key**
+   Do instead: keep reputation lookups on `https://api.etherscan.io/v2/api` with `chainid=8453`, keep explorer failure distinct from true `NOT_FOUND`, add throttling/soft-error handling, and remember that the current free/local key path returns `Free API access is not supported for this chain`, so credential plan is part of the fix.
+10. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
+   Do instead: treat `fee_manipulation` and `suspicious_selector` alias coverage as the active weak spots; keep honeypot and reentrancy on the watchlist, but do not assume they are the dominant hidden failure source without new cases.
 
 ## Local Tooling
 1. **[2026-03-12] On this 8 GB Intel iGPU laptop, QMD's safest high-quality mode is structured `lex+vec`**

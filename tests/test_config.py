@@ -14,6 +14,7 @@ def _clean_env(monkeypatch):
     monkeypatch.setattr("risk_api.config.load_dotenv", lambda **kwargs: None)
     monkeypatch.setenv("WALLET_ADDRESS", "0x" + "ab" * 20)
     monkeypatch.delenv("ERC8004_AGENT_ID", raising=False)
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
     monkeypatch.delenv("BASESCAN_API_KEY", raising=False)
 
 
@@ -33,6 +34,13 @@ def test_load_config_with_basescan_key(monkeypatch):
     monkeypatch.setenv("BASESCAN_API_KEY", "my-secret-key")
     config = load_config()
     assert config.basescan_api_key == "my-secret-key"
+
+
+def test_load_config_prefers_etherscan_key(monkeypatch):
+    monkeypatch.setenv("BASESCAN_API_KEY", "old-key")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "new-key")
+    config = load_config()
+    assert config.basescan_api_key == "new-key"
 
 
 def test_load_config_empty_agent_id(monkeypatch):

@@ -1371,7 +1371,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
   <div class="detector"><div class="name">Hidden Mint</div><div class="desc">Unauthorized token creation</div></div>
   <div class="detector"><div class="name">Fee Manipulation</div><div class="desc">Dynamic fee extraction patterns</div></div>
   <div class="detector"><div class="name">Delegatecall</div><div class="desc">External code execution risk</div></div>
-  <div class="detector"><div class="name">Deployer Reputation</div><div class="desc">Basescan deployer history</div></div>
+  <div class="detector"><div class="name">Deployer Reputation</div><div class="desc">Etherscan-backed deployer history</div></div>
 </div>
 </div>
 
@@ -1713,7 +1713,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
             "Honeypot bytecode patterns that can trap exits or restrict transfers.",
             "Fee manipulation and hidden mint signals that often travel with scam tokens.",
             "Proxy and delegatecall behavior that can hide mutable token logic.",
-            "Deployer reputation context from Basescan-backed history checks.",
+            "Deployer reputation context from Etherscan-backed history checks.",
         ],
     },
     "/proxy-risk-api": {
@@ -1749,7 +1749,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
         "eyebrow": "Use Case",
         "summary": (
             "Use Augur when contract triage needs more than raw bytecode. The deployer "
-            "reputation detector adds Basescan-backed context so an agent can weigh "
+            "reputation detector adds Etherscan-backed context so an agent can weigh "
             "who deployed a contract, not just what the bytecode contains."
         ),
         "problem_points": [
@@ -1758,7 +1758,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
             "Keep reputation in the same response shape as the rest of Augur's findings.",
         ],
         "check_points": [
-            "Deployer reputation signals gathered through the existing Basescan-backed path.",
+            "Deployer reputation signals gathered through the existing Etherscan-backed path.",
             "Bytecode findings that combine with reputation instead of replacing it.",
             "A single 0-100 score plus category scores for downstream agent policies.",
             "The same paid /analyze endpoint used by the landing page, OpenAPI, and MCP wrapper.",
@@ -2176,7 +2176,7 @@ __PROXY_ANALYSIS_EXAMPLE_JSON__
 5. **Hidden Mint** - highlights mint-related capability that may matter for token trust decisions.
 6. **Fee Manipulation** - surfaces fee and transfer-tax related bytecode signals.
 7. **Delegatecall** - flags external code execution surfaces that may affect mutability or trust.
-8. **Deployer Reputation** - adds deployer-history context when Basescan-backed data is available.
+8. **Deployer Reputation** - adds deployer-history context when Etherscan-backed data is available.
 
 ## Error Responses
 
@@ -2714,7 +2714,7 @@ def create_app(
                             "8 detectors: proxy contracts (EIP-1967/1822/OZ), reentrancy "
                             "vulnerabilities, selfdestruct capability, honeypot patterns, "
                             "hidden mint functions, fee manipulation, delegatecall usage, "
-                            "and deployer wallet reputation via Basescan."
+                            "and deployer wallet reputation via Etherscan."
                         ),
                     },
                 },
@@ -3017,7 +3017,7 @@ def create_app(
                 "Bytecode-level risk scoring for Base mainnet smart contracts. "
                 "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
                 "selfdestruct, reentrancy patterns, honeypot, proxy detection, "
-                "deployer reputation (Basescan). Returns a 0-100 composite "
+                "deployer reputation (Etherscan-backed). Returns a 0-100 composite "
                 "risk score with per-category breakdown.\n\n"
                 "## Usage\n\n"
                 "GET /analyze?address={base_contract_address}\n"

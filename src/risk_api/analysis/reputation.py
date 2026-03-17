@@ -1,7 +1,7 @@
-"""Deployer wallet reputation scoring via Basescan API.
+"""Deployer wallet reputation scoring via Etherscan V2 on Base.
 
 Checks deployer wallet age and transaction count. Fresh/inactive deployers
-are a risk signal — scammers often use burner wallets.
+are a risk signal - scammers often use burner wallets.
 
 Graceful degradation: if no API key or API fails, returns empty findings.
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -20,7 +21,12 @@ from risk_api.analysis.patterns import Finding, Severity
 
 logger = logging.getLogger(__name__)
 
-BASESCAN_API = "https://api.basescan.org/api"
+ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api"
+BASE_CHAIN_ID = "8453"
+REQUEST_TIMEOUT_SECONDS = 10
+REQUEST_INTERVAL_SECONDS = 0.25
+RETRY_BACKOFF_SECONDS = 0.5
+MAX_REQUEST_ATTEMPTS = 2
 
 # Thresholds
 YOUNG_WALLET_DAYS = 7
@@ -42,23 +48,88 @@ class CreatorLookupResult:
 
 _creator_cache: dict[tuple[str, str], CreatorLookupResult] = {}
 _CREATOR_CACHE_MAX_SIZE = 256
+_request_lock = threading.Lock()
+_last_request_started_at = 0.0
 
 
-def _looks_like_basescan_soft_error(data: object) -> bool:
+def _normalize_text(value: object) -> str:
+    return str(value).strip().lower()
+
+
+def _looks_like_etherscan_not_found(data: object) -> bool:
+    """Return True when the body indicates missing data rather than an API failure."""
+    if not isinstance(data, dict):
+        return False
+
+    status = _normalize_text(data.get("status", ""))
+    if status == "1":
+        return False
+
+    message = _normalize_text(data.get("message", ""))
+    result = data.get("result")
+    result_text = _normalize_text(result) if isinstance(result, str) else ""
+
+    if isinstance(result, list) and not result:
+        return True
+
+    not_found_markers = (
+        "no data found",
+        "no records found",
+        "no transactions found",
+    )
+    return any(marker in message or marker in result_text for marker in not_found_markers)
+
+
+def _looks_like_etherscan_retryable_soft_error(data: object) -> bool:
+    """Return True when the body indicates a temporary Etherscan-side failure."""
+    if not isinstance(data, dict):
+        return False
+
+    status = _normalize_text(data.get("status", ""))
+    if status == "1":
+        return False
+
+    message = _normalize_text(data.get("message", ""))
+    result = data.get("result")
+    result_text = _normalize_text(result) if isinstance(result, str) else ""
+    combined = f"{message} {result_text}"
+
+    retryable_markers = (
+        "max rate limit reached",
+        "rate limit",
+        "temporarily unavailable",
+        "query timeout",
+        "timeout",
+        "server too busy",
+        "max calls per sec",
+    )
+    return any(marker in combined for marker in retryable_markers)
+
+
+def _looks_like_etherscan_soft_error(data: object) -> bool:
     """Return True when a 200 response body still indicates an API-side failure."""
     if not isinstance(data, dict):
         return True
 
-    message = str(data.get("message", "")).lower()
-    result = data.get("result")
-    result_text = result.lower() if isinstance(result, str) else ""
+    if _looks_like_etherscan_not_found(data):
+        return False
 
+    status = _normalize_text(data.get("status", ""))
+    if status == "1":
+        return False
+
+    result = data.get("result")
+    if data.get("jsonrpc") == "2.0" and result is not None:
+        return False
+
+    message = _normalize_text(data.get("message", ""))
+    result_text = _normalize_text(result) if isinstance(result, str) else ""
     error_markers = (
         "notok",
-        "rate limit",
         "invalid api key",
         "missing api key",
-        "api key",
+        "missing or unsupported chainid",
+        "unsupported chain",
         "error",
         "temporar",
         "timeout",
@@ -66,10 +137,60 @@ def _looks_like_basescan_soft_error(data: object) -> bool:
     return any(marker in message or marker in result_text for marker in error_markers)
 
 
+def _throttle_etherscan_requests() -> None:
+    global _last_request_started_at
+    with _request_lock:
+        now = time.monotonic()
+        sleep_for = REQUEST_INTERVAL_SECONDS - (now - _last_request_started_at)
+        if sleep_for > 0:
+            time.sleep(sleep_for)
+            now = time.monotonic()
+        _last_request_started_at = now
+
+
+def _etherscan_get(params: dict[str, object], api_key: str) -> dict[str, object] | None:
+    request_params = {
+        "chainid": BASE_CHAIN_ID,
+        "apikey": api_key,
+        **params,
+    }
+    backoff_seconds = RETRY_BACKOFF_SECONDS
+
+    for attempt in range(MAX_REQUEST_ATTEMPTS):
+        _throttle_etherscan_requests()
+        try:
+            resp = requests.get(
+                ETHERSCAN_V2_API,
+                params=request_params,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except (requests.RequestException, ValueError) as e:
+            logger.debug("Etherscan request failed: %s", e)
+            if attempt + 1 >= MAX_REQUEST_ATTEMPTS:
+                return None
+            time.sleep(backoff_seconds)
+            backoff_seconds *= 2
+            continue
+
+        if _looks_like_etherscan_retryable_soft_error(data):
+            logger.debug("Etherscan request returned retryable soft error: %s", data)
+            if attempt + 1 >= MAX_REQUEST_ATTEMPTS:
+                return data
+            time.sleep(backoff_seconds)
+            backoff_seconds *= 2
+            continue
+
+        return data
+
+    return None
+
+
 def get_contract_creator(
     address: str, api_key: str
 ) -> CreatorLookupResult:
-    """Get contract deployer address and creation tx hash from Basescan.
+    """Get contract deployer address and creation tx hash from Etherscan V2.
 
     Returns a structured result that distinguishes success, not-found, and
     external error conditions.
@@ -83,14 +204,10 @@ def get_contract_creator(
         "module": "contract",
         "action": "getcontractcreation",
         "contractaddresses": address,
-        "apikey": api_key,
     }
-    try:
-        resp = requests.get(BASESCAN_API, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, ValueError) as e:
-        logger.debug("Basescan contract creator lookup failed: %s", e)
+    data = _etherscan_get(params, api_key)
+    if data is None:
+        logger.debug("Etherscan contract creator lookup failed for %s", address)
         return CreatorLookupResult(CreatorLookupStatus.ERROR)
 
     if data.get("status") == "1" and data.get("result"):
@@ -103,14 +220,14 @@ def get_contract_creator(
         _creator_cache_put(key, result)
         return result
 
-    if _looks_like_basescan_soft_error(data):
-        logger.debug("Basescan contract creator lookup returned soft error: %s", data)
-        return CreatorLookupResult(CreatorLookupStatus.ERROR)
-
-    if not data.get("result"):
+    if _looks_like_etherscan_not_found(data):
         result = CreatorLookupResult(CreatorLookupStatus.NOT_FOUND)
         _creator_cache_put(key, result)
         return result
+
+    if _looks_like_etherscan_soft_error(data):
+        logger.debug("Etherscan contract creator lookup returned soft error: %s", data)
+        return CreatorLookupResult(CreatorLookupStatus.ERROR)
 
     return CreatorLookupResult(CreatorLookupStatus.ERROR)
 
@@ -142,20 +259,23 @@ def get_first_tx_timestamp(
         "page": 1,
         "offset": 1,
         "sort": "asc",
-        "apikey": api_key,
     }
-    try:
-        resp = requests.get(BASESCAN_API, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, ValueError) as e:
-        logger.debug("Basescan txlist lookup failed: %s", e)
+    data = _etherscan_get(params, api_key)
+    if data is None:
+        logger.debug("Etherscan txlist lookup failed for %s", deployer)
+        return None
+
+    if _looks_like_etherscan_soft_error(data):
+        logger.debug("Etherscan txlist lookup returned soft error: %s", data)
         return None
 
     if data.get("status") != "1" or not data.get("result"):
         return None
 
-    return int(data["result"][0]["timeStamp"])
+    try:
+        return int(data["result"][0]["timeStamp"])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 @functools.lru_cache(maxsize=256)
@@ -169,14 +289,14 @@ def get_tx_count(deployer: str, api_key: str) -> int | None:
         "action": "eth_getTransactionCount",
         "address": deployer,
         "tag": "latest",
-        "apikey": api_key,
     }
-    try:
-        resp = requests.get(BASESCAN_API, params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, ValueError) as e:
-        logger.debug("Basescan tx count lookup failed: %s", e)
+    data = _etherscan_get(params, api_key)
+    if data is None:
+        logger.debug("Etherscan tx count lookup failed for %s", deployer)
+        return None
+
+    if _looks_like_etherscan_soft_error(data):
+        logger.debug("Etherscan tx count lookup returned soft error: %s", data)
         return None
 
     result = data.get("result")
@@ -208,7 +328,7 @@ def detect_deployer_reputation(
             Finding(
                 detector="deployer_reputation",
                 severity=Severity.INFO,
-                title="Contract creator not found on Basescan",
+                title="Contract creator not found in Base explorer data",
                 description=(
                     "Could not determine the deployer of this contract. "
                     "It may be very new or deployed via an unusual method."
@@ -261,6 +381,8 @@ def detect_deployer_reputation(
 
 def clear_reputation_cache() -> None:
     """Clear all reputation LRU caches (for testing)."""
+    global _last_request_started_at
     _creator_cache.clear()
     get_first_tx_timestamp.cache_clear()
     get_tx_count.cache_clear()
+    _last_request_started_at = 0.0
