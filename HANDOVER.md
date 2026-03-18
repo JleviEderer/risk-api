@@ -4,19 +4,23 @@
 - Date: 2026-03-17
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `a0547a4`
-- Status: green on `a0547a4`; the batch 5 deployer-reputation pass is committed, pushed, and deployed. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`). Remaining risk is operational: the explorer key/plan still needs confirmation for live Base coverage.
+- HEAD: `aef6f28`
+- Status: local worktree contains a follow-on batch 5 deployer-reputation pass that replaces the paid-key Etherscan path with public Base Blockscout lookups. The latest committed/deployed baseline is still the earlier Etherscan pass (`a0547a4`); local verification is green and the Blockscout path is working without a key, but commit/push/deploy has not happened yet.
 
 ## What Changed
-- Landed the batch 5 deployer-reputation migration:
+- The committed/deployed baseline currently includes the first Etherscan V2 pass:
   - commit: `a0547a4` (`Move deployer reputation to Etherscan V2`)
-  - `src/risk_api/analysis/reputation.py` now uses Etherscan V2 on Base (`chainid=8453`) with light throttling/retry and clearer soft-error handling
-  - `src/risk_api/config.py` now prefers `ETHERSCAN_API_KEY` and falls back to legacy `BASESCAN_API_KEY`
-  - `tests/test_reputation.py` and `tests/test_config.py` now lock the V2 request shape, retry behavior, and env-var preference
-  - `src/risk_api/app.py`, `CLAUDE.md`, and `scripts/register_moltmart.py` now say Etherscan-backed instead of Basescan-backed
-  - pushed to `origin/master`
-  - `flyctl deploy --remote-only` succeeded for `augurrisk`
-  - live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, `https://augurrisk.com/`, and `https://augurrisk.com/deployer-reputation-api`
+  - docs-only follow-up commit: `aef6f28` (`Refresh handover after reputation deploy`)
+- New local follow-up replaces the paid-key path with Blockscout:
+  - `src/risk_api/analysis/reputation.py` now uses public Base Blockscout endpoints for creator lookup and transaction-history probes
+  - `get_tx_count()` no longer depends on explorer proxy RPC; it now uses a cheap tx-history probe that is exact for low-count wallets and clamped at the threshold for busy wallets
+  - missing explorer keys no longer disable deployer reputation; `BLOCKSCOUT_API_KEY` is optional and only used for higher-rate access
+  - `src/risk_api/config.py` now prefers `BLOCKSCOUT_API_KEY` and only falls back to legacy `ETHERSCAN_API_KEY` / `BASESCAN_API_KEY`
+  - public wording in `src/risk_api/app.py` is now generic `explorer-backed` copy instead of vendor-specific copy
+  - local verification is green:
+    - `python -m pytest -q`
+    - `python auto/loop.py --allow-failures`
+    - real no-key smoke check: creator lookup, first-tx lookup, and low-tx probe all worked against Base Blockscout for a live Base contract
 - Added a strategy memo that locks the current wedge:
   - `docs/PRODUCT_WEDGE_MEMO.md`
   - frames Augur as `Base contract admission control for agents`
@@ -260,17 +264,16 @@
   - `reentrancy` is also structurally narrow (`CALL` then nearby `SSTORE`) and should be treated as heuristic coverage, not deep semantic analysis
   - `deployer_reputation` is the weakest detector operationally because it depends on explorer APIs; failures can erase signal even when bytecode analysis is healthy
 - Current deployer-reputation fix read:
-  - the smallest safe code pass is now landed:
-    - `src/risk_api/analysis/reputation.py` now uses Etherscan V2 (`https://api.etherscan.io/v2/api`) with `chainid=8453`
-    - preserves the repo rule that external API failure stays distinct from true `NOT_FOUND`
-    - adds request throttling plus light retry/backoff for retryable soft errors
-    - `src/risk_api/config.py` now prefers `ETHERSCAN_API_KEY` and falls back to legacy `BASESCAN_API_KEY`
-    - `tests/test_reputation.py` and `tests/test_config.py` now cover the V2 request shape, retries, and key preference/fallback
-  - real environment check found an operational blocker:
+  - the current best path is now the Blockscout rewrite, not the paid-key Etherscan path:
+    - Base Blockscout public endpoints returned real creator lookup and tx-history data in local smoke tests with no key
+    - the detector still preserves the repo rule that external API failure stays distinct from true `NOT_FOUND`
+    - request throttling/retry remains in place for explorer-side failures
+    - `BLOCKSCOUT_API_KEY` is optional for higher limits; `ETHERSCAN_API_KEY` / `BASESCAN_API_KEY` are legacy fallbacks only
+    - practical next step is to land the Blockscout pass, then verify live reputation-backed analysis behavior without paying for Etherscan
+  - the Etherscan result is now background context, not the recommended plan:
     - current local key against Etherscan V2 on Base returns `Free API access is not supported for this chain...`
-    - current BaseScan V1 path also returns a deprecation error, so the old live path is likely already degraded rather than healthy
-    - practical next step is provisioning a paid/eligible Etherscan key, then re-running a real creator lookup before trusting live deployer-reputation findings again
-  - optional later improvement: evaluate the paid `fundedby` endpoint as a better wallet-provenance signal than the current first-transaction heuristic once the key-plan issue is settled
+    - current BaseScan V1 path also returns a deprecation error
+  - optional later improvement: evaluate a richer wallet-provenance signal only if real users prove deployer reputation matters enough to justify more dependency or spend
 - Current analytics read:
   - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
   - interpret recent `402` rows carefully if you have just run your own probes against `/analyze`
@@ -336,19 +339,19 @@
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
 
 ## Tomorrow Start Here
-1. Confirm the new baseline and deployment state:
-   - latest committed/deployed baseline is `a0547a4`
-   - `python auto/loop.py --allow-failures` was green and `python -m pytest -q` was green before deploy
-   - live `https://augurrisk.com/health` and `https://augurrisk.com/openapi.json` were healthy after deploy
-2. Start with credentials, not detector widening:
-   - provision or locate a paid/eligible `ETHERSCAN_API_KEY` for Base chain coverage
-   - remember `src/risk_api/config.py` already falls back to legacy `BASESCAN_API_KEY`, but the value itself still needs to be an Etherscan V2-capable key
-3. Re-run the real reputation smoke check before deciding on deploy:
-   - hit `getcontractcreation` on Base (`chainid=8453`) with the configured key
-   - confirm the response is real data, not `Free API access is not supported for this chain...`
-   - remember the old BaseScan V1 path now returns a deprecation error too
-4. If the key works, finish the runtime follow-up:
-   - update the production secret if needed
-   - verify one real reputation-backed analysis path if payment/key access allows it
-   - record whether deployer-reputation findings are flowing again or still degrading gracefully
+1. Confirm the local Blockscout pass is still green:
+   - committed/deployed baseline is still `a0547a4`, but local work is beyond that
+   - `python -m pytest -q` should still be green
+   - `python auto/loop.py --allow-failures` should still be green
+2. Commit/push/deploy the Blockscout pass:
+   - this is now the preferred fix path, not provisioning a paid Etherscan key
+   - keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically
+3. After deploy, live-verify:
+   - `https://augurrisk.com/health`
+   - `https://augurrisk.com/openapi.json`
+   - `https://augurrisk.com/`
+   - `https://augurrisk.com/deployer-reputation-api`
+4. If possible, do one live reputation-backed analyze smoke check:
+   - the main question is whether public Blockscout-backed reputation now flows without any explorer secret
+5. Only after the Blockscout pass is landed should batch 5 continue into a new hidden discovery probe.
 5. Only after the reputation key path is either confirmed working or explicitly deferred should batch 5 continue into a new hidden discovery probe.

@@ -10,6 +10,7 @@ from risk_api.analysis.engine import (
 )
 from risk_api.analysis.patterns import EIP_1822_SLOT, EIP_1967_IMPL_SLOT
 from risk_api.analysis.policy import PolicyAction, PolicyReasonCode, ProxyResolutionStatus
+from risk_api.analysis.reputation import BLOCKSCOUT_API, clear_reputation_cache
 from risk_api.analysis.scoring import RiskLevel
 from risk_api.chain.rpc import RPCError, clear_cache
 
@@ -57,9 +58,11 @@ def _tiny_impl_bytecode() -> str:
 def _clear_caches():
     clear_cache()
     clear_analysis_cache()
+    clear_reputation_cache()
     yield
     clear_cache()
     clear_analysis_cache()
+    clear_reputation_cache()
 
 
 # --- Existing tests (updated for storage slot mocks) ---
@@ -462,15 +465,19 @@ def test_analyze_proxy_impl_address_has_no_code():
 def test_cache_returns_same_result():
     """Second call returns cached result without extra RPC calls."""
     bytecode = "0x" + "6080604052" + "00" * 200
-    # Only register ONE RPC response — second call must use cache
+    # Only register ONE RPC response and ONE explorer response - second call must use cache.
     responses.post(RPC_URL, json=_rpc_response(bytecode))
+    responses.get(
+        BLOCKSCOUT_API,
+        json={"status": "0", "message": "No data found", "result": []},
+    )
 
     addr = "0x" + "d4" * 20
     result1 = analyze_contract(addr, RPC_URL)
     result2 = analyze_contract(addr, RPC_URL)
 
     assert result1 is result2
-    assert len(responses.calls) == 1  # Only 1 RPC call, not 2
+    assert len(responses.calls) == 2  # 1 RPC call + 1 explorer call, not repeated
 
 
 @responses.activate
@@ -478,6 +485,10 @@ def test_cache_is_case_insensitive():
     """Cache key normalizes address to lowercase."""
     bytecode = "0x" + "6080604052" + "00" * 200
     responses.post(RPC_URL, json=_rpc_response(bytecode))
+    responses.get(
+        BLOCKSCOUT_API,
+        json={"status": "0", "message": "No data found", "result": []},
+    )
 
     addr_lower = "0x" + "ab" * 20
     addr_upper = "0x" + "AB" * 20
@@ -485,7 +496,7 @@ def test_cache_is_case_insensitive():
     result2 = analyze_contract(addr_upper, RPC_URL)
 
     assert result1 is result2
-    assert len(responses.calls) == 1
+    assert len(responses.calls) == 2
 
 
 def test_clear_analysis_cache_works():

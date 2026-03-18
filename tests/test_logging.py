@@ -10,6 +10,7 @@ import responses
 from risk_api.analytics import append_sqlite_entry
 from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
+from risk_api.analysis.reputation import BLOCKSCOUT_API, clear_reputation_cache
 from risk_api.chain.rpc import clear_cache
 from risk_api.config import Config
 
@@ -19,11 +20,13 @@ RPC_URL = "https://mainnet.base.org"
 def setup_function():
     clear_cache()
     clear_analysis_cache()
+    clear_reputation_cache()
 
 
 def teardown_function():
     clear_cache()
     clear_analysis_cache()
+    clear_reputation_cache()
 
 
 @pytest.fixture()
@@ -93,6 +96,8 @@ def client_analytics(app_with_analytics_db):
 def test_analyze_request_is_logged(client_logged, app_with_logging):
     bytecode = "0x" + "6080604052" + "00" * 200
     responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+    responses.get(BLOCKSCOUT_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
 
     addr = "0x" + "ab" * 20
     resp = client_logged.get(f"/analyze?address={addr}")

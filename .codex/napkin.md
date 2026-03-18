@@ -17,8 +17,8 @@
    Do instead: keep selectors like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` in the same shared fee/limit path as `setMaxSellAmount` and `setWalletLimit` so common anti-whale aliases do not slip through as clean `allow`.
 8. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
    Do instead: keep the human in the loop between hidden batches while the research loop is still shaping itself; only automate commit/push/deploy-to-next-batch chaining after the allowed fix surfaces and stop conditions are explicit.
-9. **[2026-03-17] `deployer_reputation` should use Etherscan V2 with a Base-capable key**
-   Do instead: keep reputation lookups on `https://api.etherscan.io/v2/api` with `chainid=8453`, keep explorer failure distinct from true `NOT_FOUND`, add throttling/soft-error handling, and remember that the current free/local key path returns `Free API access is not supported for this chain`, so credential plan is part of the fix.
+9. **[2026-03-17] `deployer_reputation` should use public Base Blockscout first**
+   Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
 10. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
    Do instead: treat `fee_manipulation` and `suspicious_selector` alias coverage as the active weak spots; keep honeypot and reentrancy on the watchlist, but do not assume they are the dominant hidden failure source without new cases.
 

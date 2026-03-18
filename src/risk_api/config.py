@@ -66,8 +66,11 @@ def load_config() -> Config:
         price=os.environ.get("PRICE", "$0.10"),
         erc8004_agent_id=erc8004_agent_id,
         basescan_api_key=os.environ.get(
-            "ETHERSCAN_API_KEY",
-            os.environ.get("BASESCAN_API_KEY", ""),
+            "BLOCKSCOUT_API_KEY",
+            os.environ.get(
+                "ETHERSCAN_API_KEY",
+                os.environ.get("BASESCAN_API_KEY", ""),
+            ),
         ),
         public_url=os.environ.get("PUBLIC_URL", ""),
         cdp_api_key_id=cdp_key_id,

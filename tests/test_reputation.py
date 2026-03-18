@@ -9,9 +9,9 @@ import responses
 import risk_api.analysis.reputation as reputation
 from risk_api.analysis.patterns import Severity
 from risk_api.analysis.reputation import (
-    BASE_CHAIN_ID,
-    ETHERSCAN_V2_API,
+    BLOCKSCOUT_API,
     CreatorLookupStatus,
+    LOW_TX_COUNT,
     clear_reputation_cache,
     detect_deployer_reputation,
     get_contract_creator,
@@ -44,7 +44,7 @@ def _last_call_params() -> dict[str, list[str]]:
 @responses.activate
 def test_get_contract_creator_success():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -61,7 +61,6 @@ def test_get_contract_creator_success():
     assert result.status == CreatorLookupStatus.FOUND
     assert result.deployer == FAKE_DEPLOYER
     assert result.tx_hash == FAKE_TX_HASH
-    assert params["chainid"] == [BASE_CHAIN_ID]
     assert params["module"] == ["contract"]
     assert params["action"] == ["getcontractcreation"]
     assert params["contractaddresses"] == [FAKE_ADDRESS]
@@ -69,9 +68,30 @@ def test_get_contract_creator_success():
 
 
 @responses.activate
+def test_get_contract_creator_without_api_key_omits_key_param():
+    responses.get(
+        BLOCKSCOUT_API,
+        json={
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "contractCreator": FAKE_DEPLOYER,
+                    "txHash": FAKE_TX_HASH,
+                }
+            ],
+        },
+    )
+    result = get_contract_creator(FAKE_ADDRESS, "")
+    params = _last_call_params()
+    assert result.status == CreatorLookupStatus.FOUND
+    assert "apikey" not in params
+
+
+@responses.activate
 def test_get_contract_creator_not_found():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={"status": "0", "message": "No data found", "result": []},
     )
     result = get_contract_creator(FAKE_ADDRESS, API_KEY)
@@ -80,8 +100,8 @@ def test_get_contract_creator_not_found():
 
 @responses.activate
 def test_get_contract_creator_api_error():
-    responses.get(ETHERSCAN_V2_API, status=500)
-    responses.get(ETHERSCAN_V2_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
     result = get_contract_creator(FAKE_ADDRESS, API_KEY)
     assert result.status == CreatorLookupStatus.ERROR
     assert len(responses.calls) == 2
@@ -90,7 +110,7 @@ def test_get_contract_creator_api_error():
 @responses.activate
 def test_get_contract_creator_soft_error_is_error():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
             "message": "NOTOK",
@@ -104,15 +124,15 @@ def test_get_contract_creator_soft_error_is_error():
 @responses.activate
 def test_get_contract_creator_retries_on_rate_limit_then_succeeds():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
             "message": "NOTOK",
-            "result": "Max rate limit reached",
+            "result": "Rate limit exceeded",
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -135,7 +155,7 @@ def test_get_contract_creator_retries_on_rate_limit_then_succeeds():
 @responses.activate
 def test_get_contract_creator_soft_error_is_not_cached():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
             "message": "NOTOK",
@@ -143,7 +163,7 @@ def test_get_contract_creator_soft_error_is_not_cached():
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -170,7 +190,7 @@ def test_get_contract_creator_soft_error_is_not_cached():
 @responses.activate
 def test_get_first_tx_timestamp_success():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -178,12 +198,17 @@ def test_get_first_tx_timestamp_success():
         },
     )
     assert get_first_tx_timestamp(FAKE_DEPLOYER, API_KEY) == 1700000000
+    params = _last_call_params()
+    assert params["module"] == ["account"]
+    assert params["action"] == ["txlist"]
+    assert params["sort"] == ["asc"]
+    assert params["offset"] == ["1"]
 
 
 @responses.activate
 def test_get_first_tx_timestamp_no_txs():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={"status": "0", "message": "No transactions found", "result": []},
     )
     assert get_first_tx_timestamp(FAKE_DEPLOYER, API_KEY) is None
@@ -192,19 +217,19 @@ def test_get_first_tx_timestamp_no_txs():
 @responses.activate
 def test_get_first_tx_timestamp_retryable_soft_error_returns_none_after_retry():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
             "message": "NOTOK",
-            "result": "Query Timeout occured. Please select a smaller result dataset",
+            "result": "Timeout while processing request",
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
             "message": "NOTOK",
-            "result": "Query Timeout occured. Please select a smaller result dataset",
+            "result": "Timeout while processing request",
         },
     )
     assert get_first_tx_timestamp(FAKE_DEPLOYER, API_KEY) is None
@@ -215,33 +240,40 @@ def test_get_first_tx_timestamp_retryable_soft_error_returns_none_after_retry():
 
 
 @responses.activate
-def test_get_tx_count_success():
+def test_get_tx_count_exact_low_count():
     responses.get(
-        ETHERSCAN_V2_API,
-        json={"jsonrpc": "2.0", "id": 1, "result": "0x1a"},
+        BLOCKSCOUT_API,
+        json={
+            "status": "1",
+            "message": "OK",
+            "result": [{"hash": f"0x{i}"} for i in range(4)],
+        },
     )
-    assert get_tx_count(FAKE_DEPLOYER, API_KEY) == 26
+    assert get_tx_count(FAKE_DEPLOYER, API_KEY) == 4
     params = _last_call_params()
-    assert params["chainid"] == [BASE_CHAIN_ID]
-    assert params["module"] == ["proxy"]
-    assert params["action"] == ["eth_getTransactionCount"]
-    assert params["address"] == [FAKE_DEPLOYER]
-    assert params["tag"] == ["latest"]
+    assert params["module"] == ["account"]
+    assert params["action"] == ["txlist"]
+    assert params["sort"] == ["desc"]
+    assert params["offset"] == [str(LOW_TX_COUNT)]
 
 
 @responses.activate
-def test_get_tx_count_zero():
+def test_get_tx_count_busy_wallet_clamps_at_threshold():
     responses.get(
-        ETHERSCAN_V2_API,
-        json={"jsonrpc": "2.0", "id": 1, "result": "0x0"},
+        BLOCKSCOUT_API,
+        json={
+            "status": "1",
+            "message": "OK",
+            "result": [{"hash": f"0x{i}"} for i in range(LOW_TX_COUNT)],
+        },
     )
-    assert get_tx_count(FAKE_DEPLOYER, API_KEY) == 0
+    assert get_tx_count(FAKE_DEPLOYER, API_KEY) == LOW_TX_COUNT
 
 
 @responses.activate
 def test_get_tx_count_api_error():
-    responses.get(ETHERSCAN_V2_API, status=500)
-    responses.get(ETHERSCAN_V2_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
     assert get_tx_count(FAKE_DEPLOYER, API_KEY) is None
     assert len(responses.calls) == 2
 
@@ -249,11 +281,11 @@ def test_get_tx_count_api_error():
 @responses.activate
 def test_get_tx_count_soft_error_returns_none():
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "0",
-            "message": "NOTOK",
-            "result": "Invalid API Key",
+            "message": "Unknown module",
+            "result": None,
         },
     )
     assert get_tx_count(FAKE_DEPLOYER, API_KEY) is None
@@ -262,17 +294,25 @@ def test_get_tx_count_soft_error_returns_none():
 # --- detect_deployer_reputation ---
 
 
-def test_missing_api_key_returns_empty():
-    """No API key -> graceful skip, no findings."""
+@responses.activate
+def test_missing_api_key_still_uses_public_blockscout():
+    responses.get(
+        BLOCKSCOUT_API,
+        json={
+            "status": "0",
+            "message": "No data found",
+            "result": [],
+        },
+    )
     findings = detect_deployer_reputation(FAKE_ADDRESS, "")
-    assert findings == []
+    assert len(findings) == 1
+    assert findings[0].detector == "deployer_reputation"
 
 
 @responses.activate
 def test_contract_not_found_returns_info():
-    """Contract creator not found -> 3pt INFO finding."""
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={"status": "0", "message": "No data found", "result": []},
     )
     findings = detect_deployer_reputation(FAKE_ADDRESS, API_KEY)
@@ -284,9 +324,8 @@ def test_contract_not_found_returns_info():
 
 @responses.activate
 def test_fresh_deployer_scores_points():
-    """New wallet (<7 days) with few txs -> two findings stacking up."""
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -296,7 +335,7 @@ def test_fresh_deployer_scores_points():
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -304,8 +343,12 @@ def test_fresh_deployer_scores_points():
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
-        json={"jsonrpc": "2.0", "id": 1, "result": "0x2"},
+        BLOCKSCOUT_API,
+        json={
+            "status": "1",
+            "message": "OK",
+            "result": [{"hash": f"0x{i}"} for i in range(2)],
+        },
     )
 
     findings = detect_deployer_reputation(FAKE_ADDRESS, API_KEY)
@@ -317,9 +360,8 @@ def test_fresh_deployer_scores_points():
 
 @responses.activate
 def test_established_deployer_scores_zero():
-    """Well-established deployer (>30 days, >20 txs) -> no findings."""
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -329,7 +371,7 @@ def test_established_deployer_scores_zero():
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",
@@ -337,8 +379,12 @@ def test_established_deployer_scores_zero():
         },
     )
     responses.get(
-        ETHERSCAN_V2_API,
-        json={"jsonrpc": "2.0", "id": 1, "result": "0x64"},
+        BLOCKSCOUT_API,
+        json={
+            "status": "1",
+            "message": "OK",
+            "result": [{"hash": f"0x{i}"} for i in range(LOW_TX_COUNT)],
+        },
     )
 
     findings = detect_deployer_reputation(FAKE_ADDRESS, API_KEY)
@@ -347,9 +393,8 @@ def test_established_deployer_scores_zero():
 
 @responses.activate
 def test_api_failure_graceful():
-    """All API calls fail -> returns empty (no crash, no score impact)."""
-    responses.get(ETHERSCAN_V2_API, status=500)
-    responses.get(ETHERSCAN_V2_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
+    responses.get(BLOCKSCOUT_API, status=500)
 
     findings = detect_deployer_reputation(FAKE_ADDRESS, API_KEY)
     assert findings == []
@@ -357,9 +402,8 @@ def test_api_failure_graceful():
 
 @responses.activate
 def test_caching_works():
-    """Second call with same args should use cache, not hit API again."""
     responses.get(
-        ETHERSCAN_V2_API,
+        BLOCKSCOUT_API,
         json={
             "status": "1",
             "message": "OK",

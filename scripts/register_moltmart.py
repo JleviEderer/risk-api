@@ -52,8 +52,8 @@ SERVICE_LISTING = {
         "and delegatecall usage. For proxy contracts, automatically resolves and "
         "analyzes the implementation. Returns a composite risk score (0-100) with "
         "per-detector findings and severity level (safe/low/medium/high/critical). "
-        '"safe" is not a guarantee or audit. Deployer reputation check via Etherscan '
-        "when API key is configured."
+        '"safe" is not a guarantee or audit. Deployer reputation check via a public explorer '
+        "when history data is available."
     ),
     "endpoint_url": "https://augurrisk.com/analyze",
     "price_usdc": 0.10,

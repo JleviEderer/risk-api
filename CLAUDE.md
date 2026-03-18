@@ -33,8 +33,9 @@
 - `NETWORK` — defaults to eip155:8453 (Base mainnet, CAIP-2 format)
 - `PRICE` — defaults to $0.10
 - `ERC8004_AGENT_ID` — ERC-8004 agent registration ID (optional, adds `registrations` to metadata)
-- `ETHERSCAN_API_KEY` — Etherscan API key for deployer reputation checks (optional, preferred)
-- `BASESCAN_API_KEY` — legacy fallback env name for the same Etherscan-backed deployer reputation checks
+- `BLOCKSCOUT_API_KEY` — optional Blockscout API key for higher-rate deployer reputation checks
+- `ETHERSCAN_API_KEY` — legacy fallback env name for deployer reputation checks
+- `BASESCAN_API_KEY` — older legacy fallback env name for deployer reputation checks
 - `PUBLIC_URL` — public base URL for agent metadata endpoint (optional, e.g. `https://augurrisk.com`). Falls back to `request.url_root` if unset. Required behind reverse proxies that rewrite the origin.
 - `REQUEST_LOG_PATH` — path for structured JSON-lines request log (optional, e.g. `/root/risk-api-logs/requests.jsonl`)
 - `PINATA_JWT` — Pinata API JWT for IPFS pinning (optional, used by `scripts/pin_metadata_ipfs.py`)
@@ -51,10 +52,10 @@
 - Network must be CAIP-2 format: `eip155:84532` (sepolia), `eip155:8453` (mainnet)
 - `create_app(enable_x402=False)` to skip payment middleware in tests
 - All scores 0-100, higher = riskier
-- 8 detectors: 7 bytecode pattern detectors + 1 deployer reputation detector (Etherscan-backed)
+- 8 detectors: 7 bytecode pattern detectors + 1 deployer reputation detector (Blockscout-backed by default)
 - Proxy detection covers EIP-1967, EIP-1822, and OpenZeppelin (pre-1967) slots
 - Proxy contracts auto-resolve implementation via `eth_getStorageAt` (max 1 hop). Impl findings get `impl_` prefixed detector names. Response includes nested `implementation` object. Graceful degradation if storage read or impl fetch fails.
-- Deployer reputation detector prefers `ETHERSCAN_API_KEY` and falls back to `BASESCAN_API_KEY`; silently skipped without either
+- Deployer reputation detector uses Base Blockscout by default and can use `BLOCKSCOUT_API_KEY` for higher limits; legacy `ETHERSCAN_API_KEY` / `BASESCAN_API_KEY` env vars still map through as fallback config
 - `analyze_contract()` results are cached (TTL 5 min, max 512 entries, case-insensitive address keys). Use `clear_analysis_cache()` in test setup/teardown. RPC-level caching also exists via `@lru_cache` on `get_code()`/`get_storage_at()`.
 - `/` serves a landing page with Schema.org JSON-LD (`WebAPI` + `FAQPage` types), Open Graph tags, service description, pricing, detector list, and links to all discovery endpoints
 - `/robots.txt` serves crawler directives allowing public discovery endpoints, disallowing `/stats` and `/dashboard`, with `Sitemap:` directive
