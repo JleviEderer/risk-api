@@ -70,6 +70,10 @@ SUSPICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("3ccfd60b"): "withdraw()",
     # setSwapEnabled(bool) — can disable trading
     bytes.fromhex("e01af92c"): "setSwapEnabled(bool)",
+    # setTradingEnabled(bool) — can gate when trading is allowed
+    bytes.fromhex("c2e5ec04"): "setTradingEnabled(bool)",
+    # enableTrading() — can flip trading on at owner discretion
+    bytes.fromhex("8a8c523c"): "enableTrading()",
     # excludeFromFee(address) — selective fee bypass
     bytes.fromhex("437823ec"): "excludeFromFee(address)",
     # pause() — common enough to warn on, but not to hard-block by itself
