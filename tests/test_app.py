@@ -550,6 +550,22 @@ def test_analyze_fee_bypass_alias_response_warns_even_when_score_is_safe(client)
 
 
 @responses.activate
+def test_analyze_whitelist_and_cooldown_toggle_response_warns_even_when_score_is_safe(client):
+    bytecode = "0x63052d9e7e636353623d639a9cf8db" + "00" * 200
+    responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
+
+    addr = "0x" + "f7" * 20
+    resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["score"] == 15
+    assert data["level"] == "safe"
+    assert data["decision"] == "warn"
+    assert "suspicious_selector_signal" in data["recommended_policy"]["reason_codes"]
+
+
+@responses.activate
 def test_analyze_blacklist_selector_without_transfer_warns(client):
     bytecode = "0x6344337ea1" + "00" * 200
     responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})

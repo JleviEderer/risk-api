@@ -80,6 +80,12 @@ SUSPICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("c0246668"): "excludeFromFees(address,bool)",
     # setIsExcludedFromFee(address,bool) — explicit fee-exemption toggle
     bytes.fromhex("f3d7a2f8"): "setIsExcludedFromFee(address,bool)",
+    # setWhitelistEnabled(bool) — can gate who is allowed to trade
+    bytes.fromhex("052d9e7e"): "setWhitelistEnabled(bool)",
+    # setTxCooldownEnabled(bool) — can throttle transfer frequency
+    bytes.fromhex("6353623d"): "setTxCooldownEnabled(bool)",
+    # setCooldownEnabled(bool) — generic cooldown gating
+    bytes.fromhex("9a9cf8db"): "setCooldownEnabled(bool)",
     # pause() — common enough to warn on, but not to hard-block by itself
     bytes.fromhex("8456cb59"): "pause()",
 }

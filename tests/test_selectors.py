@@ -47,16 +47,22 @@ def test_find_suspicious_selectors():
         bytes.fromhex("8a8c523c"),  # enableTrading()
         bytes.fromhex("c0246668"),  # excludeFromFees(address,bool)
         bytes.fromhex("f3d7a2f8"),  # setIsExcludedFromFee(address,bool)
+        bytes.fromhex("052d9e7e"),  # setWhitelistEnabled(bool)
+        bytes.fromhex("6353623d"),  # setTxCooldownEnabled(bool)
+        bytes.fromhex("9a9cf8db"),  # setCooldownEnabled(bool)
         bytes.fromhex("18160ddd"),  # totalSupply — standard
     }
     suspicious = find_suspicious_selectors(selectors)
-    assert len(suspicious) == 6
+    assert len(suspicious) == 9
     assert bytes.fromhex("715018a6") in suspicious
     assert bytes.fromhex("8456cb59") in suspicious
     assert bytes.fromhex("c2e5ec04") in suspicious
     assert bytes.fromhex("8a8c523c") in suspicious
     assert bytes.fromhex("c0246668") in suspicious
     assert bytes.fromhex("f3d7a2f8") in suspicious
+    assert bytes.fromhex("052d9e7e") in suspicious
+    assert bytes.fromhex("6353623d") in suspicious
+    assert bytes.fromhex("9a9cf8db") in suspicious
 
 
 def test_no_false_positives_on_clean_erc20():
