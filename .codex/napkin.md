@@ -21,6 +21,8 @@
    Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
 10. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
    Do instead: treat `fee_manipulation` and `suspicious_selector` alias coverage as the active weak spots; keep honeypot and reentrancy on the watchlist, but do not assume they are the dominant hidden failure source without new cases.
+11. **[2026-03-18] Keep `deployer_reputation`, but treat it as supporting context**
+   Do instead: keep it in the detector list because it adds useful deployer-history context at low cost, but do not sell it or optimize around it like a pillar detector; the product still stands on bytecode analysis first.
 
 ## Local Tooling
 1. **[2026-03-12] On this 8 GB Intel iGPU laptop, QMD's safest high-quality mode is structured `lex+vec`**

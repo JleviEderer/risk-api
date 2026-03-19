@@ -1,11 +1,12 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-17
+- Date: 2026-03-18
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- HEAD: `936f00b`
-- Status: green on `936f00b`; the batch 5 deployer-reputation path is now committed, pushed, and deployed on the Blockscout-backed implementation. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/research.local/`, `.playwright-mcp/`).
+- Repo code baseline: `0d0bbec`
+- Deployed app baseline: `936f00b`
+- Status: green on deployed code `936f00b`, with repo code baseline `0d0bbec` and note-only follow-up pending in this session. The batch 5 deployer-reputation path is now committed, pushed, and deployed on the Blockscout-backed implementation. A fresh `python auto/loop.py` rerun on 2026-03-18 stayed green at `32/32`. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
 
 ## What Changed
 - The previous committed/deployed baseline was the first Etherscan V2 pass:
@@ -25,6 +26,11 @@
   - pushed to `origin/master`
   - `flyctl deploy --remote-only` succeeded for `augurrisk`
   - live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, `https://augurrisk.com/`, and `https://augurrisk.com/deployer-reputation-api`
+- Re-ran the hidden discovery loop from the current baseline on 2026-03-18:
+  - `python auto/loop.py`
+  - result stayed green at `32/32`
+  - no blind spots, holdout disagreements, policy regressions, or serializer/doc drifts surfaced
+  - next action remains: add new hidden candidate or holdout cases before changing implementation again
 - Added a strategy memo that locks the current wedge:
   - `docs/PRODUCT_WEDGE_MEMO.md`
   - frames Augur as `Base contract admission control for agents`
@@ -273,7 +279,8 @@
     - the detector still preserves the repo rule that external API failure stays distinct from true `NOT_FOUND`
     - request throttling/retry remains in place for explorer-side failures
     - `BLOCKSCOUT_API_KEY` is optional for higher limits; `ETHERSCAN_API_KEY` / `BASESCAN_API_KEY` are legacy fallbacks only
-    - practical next step is to verify one real paid `/analyze` flow if you want end-to-end proof that deployer-reputation is now showing up again on production traffic
+    - product call for now: keep `deployer_reputation` in the detector set, but treat it as supporting context rather than a pillar detector
+    - practical next step is optional, not blocking: verify one real paid `/analyze` flow if you want end-to-end proof that deployer-reputation is now showing up again on production traffic
   - the Etherscan result is now background context only:
     - current local key against Etherscan V2 on Base returns `Free API access is not supported for this chain...`
     - current BaseScan V1 path also returns a deprecation error
@@ -343,14 +350,21 @@
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
 
 ## Tomorrow Start Here
-1. Confirm the new baseline is still `936f00b` and the live app is healthy:
+1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
    - `https://augurrisk.com/health`
    - `https://augurrisk.com/openapi.json`
-2. If you want end-to-end proof on production, do one real paid `/analyze` smoke check:
-   - the main open runtime question is whether deployer-reputation findings are now flowing again through the live paid path without any explorer secret
-3. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
-4. Only after that confirmation should batch 5 continue into a new hidden discovery probe:
+2. Treat deployer reputation as good enough for now:
+   - keep it listed as a detector
+   - keep presenting it as supporting context, not a core pillar of Augur
+   - do not spend more time or money on it unless real users prove it matters
+3. The latest hidden discovery rerun is already green:
+   - `python auto/loop.py` passed at `32/32` on 2026-03-18
+   - do not change detector logic until you first add a new hidden candidate or holdout case
+4. Optional runtime proof if desired:
+   - do one real paid `/analyze` smoke check to confirm deployer-reputation findings flow end to end on production
+   - this is useful evidence, but not a blocker for normal next work
+5. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
+6. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
    - use `python auto/loop.py`
    - keep batches serial
    - add a new hidden holdout/candidate before changing detector logic again
-5. Only after the reputation key path is either confirmed working or explicitly deferred should batch 5 continue into a new hidden discovery probe.
