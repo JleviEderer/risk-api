@@ -4,9 +4,9 @@
 - Date: 2026-03-18
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `23c1657`
-- Deployed app baseline: `23c1657`
-- Status: green on deployed code `23c1657`. The Blockscout-backed deployer-reputation path remains live, and the two newest hidden-batch follow-ups expanded both broader limit-control alias coverage and trading-toggle alias coverage. Verification is green: `python auto/loop.py` now passes at `37/37`, `python -m pytest -q` passed at `336`, and live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
+- Repo code baseline: `3cefda6`
+- Deployed app baseline: `3cefda6`
+- Status: green on deployed code `3cefda6`. The Blockscout-backed deployer-reputation path remains live, and the three newest hidden-batch follow-ups expanded broader limit-control alias coverage, trading-toggle alias coverage, and selective fee-bypass alias coverage. Verification is green: `python auto/loop.py` now passes at `39/39`, `python -m pytest -q` passed at `339`, and live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
 
 ## What Changed
 - The previous committed/deployed baseline was the first Etherscan V2 pass:
@@ -48,6 +48,16 @@
   - expanded tracked regressions in `tests/test_selectors.py`, `tests/test_scoring.py`, `tests/test_engine.py`, and `tests/test_app.py`
   - local hidden corpus is now green again at `37/37`
   - full local test suite passed at `336 passed`
+  - pushed to `origin/master`
+  - `flyctl deploy --remote-only` succeeded for `augurrisk`
+  - live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`
+- Landed the next hidden-batch follow-up on 2026-03-18:
+  - commit: `3cefda6` (`Warn on fee bypass selector aliases`)
+  - new local hidden candidates surfaced a fresh suspicious-selector gap where `excludeFromFees(address,bool)` and `setIsExcludedFromFee(address,bool)` still returned clean `allow`
+  - `src/risk_api/analysis/selectors.py` now routes those selectors through the existing suspicious-selector warning path alongside other selective fee-bypass controls
+  - expanded tracked regressions in `tests/test_selectors.py`, `tests/test_scoring.py`, `tests/test_engine.py`, and `tests/test_app.py`
+  - local hidden corpus is now green again at `39/39`
+  - full local test suite passed at `339 passed`
   - pushed to `origin/master`
   - `flyctl deploy --remote-only` succeeded for `augurrisk`
   - live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`
@@ -286,6 +296,7 @@
   - keep fee/limit selector alias matching shared between detector surfacing and orphan-selector filtering so limit controls warn at `15` instead of double-counting as `suspicious_selector`
   - keep transaction-limit aliases like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` in that same shared fee/limit family, along with broader limit-control aliases like `setMaxWalletAmount`, `setMaxHoldAmount`, and `setMaxTransferAmount`
   - keep trading-gate aliases like `setTradingEnabled(bool)` and `enableTrading()` on the suspicious-selector warning path alongside other admin toggles like `setSwapEnabled(bool)`
+  - keep selective fee-bypass aliases like `excludeFromFees(address,bool)` and `setIsExcludedFromFee(address,bool)` on the suspicious-selector warning path alongside `excludeFromFee(address)`
   - keep `pause()` on the suspicious-selector path for now; it should warn instead of silently allowing, but it does not yet justify a dedicated public detector or automatic block
   - if a known malicious selector is present but no concrete detector surfaces it, prefer warning through the suspicious-selector path over silently allowing it
   - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
@@ -358,7 +369,7 @@
    - use `python auto/loop.py` as the default runner
    - run one batch at a time; do not queue multiple hidden discovery batches before you know what the previous one changed
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
-   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, blacklist-controls-without-transfer warning behavior, transaction-limit alias warning behavior, broader limit-control alias warning behavior, and trading-toggle alias warning behavior
+   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, blacklist-controls-without-transfer warning behavior, transaction-limit alias warning behavior, broader limit-control alias warning behavior, trading-toggle alias warning behavior, and fee-bypass alias warning behavior
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
 12. Automation follow-up:
@@ -374,13 +385,13 @@
 1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
    - `https://augurrisk.com/health`
    - `https://augurrisk.com/openapi.json`
-   - baseline commit is `23c1657`
+   - baseline commit is `3cefda6`
 2. Treat deployer reputation as good enough for now:
    - keep it listed as a detector
    - keep presenting it as supporting context, not a core pillar of Augur
    - do not spend more time or money on it unless real users prove it matters
 3. The latest hidden discovery rerun is already green:
-   - `python auto/loop.py` passed at `37/37` on 2026-03-18 after the new trading-toggle alias follow-up
+   - `python auto/loop.py` passed at `39/39` on 2026-03-18 after the new fee-bypass alias follow-up
    - do not change detector logic until you first add a new hidden candidate or holdout case
 4. Optional runtime proof if desired:
    - do one real paid `/analyze` smoke check to confirm deployer-reputation findings flow end to end on production
