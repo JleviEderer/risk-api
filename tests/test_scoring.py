@@ -110,6 +110,15 @@ def test_trading_toggle_selectors_score_as_suspicious():
     assert result.category_scores.get("suspicious_selector", 0) == 10
 
 
+def test_fee_bypass_aliases_score_as_suspicious():
+    bytecode = "63c024666863f3d7a2f8" + "00" * 200
+    instructions = disassemble(bytecode)
+    findings = run_all_detectors(instructions)
+    result = compute_score(findings, instructions, bytecode)
+    assert findings == []
+    assert result.category_scores.get("suspicious_selector", 0) == 10
+
+
 def test_blacklist_selector_without_transfer_still_scores_as_suspicious():
     bytecode = "6344337ea1" + "00" * 200
     instructions = disassemble(bytecode)

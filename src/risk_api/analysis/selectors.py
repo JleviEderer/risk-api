@@ -76,6 +76,10 @@ SUSPICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("8a8c523c"): "enableTrading()",
     # excludeFromFee(address) — selective fee bypass
     bytes.fromhex("437823ec"): "excludeFromFee(address)",
+    # excludeFromFees(address,bool) — selective fee bypass with explicit toggle
+    bytes.fromhex("c0246668"): "excludeFromFees(address,bool)",
+    # setIsExcludedFromFee(address,bool) — explicit fee-exemption toggle
+    bytes.fromhex("f3d7a2f8"): "setIsExcludedFromFee(address,bool)",
     # pause() — common enough to warn on, but not to hard-block by itself
     bytes.fromhex("8456cb59"): "pause()",
 }
