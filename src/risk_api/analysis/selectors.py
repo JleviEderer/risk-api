@@ -14,7 +14,9 @@ FEE_MANIPULATION_LABEL_TERMS = (
     "maxbuy",
     "maxtx",
     "maxtxn",
+    "maxtransfer",
     "maxwallet",
+    "maxhold",
     "txlimit",
     "maxsell",
     "walletlimit",
@@ -48,6 +50,12 @@ MALICIOUS_SELECTORS: dict[bytes, str] = {
     bytes.fromhex("e99c9d09"): "setMaxSellAmount(uint256)",
     # setWalletLimit(uint256)
     bytes.fromhex("f1d5f517"): "setWalletLimit(uint256)",
+    # setMaxWalletAmount(uint256)
+    bytes.fromhex("27a14fc2"): "setMaxWalletAmount(uint256)",
+    # setMaxHoldAmount(uint256)
+    bytes.fromhex("d8b60040"): "setMaxHoldAmount(uint256)",
+    # setMaxTransferAmount(uint256)
+    bytes.fromhex("8bf55409"): "setMaxTransferAmount(uint256)",
 }
 
 # Suspicious selectors — risky but context-dependent
