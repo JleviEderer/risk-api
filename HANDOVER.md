@@ -6,7 +6,7 @@
 - Branch: `master`
 - Repo code baseline: `0d0bbec`
 - Deployed app baseline: `936f00b`
-- Status: green on deployed code `936f00b`, with repo code baseline `0d0bbec` and note-only follow-up pending in this session. The batch 5 deployer-reputation path is now committed, pushed, and deployed on the Blockscout-backed implementation. A fresh `python auto/loop.py` rerun on 2026-03-18 stayed green at `32/32`. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
+- Status: green on deployed code `936f00b`, with repo code baseline `0d0bbec` and current operator notes saved. The batch 5 deployer-reputation path is now committed, pushed, and deployed on the Blockscout-backed implementation. A fresh `python auto/loop.py` rerun on 2026-03-18 stayed green at `32/32`. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
 
 ## What Changed
 - The previous committed/deployed baseline was the first Etherscan V2 pass:
