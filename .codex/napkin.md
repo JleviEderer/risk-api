@@ -12,16 +12,14 @@
 5. **[2026-03-16] Run hidden discovery batches serially**
    Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable.
 6. **[2026-03-16] Keep fee/limit alias matching shared**
-   Do instead: when you add fee-control selector aliases, reuse one label matcher across `detect_fee_manipulation()` and orphan-selector filtering so known limit controls warn at `15` instead of double-counting as `suspicious_selector`.
-7. **[2026-03-16] Treat transaction-limit aliases as the same fee/limit family**
-   Do instead: keep selectors like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` in the same shared fee/limit path as `setMaxSellAmount` and `setWalletLimit` so common anti-whale aliases do not slip through as clean `allow`.
-8. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
+   Do instead: when you add fee-control selector aliases, reuse one label matcher across `detect_fee_manipulation()` and orphan-selector filtering so known limit controls warn at `15` instead of double-counting as `suspicious_selector`; keep transaction-limit aliases like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` plus broader limit-control aliases like `setMaxWalletAmount`, `setMaxHoldAmount`, and `setMaxTransferAmount` in that same family.
+7. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
    Do instead: keep the human in the loop between hidden batches while the research loop is still shaping itself; only automate commit/push/deploy-to-next-batch chaining after the allowed fix surfaces and stop conditions are explicit.
-9. **[2026-03-17] `deployer_reputation` should use public Base Blockscout first**
+8. **[2026-03-17] `deployer_reputation` should use public Base Blockscout first**
    Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
-10. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
+9. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
    Do instead: treat `fee_manipulation` and `suspicious_selector` alias coverage as the active weak spots; keep honeypot and reentrancy on the watchlist, but do not assume they are the dominant hidden failure source without new cases.
-11. **[2026-03-18] Keep `deployer_reputation`, but treat it as supporting context**
+10. **[2026-03-18] Keep `deployer_reputation`, but treat it as supporting context**
    Do instead: keep it in the detector list because it adds useful deployer-history context at low cost, but do not sell it or optimize around it like a pillar detector; the product still stands on bytecode analysis first.
 
 ## Local Tooling
