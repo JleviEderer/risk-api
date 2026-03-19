@@ -6,7 +6,7 @@
 2. **[2026-03-10] Keep proof-report assets explicit**
    Do instead: use report-specific OG images for proof pages when promoting them; the generic `/avatar.png` reads like stock security art in social previews.
 3. **[2026-03-16] Treat `pause()` as suspicious admin control, not silent allow**
-   Do instead: keep `pause()` on the `suspicious_selector` path so transfer-freeze authority warns via `suspicious_selector_signal` without inventing a new detector or auto-block rule yet.
+   Do instead: keep `pause()` on the `suspicious_selector` path so transfer-freeze authority warns via `suspicious_selector_signal` without inventing a new detector or auto-block rule yet; keep admin trading-toggle aliases like `setTradingEnabled(bool)` and `enableTrading()` on that same warning path alongside `setSwapEnabled(bool)`.
 4. **[2026-03-16] Do not let orphan malicious selectors silently pass**
    Do instead: if a selector is in the malicious table but no concrete detector surfaces it, route it through the `suspicious_selector` warning path instead of returning clean `allow`.
 5. **[2026-03-16] Run hidden discovery batches serially**
