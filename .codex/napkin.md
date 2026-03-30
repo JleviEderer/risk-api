@@ -85,22 +85,22 @@
    Do instead: treat repeated `Base-only deterministic prefilter` framing and zero unprompted mentions as a category/distribution signal before deciding on a product pivot into simulation.
 
 ## Validation
-1. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
+1. **[2026-03-29] A healthy live app can still be metadata-stale**
+   Do instead: before touching third-party listings, fetch `https://augurrisk.com/`, `openapi.json`, `skill.md`, `llms*.txt`, `/.well-known/agent-card.json`, `agent-metadata.json`, and `/.well-known/x402` and confirm the actual live wording matches the repo change you plan to propagate.
+2. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
    Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
-2. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
+3. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
-3. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
+4. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
-4. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+5. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
    Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
-5. **[2026-03-16] Public examples must round-trip through the live serializer**
+6. **[2026-03-16] Public examples must round-trip through the live serializer**
    Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
-6. **[2026-03-16] Keep private detector holdouts out of git**
+7. **[2026-03-16] Keep private detector holdouts out of git**
    Do instead: store hidden autoresearch cases as `auto/corpus/*.local.json` or `auto/candidates/*.local.json`; load them locally with `python auto/bench.py` but do not promote them until they are ready to become public regressions.
-7. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
+8. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
    Do instead: keep `auto/bench.py` checking proof-report `decision` and `recommended_policy` against current `derive_policy()` semantics; a dated snapshot can keep old scores/findings, but stale policy recommendations should fail loudly unless you intentionally preserve historical policy and relax the check.
-8. **[2026-03-16] Keep only the tracked public autoresearch corpus in CI**
-   Do instead: run `python auto/bench.py auto/corpus/public_cases.json` in GitHub Actions; let local `*.local.json` holdouts stay workstation-only so CI stays reproducible while hidden pressure remains private.
 9. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
    Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint.
 10. **[2026-03-16] Do not collapse proxy `no_code` into transport failure**
