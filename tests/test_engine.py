@@ -63,6 +63,10 @@ def _tiny_impl_bytecode() -> str:
     return "0x6000"
 
 
+def _solidity_metadata_tail() -> str:
+    return "a2646970667358221220d1f046eaee25ecce10f4aa5481ba5d2a8343e13df760d1cad2a3844efd9d1e2264736f6c63430008130033"
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches():
     clear_cache()
@@ -229,6 +233,21 @@ def test_analyze_whitelist_and_cooldown_toggles_warn_even_when_score_is_safe():
     assert result.level == RiskLevel.SAFE
     assert result.decision == PolicyAction.WARN
     assert PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value in result.recommended_policy.reason_codes
+
+
+@responses.activate
+def test_analyze_ignores_delegatecall_in_solidity_metadata():
+    bytecode = "0x63715018a663f2fde38b" + "00" * 210 + _solidity_metadata_tail()
+    responses.post(RPC_URL, json=_rpc_response(bytecode))
+
+    result = analyze_contract("0x" + "f8" * 20, RPC_URL)
+
+    assert result.score == 10
+    assert result.level == RiskLevel.SAFE
+    assert result.decision == PolicyAction.WARN
+    assert PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value in result.recommended_policy.reason_codes
+    assert PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value not in result.recommended_policy.reason_codes
+    assert all(f.detector != "delegatecall" for f in result.findings)
 
 
 @responses.activate

@@ -381,5 +381,25 @@
         "delegatecall": 10
       }
     }
+  },
+  {
+    "id": "solidity-metadata-does-not-trigger-delegatecall",
+    "name": "Solidity metadata trailer is ignored during bytecode analysis",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "delegatecall", "metadata"],
+    "blind_spot": "solidity_metadata_false_delegatecall",
+    "bytecode": "0x63715018a663f2fde38b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a2646970667358221220d1f046eaee25ecce10f4aa5481ba5d2a8343e13df760d1cad2a3844efd9d1e2264736f6c63430008130033",
+    "expected": {
+      "score": 10,
+      "level": "safe",
+      "decision": "warn",
+      "reason_codes_include": ["suspicious_selector_signal"],
+      "reason_codes_exclude": ["delegatecall_surface", "raw_delegatecall_surface"],
+      "findings_exclude": ["delegatecall"],
+      "category_scores_include": {
+        "suspicious_selector": 10
+      }
+    }
   }
 ]

@@ -1,12 +1,12 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-29
+- Date: 2026-03-30
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `f248e80` plus an uncommitted minimal-proxy wrapper pass
-- Deployed app baseline: `dee071e`
-- Status: green on deployed app baseline `dee071e`; local repo work now also includes an uncommitted EIP-1167 minimal-proxy pass aimed at real wrapper families. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. The newest local quality passes now cover both managed upgradeable assets and standard clone wrappers: high-score proxy + mint/admin-control surfaces escalate to `manual_review` instead of auto-`block`, and 45-byte EIP-1167 clone shells no longer present as raw `DELEGATECALL` plus tiny-bytecode false alarms. Verification is green: `python -m pytest -q` passed at `353`, `python auto/loop.py` passed at `50/50`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Repo code baseline: `6bd331e` plus an uncommitted metadata-trailer pass
+- Deployed app baseline: `6bd331e`
+- Status: green on deployed app baseline `6bd331e`; local repo work now also includes an uncommitted Solidity-metadata pass aimed at shared implementation families. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, and `x402.org/ecosystem` now also refreshed to the new Augur copy; 8004scan still appears to be the remaining stale/cached external surface against the older score-first copy. The newest local quality passes now cover three adjacent issues: managed upgradeable assets escalate to `manual_review` instead of auto-`block`, 45-byte EIP-1167 clone shells no longer present as raw `DELEGATECALL` plus tiny-bytecode false alarms, and Solidity CBOR metadata trailers are now stripped before disassembly so metadata bytes do not create fake opcode findings. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -52,13 +52,14 @@
     - MoltMart public page shows the new admission-control wording
     - Work402 public page shows the new admission-control wording for `did:erc8004:37906`
     - `8004scan` still shows the older score-first wording despite the successful on-chain URI update to `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
-    - `x402.org/ecosystem` still contains `Augur` and `augurrisk.com`, but page HTML still reads more like the older `risk scoring` wording than the new admission-control framing
+    - `x402.org/ecosystem` now shows the refreshed Augur admission-control wording on the public card
     - Coinbase public discovery feed still returned `NOT_FOUND` over the first `5` pages / `500` items when checked with `python scripts/check_cdp_discovery.py --max-pages 5`
     - `x402list.fun` is still stale on `risk-api.life.conway.tech` and still does not mention `augurrisk.com`
 - Opened the follow-up curated-listing PR on 2026-03-29:
   - `coinbase/x402` PR `#1869` (`Refresh Augur ecosystem listing copy`)
   - updates `typescript/site/app/ecosystem/partners-data/augur/metadata.json` in the upstream site repo
   - purpose: move the Augur ecosystem card from the old score-first wording to the current admission-control wording
+  - follow-up status as of 2026-03-30: the public `x402.org/ecosystem` card is now showing the refreshed copy, so this no longer blocks the external audit pass
 - Landed a policy-quality follow-up locally on 2026-03-29:
   - commit: `f248e80` (`Refine managed proxy policy decisions`)
   - added a new tracked autoresearch regression for high-score managed proxy admin surfaces
@@ -91,6 +92,21 @@
     - `python auto/loop.py` -> `50/50`
     - `python -m pytest tests/test_patterns.py tests/test_scoring.py tests/test_engine.py -q` -> `70 passed`
     - `python -m pytest -q` -> `353 passed`
+- Landed the next hidden-batch follow-up locally on 2026-03-30:
+  - Solidity CBOR metadata trailers are now stripped before disassembly, so metadata bytes no longer create fake opcode findings like raw `DELEGATECALL`
+  - added/promoted regressions in:
+    - `auto/corpus/public_cases.json`
+    - `tests/test_disassembler.py`
+    - `tests/test_engine.py`
+  - local holdout that originally failed was `solidity_metadata_false_delegatecall`
+  - real effect on the shared wrapper family behind the previous clone-proxy pass:
+    - shared implementation `0x9818df1bdce8d0e79b982e2c3a93ac821b3c17e0` now moves from `manual_review` at `25` down to `warn` at `10`
+    - wrapper `0x09139A80454609B69700836a9eE12Db4b5DBB15f` now moves from `manual_review` at `45` down to `warn` at `30`
+    - sampled Base clone-wrapper family result after the fix: `80/80` wrappers in the sample now land on the same `warn` cluster with reason codes `upgradeable_proxy`, `delegatecall_surface`, and `suspicious_selector_signal`
+  - validation passed:
+    - `python auto/loop.py` -> `52/52`
+    - `python -m pytest tests/test_disassembler.py tests/test_engine.py tests/test_patterns.py tests/test_scoring.py -q` -> `80 passed`
+    - `python -m pytest -q` -> `356 passed`
 - Found an ops-script safety bug during the external pass:
   - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
   - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`
@@ -518,10 +534,10 @@
     - `/stats` and `/dashboard` stay useful hints, but not the source of truth
     - treat `curl/...` and similar agents as intent signals, not proof of a human at the keyboard
 - `coinbase/x402` PR `#1515` is merged into `main`.
-- `coinbase/x402` follow-up PR `#1869` is open for the wording refresh on `x402.org/ecosystem`.
+- `coinbase/x402` follow-up PR `#1869` delivered the wording refresh that is now visible on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: add the next hidden holdout batch or real-corpus candidate before changing policy again; `python auto/loop.py` is clean at `48/48` from repo baseline `f248e80`
-  - second: finish the two remaining external follow-ups against `docs/REGISTRATIONS.md`: 8004scan refresh/caching and the open `x402.org/ecosystem` wording PR
+  - first: commit the already-validated Solidity-metadata trailer fix and treat that as the new local baseline; `python auto/loop.py` is clean at `52/52` and `python -m pytest -q` is green at `356`
+  - second: finish the remaining external follow-up against `docs/REGISTRATIONS.md`: 8004scan refresh/caching
   - third: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
   - fourth: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
@@ -548,13 +564,13 @@
 - [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
 - [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
 
-1. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
+1. Commit the already-validated Solidity metadata-trailer fix so the repo baseline catches up with the green local state.
+2. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
    - verify whether 8004scan has refreshed from the new `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` URI
-   - watch `coinbase/x402` PR `#1869` and confirm the public `x402.org/ecosystem` card refreshes after merge
    - keep `x402list.fun` classified as stale external state unless the directory itself updates
-2. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
-3. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-4. Revise the LLM discoverability artifacts on the next pass:
+3. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
+4. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+5. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
@@ -590,7 +606,7 @@
 1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
    - `https://augurrisk.com/health`
    - `https://augurrisk.com/openapi.json`
-   - baseline commit is `dee071e`
+   - live deployed baseline is still `6bd331e`
    - if the public domain ever times out again, check `flyctl status --app augurrisk` immediately; the last real issue was the machine sitting in `stopped` after auto-stop, not bad detector code
 2. The paid-result problem and the wording/deploy work are already landed:
    - Base WETH (`0x4200000000000000000000000000000000000006`) now returns `allow` locally
@@ -602,11 +618,11 @@
    - it did not overlap with the paid `/analyze` burst
    - if it happens again, consider a memory bump or more direct memory profiling
 4. The latest hidden discovery rerun is already green:
-   - `python auto/loop.py` passed at `47/47` on 2026-03-29
-   - do not change detector logic until you first add a new hidden candidate or holdout case
+   - `python auto/loop.py` passed at `52/52` on 2026-03-30
+   - `python -m pytest -q` passed at `356`
+   - commit the current metadata-trailer pass before starting a new hidden batch
 5. Next execution step is the remaining external audit pass:
    - verify whether 8004scan refreshes from the new IPFS URI
-   - watch `coinbase/x402` PR `#1869` and confirm `x402.org/ecosystem` refreshes after merge
    - keep `x402list.fun` as stale unless the external directory changes
 6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan

@@ -1,4 +1,4 @@
-from risk_api.analysis.disassembler import Instruction, disassemble
+from risk_api.analysis.disassembler import Instruction, disassemble, strip_solidity_metadata
 
 
 def test_simple_sequence():
@@ -56,3 +56,17 @@ def test_offsets_are_correct():
     assert instructions[0].offset == 0  # PUSH1
     assert instructions[1].offset == 2  # PUSH2
     assert instructions[2].offset == 5  # STOP
+
+
+def test_strip_solidity_metadata_removes_standard_trailer():
+    body = "6080604052"
+    metadata = "a2646970667358221220d1f046eaee25ecce10f4aa5481ba5d2a8343e13df760d1cad2a3844efd9d1e2264736f6c63430008130033"
+    assert strip_solidity_metadata("0x" + body + metadata) == body
+
+
+def test_disassemble_ignores_solidity_metadata_trailer():
+    body = "6080604052"
+    metadata = "a2646970667358221220d1f046eaee25ecce10f4aa5481ba5d2a8343e13df760d1cad2a3844efd9d1e2264736f6c63430008130033"
+    instructions = disassemble("0x" + body + metadata)
+    assert len(instructions) == 3
+    assert [instr.name for instr in instructions] == ["PUSH1", "PUSH1", "MSTORE"]

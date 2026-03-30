@@ -19,8 +19,8 @@
    Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
 9. **[2026-03-29] Registration scripts are duplicated and easy to misuse**
    Do instead: when discovery wording or output shape changes, update not only `src/risk_api/app.py` plus `pin_metadata_ipfs.py` / `register_erc8004.py` / `register_x402jobs.py`, but also marketplace-specific scripts like `register_moltmart.py` and `register_work402.py`; keep argparse help paths safe and source-inspect operator scripts before assuming a flag is dry-run only.
-10. **[2026-03-29] Treat standard clone wrappers as proxies, not raw shells**
-   Do instead: recognize 45-byte EIP-1167 runtimes as proxy shells, resolve their implementation from embedded bytecode before falling back to storage-slot reads, and avoid presenting clone wrappers as `raw_delegatecall + tiny_bytecode` unless the resolved implementation still earns that conclusion.
+10. **[2026-03-30] Treat wrapper families through executable bytecode only**
+   Do instead: recognize 45-byte EIP-1167 runtimes as proxy shells, resolve their implementation from embedded bytecode before falling back to storage-slot reads, and strip Solidity CBOR metadata trailers before disassembly so wrapper families are judged on executable logic instead of `raw_delegatecall + tiny_bytecode` or other metadata-born false positives.
 
 ## Local Tooling
 1. **[2026-03-12] On this 8 GB Intel iGPU laptop, QMD's safest high-quality mode is structured `lex+vec`**
