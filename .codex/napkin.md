@@ -17,8 +17,8 @@
    Do instead: keep the human in the loop between hidden batches while the research loop is still shaping itself; only automate commit/push/deploy-to-next-batch chaining after the allowed fix surfaces and stop conditions are explicit.
 8. **[2026-03-17] `deployer_reputation` should use public Base Blockscout first**
    Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
-9. **[2026-03-17] Hidden-batch misses are currently alias coverage problems first**
-   Do instead: treat `fee_manipulation` and `suspicious_selector` alias coverage as the active weak spots; keep honeypot and reentrancy on the watchlist, but do not assume they are the dominant hidden failure source without new cases.
+9. **[2026-03-29] Registration metadata is duplicated beyond the obvious scripts**
+   Do instead: when discovery wording or output shape changes, update not only `src/risk_api/app.py` plus `pin_metadata_ipfs.py` / `register_erc8004.py` / `register_x402jobs.py`, but also marketplace-specific scripts like `register_moltmart.py` and `register_work402.py`.
 10. **[2026-03-18] Keep `deployer_reputation`, but treat it as supporting context**
    Do instead: keep it in the detector list because it adds useful deployer-history context at low cost, but do not sell it or optimize around it like a pillar detector; the product still stands on bytecode analysis first.
 
@@ -37,24 +37,24 @@
 ## Growth
 1. **[2026-03-10] Use the live proof report as the first outreach artifact**
    Do instead: point early traffic to `https://augurrisk.com/reports/base-bluechip-bytecode-snapshot` before building more proof pages.
-2. **[2026-03-11] Keep Augur's wedge narrow**
-   Do instead: treat Augur as `Base contract admission control for agents`; improve decision-native outputs and clone/proxy interpretation before drifting into simulation or a broad execution-security platform.
-3. **[2026-03-11] Keep public wedge wording plain**
-   Do instead: use `Deterministic Base contract risk screening for agents` or similarly direct phrasing in public copy; keep `admission control` as internal strategy language if needed.
-4. **[2026-03-11] Explain the trigger moment, not just the category**
-   Do instead: pair the public headline with a concrete sentence like `Screen Base contracts before your agent buys, routes funds, approves, or interacts`, and keep one compact use-case block on human-facing surfaces.
-5. **[2026-03-16] Keep the policy layer thin and explicit**
-   Do instead: keep `allow` for clean `safe` outputs only, `warn` for residual non-blocking signals, `manual_review` for unresolved proxy/raw `DELEGATECALL`/`SELFDESTRUCT`, and `block` for `hidden_mint` or `honeypot` rather than drifting into a complex custom policy engine.
-6. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
+2. **[2026-03-19] Finish the turn from contract scoring to action-aware admission control**
+   Do instead: keep Augur as `Base contract admission control for agents`, but treat the current `decision` / `recommended_policy` layer as v1; move next toward action-aware pre-transaction gates for `buy`, `approve`, `route`, `bridge`, or `pay` decisions, and do not respond by building a wallet product.
+3. **[2026-03-19] Public copy should now lead with admission control, not scoring**
+   Do instead: use `Deterministic Base contract admission control for agents` or `pre-transaction contract admission control for agents on Base` as the lead framing on current public surfaces; keep the 0-100 score as supporting output, not the headline.
+4. **[2026-03-19] Explain the trigger moment in action terms**
+   Do instead: pair the headline with a concrete sentence like `Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts`, and keep one compact use-case block on human-facing surfaces.
+5. **[2026-03-19] Agent-native services only win if delegation beats self-computation**
+   Do instead: when choosing roadmap work, prefer changes that make Augur more obviously worth calling than rebuilding in-agent: faster response, clearer policy output, stronger reliability, better edge-case coverage, and more machine-readable trust surfaces; publish concrete trust signals like uptime history, latency percentiles, and accuracy evidence, and return confidence metadata when uncertainty is real.
+6. **[2026-03-20] Keep action-aware expansion narrow and recipient-aware**
+   Do instead: if Augur moves beyond raw contract screening, extend it as destination-aware preflight for concrete actions like `deposit`, `approve`, `route`, or `pay`; validate claimed protocol + chain + recipient consistency, but do not drift into a generic phishing browser, wallet shield, or broad anti-scam suite.
+7. **[2026-03-29] Keep the policy layer thin and explicit**
+   Do instead: keep `allow` for clean `safe` outputs only, `warn` for residual non-blocking signals, `manual_review` for unresolved proxy/raw `DELEGATECALL`/`SELFDESTRUCT`/mint-capability-only cases, and `block` for honeypot or genuinely high-risk combinations rather than drifting into a complex custom policy engine.
+8. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
    Do instead: if a contract has high-severity non-proxy `delegatecall`, force at least `manual_review` in policy even when the numeric score is only `15`.
-7. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
+9. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
    Do instead: put reproducible cases in `auto/corpus/public_cases.json` or local `*.local.json` files, run `python auto/bench.py`, and only change implementation after the failure is locked into the corpus or pytest.
-8. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
+10. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
    Do instead: use `auto/corpus/public_cases.json` for durable regressions, but keep the real search pressure in hidden `auto/corpus/*.local.json` holdouts and `auto/candidates/*.local.json` discoveries so the loop cannot simply memorize the public cases.
-9. **[2026-03-10] Keep proof-page claims narrower than the implementation**
-   Do instead: frame the report as a dated snapshot, not a live rerun or a full product demo; use the payment explainer and dashboard as separate surfaces.
-10. **[2026-03-10] Homepage polish should preserve the agent entry path**
-   Do instead: keep the brand lockup, `skill.md` entry, and one obvious paid-call path visible above the fold even when tightening the visual hierarchy.
 
 ## Distribution
 1. **[2026-03-10] Public entry pages are not the detector list**
@@ -69,7 +69,9 @@
    Do instead: keep `examples/javascript/augur-mcp` usable for tool discovery and smoke startup without `CLIENT_PRIVATE_KEY`; require the key only when the paid analyze tool is invoked.
 6. **[2026-03-10] Keep distribution posts in one outreach log**
    Do instead: record each forum/community post in `.codex/outreach.local.md` if it exists, otherwise keep `docs/outreach.md` current with date, surface, URL, status, and exact message.
-7. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
+7. **[2026-03-19] Outreach should sell Augur as admission control, not as a generic risk screen**
+   Do instead: in posts, replies, and ecosystem submissions, lead with `contract admission control for agents` or `pre-transaction contract gate`, and use the proof page as supporting evidence rather than making `0-100 risk score` the headline.
+8. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
    Do instead: test `r/OpenClaw` or OpenClaw Discord after Base/x402-first outreach, and avoid using the AI-only OpenClaw forum as the main posting surface.
 
 ## Research Hygiene
@@ -83,14 +85,14 @@
    Do instead: treat repeated `Base-only deterministic prefilter` framing and zero unprompted mentions as a category/distribution signal before deciding on a product pivot into simulation.
 
 ## Validation
-1. **[2026-03-10] Public-surface cleanup should not remove discoverability docs**
-   Do instead: keep `skill.md`, `llms.txt`, `llms-full.txt`, `openapi.json`, the proof page, and the MCP setup page live while avoiding accidental operator-only material in tracked docs.
+1. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
+   Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
 2. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
 3. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
 4. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
-   Do instead: when you inspect `/dashboard` or `/stats` after testing `/analyze` yourself, assume the newest rows may be your own probes and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
+   Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
 5. **[2026-03-16] Public examples must round-trip through the live serializer**
    Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
 6. **[2026-03-16] Keep private detector holdouts out of git**

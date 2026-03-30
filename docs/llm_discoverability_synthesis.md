@@ -1,5 +1,7 @@
 # LLM Discoverability Synthesis
 
+Note: this memo reflects discovery research from 2026-03-10. Some "next step" recommendations here, especially around adding a thin decision layer, have since been overtaken by shipped product changes and the 2026-03-19 direction update in `docs/PRODUCT_DIRECTION_UPDATE.md`.
+
 Internal research memo based on 12 fresh ChatGPT conversations run on 2026-03-10.
 
 The raw sources are archived locally in `.codex/research.local/llm-discoverability/`.

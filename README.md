@@ -1,6 +1,6 @@
 # Augur
 
-> Deterministic Base contract risk screening for agents. x402-paid API access for fast first-pass decisions.
+> Deterministic Base contract admission control for agents. x402-paid API access for fast pre-transaction decisions.
 
 **Live:** https://augurrisk.com  
 **Proof report:** https://augurrisk.com/reports/base-bluechip-bytecode-snapshot  
@@ -10,9 +10,9 @@
 
 ## What Augur Does
 
-Augur accepts a Base mainnet contract address and returns a structured 0-100 bytecode risk score, a default first-pass decision, and detailed findings.
+Augur accepts a Base mainnet contract address and returns a default first-pass decision, a machine-readable policy recommendation, supporting findings, and a structured 0-100 bytecode score.
 
-The product is designed for agent workflows that need a fast deterministic contract screen before interacting with a contract. It is a deterministic bytecode analysis service, not a full security audit, runtime monitor, or guarantee.
+The product is designed for agent workflows that need a fast deterministic contract gate before interacting with a contract. It is a deterministic bytecode analysis service, not a full security audit, runtime monitor, or guarantee.
 
 Augur focuses on one job:
 
@@ -20,7 +20,7 @@ Augur focuses on one job:
 - one contract check per request
 - 8 deterministic detectors in one response
 
-Screen Base contracts before your agent buys, routes funds, approves, or interacts. If a contract still needs deeper analysis after that first pass, escalate it to a heavier tool.
+Screen Base contracts before your agent buys, routes funds, approves, pays, or interacts. If a contract still needs deeper analysis after that first pass, escalate it to a heavier tool.
 
 ## Common Use Cases
 
@@ -200,7 +200,7 @@ Default first-pass policy actions:
 
 ## Detector Coverage
 
-Augur's narrow risk-screening product currently scores contracts across these high-level categories:
+Augur's narrow admission-control product currently evaluates contracts across these high-level categories:
 
 - proxy behavior
 - reentrancy risk

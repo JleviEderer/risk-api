@@ -1,6 +1,7 @@
 # Agent Economy Primer For Augur
 
 > Last updated: 2026-03-08
+> For the market and product implications of agent-native service buying, read `docs/SELLING_TO_AGENTS_MEMO.md`. This primer is mainly about stack layers and payment rails.
 
 This note captures the highest-leverage path for understanding the agent-to-agent economy as it applies to Augur.
 

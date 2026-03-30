@@ -16,6 +16,43 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | x402 Bazaar | Historical / unverified | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | - | 2026-03-08 |
 | Coinbase Bazaar | Not confirmed in public feed | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`augurrisk.com/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-10 |
 
+## 2026-03-29 Alignment Checklist
+
+Use this checklist when public positioning changes, especially when machine-readable output emphasis changes like `score`-first to `decision` / `recommended_policy` first.
+
+The important distinction is:
+
+- repo files updated = source metadata is ready
+- external listing updated = the third-party directory actually received and shows the new metadata
+
+| Surface | Control Type | Repo State | What Must Happen Next | How To Verify |
+|---------|--------------|------------|------------------------|---------------|
+| Internal app surfaces (`/`, `/openapi.json`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/.well-known/agent-card.json`, `/agent-metadata.json`, `/.well-known/x402`) | direct deploy | updated in repo | deploy app changes | fetch each live route on `https://augurrisk.com` and confirm admission-control / `decision` / `recommended_policy` wording |
+| IPFS metadata CID | script-driven | updated in repo | rerun `scripts/pin_metadata_ipfs.py` to pin a new CID | confirm new CID exists and metadata payload matches current wording |
+| ERC-8004 on-chain `agentURI` / 8004scan | script-driven + browser verification | updated in repo | after pinning IPFS, run `scripts/register_erc8004.py --update-uri ipfs://<new-CID>` | verify [8004scan agent #19074](https://8004scan.io/agents/base/19074) shows the new metadata |
+| x402.jobs | script-driven | updated in repo | rerun `scripts/register_x402jobs.py --update <UUID>` | verify public listing text and response schema mention admission control plus `decision` / `recommended_policy` |
+| MoltMart | script-driven | updated in repo | rerun `scripts/register_moltmart.py --update <SERVICE_ID>` | verify public listing/service view shows the new positioning and response fields |
+| Work402 (testnet) | script-driven | updated in repo | rerun `scripts/register_work402.py` if we still care about the testnet listing | verify public agent profile text reflects admission-control language |
+| x402scan | manual / browser-driven | no repo automation here | update manually if the listing exposes editable metadata | verify listing text manually in browser |
+| x402.org/ecosystem | curated / manual upstream | no direct script update | verify current listing; open a PR only if stale wording is visible | confirm public ecosystem entry text and link are still acceptable |
+| Coinbase public discovery feed | external / auto-indexed | repo/app ready after deploy | do at least one real paid call after deploy, then re-check feed | rerun `scripts/check_cdp_discovery.py` carefully and/or inspect the public feed |
+| x402list.fun | external / stale third-party state | repo/app already point at canonical domain | verify only; do not expect repo changes alone to fix it | check whether legacy `risk-api.life.conway.tech` listing is still stale |
+| Historical x402 Bazaar manual ID | historical | no current repo action needed | leave alone unless we decide to revive that path explicitly | treat as historical until a live public surface is found |
+
+### Practical Sequence
+
+If the goal is full public alignment rather than only local repo correctness, do this in order:
+
+1. Deploy the app changes.
+2. Verify the internal machine-readable routes on the live domain.
+3. Pin new IPFS metadata and update the ERC-8004 on-chain URI.
+4. Rerun script-driven external listings:
+   - `scripts/register_x402jobs.py`
+   - `scripts/register_moltmart.py`
+   - `scripts/register_work402.py` if we still care about that testnet surface
+5. Manually audit the public external surfaces against this file.
+6. Treat Coinbase feed visibility and `x402list.fun` as external-state checks, not purely repo-side checks.
+
 ## Current Audit Status (2026-03-08)
 
 Use this table as the current `G-004` source of truth. The list above still includes historical or manual registrations; this table records what was verifiable from live public surfaces on 2026-03-08.

@@ -58,7 +58,9 @@ class TestServiceListing:
         schema = SERVICE_LISTING["output_schema"]
         assert schema["type"] == "object"
         assert "score" in schema["properties"]
-        assert "risk_level" in schema["properties"]
+        assert "level" in schema["properties"]
+        assert "decision" in schema["properties"]
+        assert "recommended_policy" in schema["properties"]
         assert "findings" in schema["properties"]
 
     def test_has_examples(self) -> None:
@@ -66,7 +68,8 @@ class TestServiceListing:
         assert "example_response" in SERVICE_LISTING
         assert "address" in SERVICE_LISTING["example_request"]
         assert SERVICE_LISTING["example_response"]["score"] == 0
-        assert SERVICE_LISTING["example_response"]["risk_level"] == "safe"
+        assert SERVICE_LISTING["example_response"]["level"] == "safe"
+        assert SERVICE_LISTING["example_response"]["decision"] == "allow"
 
     def test_has_usage_instructions(self) -> None:
         instructions = SERVICE_LISTING["usage_instructions"]
@@ -79,6 +82,11 @@ class TestServiceListing:
         score_schema = SERVICE_LISTING["output_schema"]["properties"]["score"]
         assert score_schema["minimum"] == 0
         assert score_schema["maximum"] == 100
+
+    def test_output_schema_requires_policy_fields(self) -> None:
+        required = SERVICE_LISTING["output_schema"]["required"]
+        assert "decision" in required
+        assert "recommended_policy" in required
 
 
 class TestAgentMetadata:

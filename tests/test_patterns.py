@@ -79,49 +79,19 @@ def test_detect_proxy_patterns_absent():
     assert detect_proxy_patterns(instructions) == []
 
 
-def test_detect_honeypot_patterns():
-    # Build minimal: PUSH4 transfer selector + EQ → JUMPI → REVERT
+def test_detect_honeypot_patterns_does_not_flag_standard_dispatch_revert():
+    # Standard dispatcher/default-revert flow should not count as honeypot.
     bytecode = (
         "63a9059cbb"  # PUSH4 transfer(address,uint256)
         "14"          # EQ
+        "610010"      # PUSH2 0x0010
         "57"          # JUMPI
+        "6000"        # PUSH1 0
+        "80"          # DUP1
         "fd"          # REVERT (fallthrough)
     )
     instructions = disassemble(bytecode)
-    findings = detect_honeypot_patterns(instructions)
-    assert len(findings) == 1
-    assert findings[0].severity == Severity.HIGH
-    assert findings[0].points == 25
-
-
-def test_detect_honeypot_patterns_with_push_between_eq_and_jumpi():
-    bytecode = (
-        "63a9059cbb"  # PUSH4 transfer(address,uint256)
-        "14"          # EQ
-        "610010"      # PUSH2 0x0010
-        "57"          # JUMPI
-        "fd"          # REVERT
-    )
-    instructions = disassemble(bytecode)
-    findings = detect_honeypot_patterns(instructions)
-    assert len(findings) == 1
-    assert findings[0].detector == "honeypot"
-
-
-def test_detect_honeypot_patterns_with_iszero_and_jumpdest():
-    bytecode = (
-        "63a9059cbb"  # PUSH4 transfer(address,uint256)
-        "14"          # EQ
-        "15"          # ISZERO
-        "610010"      # PUSH2 0x0010
-        "57"          # JUMPI
-        "5b"          # JUMPDEST
-        "fd"          # REVERT
-    )
-    instructions = disassemble(bytecode)
-    findings = detect_honeypot_patterns(instructions)
-    assert len(findings) == 1
-    assert findings[0].detector == "honeypot"
+    assert detect_honeypot_patterns(instructions) == []
 
 
 def test_detect_honeypot_patterns_with_blacklist_selector():

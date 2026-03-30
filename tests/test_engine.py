@@ -107,7 +107,7 @@ def test_analyze_raw_delegatecall_requires_manual_review_even_when_score_is_safe
 
 
 @responses.activate
-def test_analyze_hidden_mint_blocks_even_when_level_is_low():
+def test_analyze_hidden_mint_requires_manual_review_even_when_level_is_low():
     bytecode = "0x63a0712d68" + "00" * 200
     responses.post(RPC_URL, json=_rpc_response(bytecode))
 
@@ -115,7 +115,7 @@ def test_analyze_hidden_mint_blocks_even_when_level_is_low():
 
     assert result.score == 25
     assert result.level == RiskLevel.LOW
-    assert result.decision == PolicyAction.BLOCK
+    assert result.decision == PolicyAction.MANUAL_REVIEW
     assert PolicyReasonCode.HIDDEN_MINT_SIGNAL.value in result.recommended_policy.reason_codes
 
 

@@ -1,14 +1,103 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-18
+- Date: 2026-03-19
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
 - Repo code baseline: `be812ee`
 - Deployed app baseline: `be812ee`
-- Status: green on deployed app baseline `be812ee`. The Blockscout-backed deployer-reputation path remains live, and the four newest hidden-batch follow-ups expanded broader limit-control alias coverage, trading-toggle alias coverage, selective fee-bypass alias coverage, and whitelist/cooldown-toggle alias coverage. Verification is green: `python auto/loop.py` now passes at `42/42`, `python -m pytest -q` passed at `342`, and live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`. One production ops issue surfaced after deploy: Fly left the only machine stopped and auto-start hit rate limits, so the fix in `be812ee` turns `auto_stop_machines` off to keep the single machine running. Local worktree is clean except for local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
+- Status: green on deployed app baseline `be812ee`. The Blockscout-backed deployer-reputation path remains live, and the four newest hidden-batch follow-ups expanded broader limit-control alias coverage, trading-toggle alias coverage, selective fee-bypass alias coverage, and whitelist/cooldown-toggle alias coverage. Verification is green: `python auto/loop.py` now passes at `42/42`, `python -m pytest -q` passed at `342`, and live checks passed for `https://augurrisk.com/health`, `https://augurrisk.com/openapi.json`, and `https://augurrisk.com/`. One production ops issue surfaced after deploy: Fly left the only machine stopped and auto-start hit rate limits, so the fix in `be812ee` turns `auto_stop_machines` off to keep the single machine running. Local worktree now has uncommitted product-direction follow-ups: `docs/PRODUCT_DIRECTION_UPDATE.md`, public-copy alignment in `README.md` and `src/risk_api/app.py`, historical-doc notes in `docs/PRODUCT_WEDGE_MEMO.md` and `docs/llm_discoverability_synthesis.md`, x402 ecosystem metadata wording updates, `tests/test_app.py` expectation updates, plus the usual local-only scratch dirs (`.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.playwright-mcp/`).
 
 ## What Changed
+- Fixed the paid blue-chip false-positive path locally on 2026-03-29:
+  - narrowed `detect_honeypot_patterns()` so ordinary dispatcher/default-`REVERT` flow no longer counts as a honeypot; the detector now only fires on blacklist-style transfer controls until a stronger transfer-path heuristic exists
+  - changed `hidden_mint` from automatic `block` to `manual_review` when it is the main signal, so governed mint-capability tokens do not hard-block by default
+  - added/updated reproducible regressions in `auto/corpus/public_cases.json`, `tests/test_patterns.py`, `tests/test_policy.py`, `tests/test_engine.py`, and `tests/test_app.py`
+  - local live re-check against the paid examples now returns:
+    - Base WETH (`0x4200000000000000000000000000000000000006`) -> `allow`
+    - AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`) -> `manual_review`
+    - `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` -> `allow`
+  - verification passed:
+    - `python -m pytest -q` -> `340 passed`
+    - `python auto/loop.py` -> `43/43`
+- Finished the duplicated registration/discovery metadata wording pass locally on 2026-03-29:
+  - updated stale registration surfaces in:
+    - `scripts/pin_metadata_ipfs.py`
+    - `scripts/register_erc8004.py`
+    - `scripts/register_x402jobs.py`
+    - `scripts/register_moltmart.py`
+    - `scripts/register_work402.py`
+  - aligned those scripts around admission control language and the current output shape (`decision`, `recommended_policy`, supporting findings, score)
+  - `scripts/register_moltmart.py` and `scripts/register_x402jobs.py` no longer advertise the stale `risk_level`-style response shape
+  - syntax check passed:
+    - `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py`
+- Added a concrete registration/discovery alignment checklist on 2026-03-29:
+  - `docs/REGISTRATIONS.md` now explicitly separates:
+    - internal app surfaces that update on deploy
+    - script-driven third-party listings that require rerunning update flows
+    - manual/curated or external-indexed surfaces that only support verification or escalation
+  - practical consequence:
+    - repo alignment is done locally
+    - external listing alignment is not yet proven until we deploy, rerun the script-driven listing updates, and manually audit the live surfaces
+  - currently tracked external surfaces that matter for this pass:
+    - ERC-8004 / 8004scan
+    - x402.jobs
+    - MoltMart
+    - Work402 (testnet, if still worth maintaining)
+    - x402.org/ecosystem
+    - Coinbase public discovery feed
+    - x402list.fun as an external stale-state check, not a repo-controlled surface
+- Captured the 2026-03-26 production traffic and outcome review so the next session does not over-prioritize copy/distribution cleanup:
+  - pulled the durable production analytics store from Fly volume data (`/data/analytics.sqlite3`) and checked Fly logs around the same window
+  - analyzed `2026-03-16` through `2026-03-26` UTC:
+    - `3563` total logged events
+    - `95` `/analyze` requests
+    - `7` paid `/analyze` successes, all on `2026-03-25`
+    - top traffic was mostly discovery/crawler activity on `/`, `/.well-known/agent-card.json`, `robots.txt`, and `sitemap.xml`
+  - confirmed the Fly OOM alert was real but brief:
+    - `2026-03-26 07:21:00 UTC`: Fly logged `Out of memory: Killed process 786 (gunicorn)`
+    - one proxy-side `connection closed before message completed` error appeared at the same moment
+    - a new worker booted at `2026-03-26 07:21:01 UTC`
+    - the OOM happened during a burst of `/` requests from `x402audit/1.0`, not during the paid `/analyze` burst
+  - operational read from the production window:
+    - no app-level `500` or `502` rows appeared in the durable analytics DB for the analyzed window
+    - current live route checks returned `200` for `/`, `/openapi.json`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/.well-known/agent-card.json`, `/agent-metadata.json`, and `/.well-known/x402`
+    - paid `/analyze` calls averaged about `1.25s`; unpaid `402` and invalid `422` paths stayed fast
+  - product-quality read from the same evidence:
+    - the meaningful issue is not uptime; it is that real paid testers hit major contracts and got bad block decisions
+    - the paid contracts in the traffic review included Base WETH (`0x4200000000000000000000000000000000000006`), AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`), and `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984`
+    - local re-check from the current code still blocks all three, so this is not just a historical artifact in old logs
+  - plan adjustment from this review:
+    - keep the full admission-control wording/metadata alignment pass as valid cleanup
+    - but move result quality ahead of metadata alignment and ahead of broader distribution work
+    - treat the OOM as a secondary ops follow-up unless it repeats
+- Captured the 2026-03-26 growth/distribution cleanup so the next session starts with the right framing:
+  - `docs/GrowthExecutionPlan.md` now points at `docs/PRODUCT_DIRECTION_UPDATE.md` as the current strategy source instead of treating the older wedge memo as the newest call
+  - the growth plan now separates three channels that should not be conflated:
+    - registry/directory maintenance
+    - AI-answer visibility / citation work
+    - operator ecosystems such as OpenClaw and installable workflow surfaces
+  - the old checklist is now framed as baseline history rather than the current sprint, and the next explicit growth items include measured AI-answer visibility work plus one operator-ecosystem experiment
+  - bookmark review takeaways from this session:
+    - CrowdReply belongs in the LLM-discoverability / AI-answer-visibility bucket, not the registry-cleanup bucket
+    - `Larry something` was almost certainly `Larrybrain` / `Larry marketing` in the OpenClaw ecosystem
+    - `Clawdmarket` was not found by that exact name in the repo or the current bookmark export
+  - the temporary scratch note `docs/X_BOOKMARK_DISTRIBUTION_NOTES.md` was merged into `docs/GrowthExecutionPlan.md` and deleted to avoid doc sprawl
+- Added a product-direction follow-up memo and aligned the public/docs wording with it on 2026-03-19:
+  - new memo: `docs/PRODUCT_DIRECTION_UPDATE.md`
+  - supporting market-read memo: `docs/SELLING_TO_AGENTS_MEMO.md`
+  - `docs/agent-economy-primer.md` now points to the new memo for market/product implications so the primer stays focused on payment/discovery stack layers
+  - keeps the engine/wedge, but makes the current direction explicit: Augur should be sold as `pre-transaction contract admission control for agents on Base`, not mainly as a generic risk-score/report API
+  - `README.md` now leads with admission control and treats the score as supporting output instead of the main product
+  - `src/risk_api/app.py` now aligns the homepage, OpenAPI description, `skill.md`, `llms.txt`, `llms-full.txt`, agent card, plugin manifest, ERC-8004 metadata, and x402 discovery copy around `decision` / `recommended_policy` first and the 0-100 score second
+  - `docs/PRODUCT_WEDGE_MEMO.md` and `docs/llm_discoverability_synthesis.md` now point readers at the newer direction update so older strategy notes do not compete with the current call
+  - the new memo captures a durable market test: Augur needs to be a service agents are rational to call instead of computing around, so roadmap work should favor speed, reliability, clearer policy output, and maintained judgment over generic breadth
+  - the strategy docs now make the next narrow extension more explicit: destination-aware preflight for actions like `deposit`, `approve`, `route`, or `pay` can fit the wedge when it validates claimed protocol + chain + recipient consistency, but Augur should still avoid drifting into a generic phishing browser, wallet shield, or broad anti-scam suite
+  - `docs/SELLING_TO_AGENTS_MEMO.md` now also captures the article's concrete trust checklist: publish uptime history, latency percentiles, and accuracy evidence, expose provenance where useful, and return confidence metadata when uncertainty is real
+  - `docs/X402_ECOSYSTEM_SUBMISSION.md` and `docs/submissions/x402-ecosystem/metadata.json` now describe Augur as admission control rather than primarily as risk scoring
+  - `docs/outreach.md` now uses admission-control language for reusable post angles instead of calling Augur a generic risk screen
+  - verification for this wording pass: `python -m pytest tests/test_app.py -q` passed at `137 passed`
+  - not yet committed or deployed
 - The previous committed/deployed baseline was the first Etherscan V2 pass:
   - commit: `a0547a4` (`Move deployer reputation to Etherscan V2`)
   - docs-only follow-up commit: `aef6f28` (`Refresh handover after reputation deploy`)
@@ -147,7 +236,7 @@
     - `allow` only for clean `safe` results with no reason codes
     - `warn` for `low` results and `safe` results that still carry non-blocking signals
     - `manual_review` for `medium`, unresolved proxy logic, raw `DELEGATECALL`, or `SELFDESTRUCT`
-    - `block` for `high` / `critical`, hidden mint, or honeypot signals
+    - `block` for `high` / `critical` or honeypot signals
   - `recommended_policy` now returns `action`, `summary`, and stable `reason_codes`
 - Updated all machine-readable surfaces and examples to reflect the real policy output:
   - OpenAPI examples and `AnalysisResult` schema in `src/risk_api/app.py`
@@ -296,7 +385,8 @@
   - Augur now returns explicit first-pass policy outputs: `decision` and `recommended_policy`
   - `recommended_policy` currently includes `action`, `summary`, and `reason_codes`
   - `allow` should be reserved for clean `safe` outputs with no reason codes
-  - `hidden_mint` and `honeypot` should block even at `low`
+  - `honeypot` should still block even at `low`
+  - `hidden_mint` should now force at least `manual_review`, not automatic `block`, when it is the main signal
   - raw non-proxy `delegatecall` and `SELFDESTRUCT` should never auto-allow or stay at plain `warn` just because the numeric score is low
   - unresolved proxy logic should be carried as structured engine state and stable reason codes, not inferred from human-readable finding titles
   - treat `fetch_failed` (RPC/lookup failure) separately from `no_code` (implementation address resolved but has no deployed bytecode)
@@ -318,7 +408,7 @@
   - proof-report snapshots are allowed to stay dated, but their embedded `decision` / `recommended_policy` should still agree with current policy semantics unless you intentionally choose to preserve a historical policy layer and update the drift checks accordingly
 - Current detector weakness read:
   - observed hidden-batch misses have been concentrated in `fee_manipulation` alias coverage and `suspicious_selector` fallback coverage, not repeated core `honeypot` misses
-  - the main `honeypot` issue found so far was policy severity on blacklist-style cases; the detector itself is still structurally narrow and remains a future research target rather than the current dominant failure source
+  - the generic honeypot control-flow heuristic was producing obvious false positives on standard dispatcher/default-`REVERT` patterns in blue-chip contracts, so the detector is now intentionally narrowed to blacklist-style transfer-control signals until a stronger transfer-path heuristic exists
   - `reentrancy` is also structurally narrow (`CALL` then nearby `SSTORE`) and should be treated as heuristic coverage, not deep semantic analysis
   - `deployer_reputation` is the weakest detector operationally because it depends on explorer APIs; failures can erase signal even when bytecode analysis is healthy
 - Current deployer-reputation fix read:
@@ -334,11 +424,25 @@
     - current BaseScan V1 path also returns a deprecation error
   - optional later improvement: evaluate a richer wallet-provenance signal only if real users prove deployer reputation matters enough to justify more dependency or spend
 - Current analytics read:
-  - live `/stats` currently shows `21` unpaid `402` attempts and `6` paid requests on this instance
-  - interpret recent `402` rows carefully if you have just run your own probes against `/analyze`
-  - treat `curl/...` as intentional CLI or scripted traffic, not as hard proof of human-origin traffic
+  - durable production read for `2026-03-16` through `2026-03-26` UTC:
+    - `3563` total logged events
+    - `95` `/analyze` requests
+    - `7` paid `/analyze` successes
+    - no app-level `500` or `502` rows in the analytics DB for that window
+  - the only confirmed Fly OOM in that review window was `2026-03-26 07:21:00 UTC`
+    - it caused one proxy-side dropped request and a worker restart about a second later
+    - it did not overlap with the paid `/analyze` burst on `2026-03-25`
+  - the important production concern is result quality, not sustained downtime
+    - real paid testers checked Base WETH, AERO, and `0x1f98...F984`
+    - current local analysis still blocks those contracts
+  - keep using the Fly volume DB plus Fly logs together for traffic forensics
+    - `/stats` and `/dashboard` stay useful hints, but not the source of truth
+    - treat `curl/...` and similar agents as intent signals, not proof of a human at the keyboard
 - `coinbase/x402` PR `#1515` is merged into `main`.
-- Current next step is still `G-015`: use the live proof report for targeted distribution and watch for qualified traffic.
+- Current execution priority:
+  - first: commit and deploy the local result-quality plus metadata-alignment work
+  - second: rerun the script-driven external listing updates and audit the live external surfaces against `docs/REGISTRATIONS.md`
+  - third: only then treat public/distribution alignment as complete and resume broader outreach work
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:
@@ -363,36 +467,61 @@
 - [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
 - [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
 
-1. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-2. Revise the LLM discoverability artifacts on the next pass:
+1. Turn the three known bad paid outcomes into reproducible cases before changing logic:
+   - Base WETH: `0x4200000000000000000000000000000000000006`
+   - AERO: `0x940181a94A35A4569E4529A3CDfB74e38FD98631`
+   - `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984`
+   - prefer a durable pytest or `auto/corpus/*.local.json` case over ad hoc tweaking
+2. Fix the false-positive detector or policy behavior those cases expose before pushing more distribution work.
+3. After the logic fix, verify locally with:
+   - `python -m pytest -q`
+   - `python auto/loop.py`
+4. Before any deploy, verify the live machine-readable surfaces explicitly:
+   - `/`
+   - `/openapi.json`
+   - `/skill.md`
+   - `/llms.txt`
+   - `/llms-full.txt`
+   - `/.well-known/agent-card.json`
+   - `/agent-metadata.json`
+   - `/.well-known/x402`
+5. After deploy, update the script-driven external listings that still depend on repo payloads:
+   - `scripts/pin_metadata_ipfs.py`
+   - `scripts/register_erc8004.py`
+   - `scripts/register_x402jobs.py`
+   - `scripts/register_moltmart.py`
+   - `scripts/register_work402.py` if the testnet listing still matters
+6. After those reruns, audit the live public surfaces in `docs/REGISTRATIONS.md` instead of assuming the scripts were enough.
+7. Do one real paid `/analyze` smoke test after deploy to confirm the payment flow and output quality end to end.
+8. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+9. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
-3. Use the LLM memo to tighten both category wording and entity disambiguation around `Augur Risk`, `augurrisk.com`, and Base-first deterministic contract gating before broader promotion.
-4. Do one real paid end-to-end MCP test with a wallet configured before any broader MCP push or npm patch release.
-5. Watch:
+10. Use the LLM memo to tighten both category wording and entity disambiguation around `Augur Risk`, `augurrisk.com`, and Base-first deterministic contract gating before broader promotion.
+11. Do one real paid end-to-end MCP test with a wallet configured before any broader MCP push or npm patch release.
+12. Watch:
    - `proof_report_view`
    - `top_referers`
    - `/how-payment-works` visits
    - unpaid `402` attempts
    - paid requests
-6. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
-7. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
-8. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
-9. Validate the new policy outputs on real Base contracts and tighten the mapping if any obvious blue-chip or proxy cases feel operationally wrong.
-10. Use real `/stats` and paid-call observations to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
-11. In the next session, start a fresh hidden holdout discovery batch:
+13. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
+14. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
+15. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
+16. Use real paid-call observations, not only `/stats`, to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
+17. In the next session, start a fresh hidden holdout discovery batch:
    - use `python auto/loop.py` as the default runner
    - run one batch at a time; do not queue multiple hidden discovery batches before you know what the previous one changed
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
-   - the most recent local additions cover `pause()` warning behavior, safe-score reentrancy warning, proxy `fetch_failed` manual-review behavior, blacklist-controls-without-transfer warning behavior, transaction-limit alias warning behavior, broader limit-control alias warning behavior, trading-toggle alias warning behavior, fee-bypass alias warning behavior, and whitelist/cooldown-toggle alias warning behavior
+   - the most recent local additions also cover dispatcher/default-`REVERT` non-honeypot behavior and mint-capability-only `manual_review` behavior
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
-12. Automation follow-up:
+18. Automation follow-up:
    - keep serial hidden-batch runs manual for now while the fixes are still shaping the research workflow
    - later, build a guarded local orchestrator that can run `N` serial batches end-to-end: hidden batch -> validation -> commit -> push -> deploy -> live verify -> next batch
    - first version should stay constrained to narrow selector/policy research surfaces and fail closed on ambiguous results
-13. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
+19. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
@@ -403,18 +532,44 @@
    - `https://augurrisk.com/openapi.json`
    - baseline commit is `be812ee`
    - if the public domain ever times out again, check `flyctl status --app augurrisk` immediately; the last real issue was the machine sitting in `stopped` after auto-stop, not bad detector code
-2. Treat deployer reputation as good enough for now:
-   - keep it listed as a detector
-   - keep presenting it as supporting context, not a core pillar of Augur
-   - do not spend more time or money on it unless real users prove it matters
-3. The latest hidden discovery rerun is already green:
+2. Start from the real paid-result problem, not the wording cleanup:
+   - lock Base WETH, AERO, and `0x1f98...F984` into reproducible local cases first
+   - fix the false-positive logic before treating metadata alignment or new distribution work as the main task
+3. Treat the March 26 OOM as secondary unless it repeats:
+   - it caused one brief dropped request during crawler traffic on `/`
+   - it did not overlap with the paid `/analyze` burst
+   - if it happens again, consider a memory bump or more direct memory profiling
+4. The latest hidden discovery rerun is already green:
    - `python auto/loop.py` passed at `42/42` on 2026-03-18 after the new whitelist/cooldown-toggle alias follow-up
-   - do not change detector logic until you first add a new hidden candidate or holdout case
-4. Optional runtime proof if desired:
-   - do one real paid `/analyze` smoke check to confirm deployer-reputation findings flow end to end on production
+   - do not change detector logic until you first add a new hidden candidate, holdout case, or the new paid false-positive cases above
+5. Before any deploy, verify the public machine-readable routes, not just tests:
+   - `/`
+   - `/openapi.json`
+   - `/skill.md`
+   - `/llms.txt`
+   - `/llms-full.txt`
+   - `/.well-known/agent-card.json`
+   - `/agent-metadata.json`
+   - `/.well-known/x402`
+6. After deploy, rerun the script-driven external listing updates captured in `docs/REGISTRATIONS.md`:
+   - `scripts/pin_metadata_ipfs.py`
+   - `scripts/register_erc8004.py`
+   - `scripts/register_x402jobs.py`
+   - `scripts/register_moltmart.py`
+   - `scripts/register_work402.py` only if the testnet listing is still worth maintaining
+7. After those reruns, audit the live third-party surfaces instead of assuming the repo updates propagated:
+   - 8004scan
+   - x402.jobs
+   - MoltMart
+   - Work402 if applicable
+   - x402.org/ecosystem
+   - Coinbase public discovery feed
+   - x402list.fun as an external stale-state check
+8. Optional runtime proof if desired:
+   - do one real paid `/analyze` smoke check after the next fix to confirm both payment flow and output quality end to end
    - this is useful evidence, but not a blocker for normal next work
-5. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
-6. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
+9. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
+10. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
    - use `python auto/loop.py`
    - keep batches serial
    - add a new hidden holdout/candidate before changing detector logic again

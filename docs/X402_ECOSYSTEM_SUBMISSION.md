@@ -32,7 +32,7 @@ For Augur, use slug `augur`.
 ```json
 {
   "name": "Augur",
-  "description": "Deterministic Base contract risk screening for agents on Base. Pay $0.10/call via x402 in USDC on Base and get a 0-100 score with findings. Screen Base contracts before your agent buys, routes funds, approves, or interacts.",
+  "description": "Deterministic Base contract admission control for agents on Base. Pay $0.10/call via x402 in USDC on Base and get a default decision, policy recommendation, and supporting findings before your agent buys, routes funds, approves, pays, or interacts.",
   "logoUrl": "/logos/augur.png",
   "websiteUrl": "https://augurrisk.com/",
   "category": "Services/Endpoints"

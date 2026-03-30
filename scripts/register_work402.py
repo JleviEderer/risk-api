@@ -1,4 +1,4 @@
-"""Register risk-api on Work402 agent hiring marketplace (Base Sepolia testnet).
+"""Register Augur on Work402 agent hiring marketplace (Base Sepolia testnet).
 
 Work402 is an agent-to-agent hiring marketplace where agents post services
 and hire other agents. Currently on Base Sepolia (testnet).
@@ -28,10 +28,10 @@ WALLET_ADDRESS = "0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891"
 AGENT_PROFILE = {
     "name": "Augur",
     "bio": (
-        "Base mainnet smart contract bytecode risk scoring API for agents. "
+        "Deterministic Base contract admission control for agents on Base. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, selfdestruct, "
         "honeypot, hidden mint, fee manipulation, delegatecall) and deployer "
-        'reputation. Returns a composite 0-100 risk score with findings. '
+        'reputation. Returns a default decision, policy recommendation, supporting findings, and a composite 0-100 score. '
         '"safe" is not a guarantee or audit. Live at augurrisk.com. '
         "Pay $0.10/call via x402 in USDC on Base."
     ),

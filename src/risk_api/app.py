@@ -232,13 +232,14 @@ OPENAPI_SPEC: dict[str, object] = {
         "title": "Augur",
         "version": "1.0.0",
         "description": (
-            "Deterministic Base contract risk screening for agents on Base "
+            "Deterministic Base contract admission control for agents on Base "
             "and the developers building them. "
-            "Screen Base contracts before your agent buys, routes funds, approves, or interacts. "
+            "Screen Base contracts before your agent buys, routes funds, approves, pays, or interacts. "
             "Analyzes Base bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
-            "delegatecall, deployer reputation) and returns a composite 0-100 "
-            "risk score, default decision, and findings. Pay $0.10/call via x402 in USDC on Base. "
+            "delegatecall, deployer reputation) and returns a default decision, "
+            "policy recommendation, supporting findings, and a composite 0-100 "
+            "score. Pay $0.10/call via x402 in USDC on Base. "
             '"safe" means no major bytecode-level risk signals detected in this '
             "scan, not a security audit or guarantee."
         ),
@@ -250,13 +251,13 @@ OPENAPI_SPEC: dict[str, object] = {
         "/analyze": {
             "get": {
                 "operationId": "analyzeContract",
-                "summary": "Analyze a Base smart contract for bytecode risk",
+                "summary": "Decide whether a Base contract should be allowed before interaction",
                 "description": (
                     "Fetches on-chain bytecode for the given Base mainnet "
                     "contract address and runs 8 detectors (proxy, reentrancy, selfdestruct, "
                     "honeypot, hidden mint, fee manipulation, delegatecall, "
-                    "deployer reputation). Returns a composite 0-100 risk score, "
-                    'default decision, and findings. "safe" is a low-risk bytecode bucket, not a '
+                    "deployer reputation). Returns a default decision, policy recommendation, "
+                    'supporting findings, and a composite 0-100 score. "safe" is a low-risk bytecode bucket, not a '
                     "security guarantee."
                 ),
                 "parameters": [
@@ -1206,11 +1207,11 @@ LANDING_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Augur - Deterministic Base Contract Risk Screening For Agents</title>
-<meta name="description" content="Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.">
+<title>Augur - Deterministic Base Contract Admission Control For Agents</title>
+<meta name="description" content="Deterministic Base contract admission control for agents. Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts.">
 <meta name="robots" content="index, follow">
 <meta property="og:title" content="Augur">
-<meta property="og:description" content="Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.">
+<meta property="og:description" content="Deterministic Base contract admission control for agents. Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="__BASE_URL__">
 <meta property="og:image" content="__BASE_URL__/avatar.png">
@@ -1305,7 +1306,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
     <img src="__BASE_URL__/avatar.png" alt="Augur">
     <div>
       <span class="brand-name">Augur</span>
-      <span class="brand-sub">Base Risk Screen</span>
+      <span class="brand-sub">Base Admission Gate</span>
     </div>
   </a>
   <nav class="topnav">
@@ -1319,14 +1320,14 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 
 <section class="hero">
 <div class="hero-main">
-  <div class="eyebrow">Base Mainnet  |  Deterministic Risk Screening  |  x402-Paid API</div>
+  <div class="eyebrow">Base Mainnet  |  Deterministic Admission Control  |  x402-Paid API</div>
   <h1>Screen a Base contract before your agent touches it.</h1>
-  <p class="subtitle">Deterministic Base contract risk screening for agents. Screen Base contracts before your agent buys, routes funds, approves, or interacts.</p>
+  <p class="subtitle">Deterministic Base contract admission control for agents. Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts.</p>
   <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
   <p class="hero-note">Fastest path for integration: start with <a href="__BASE_URL__/skill.md">/skill.md</a> if you want the shortest agent-oriented workflow, use <a href="__BASE_URL__/openapi.json">/openapi.json</a> for a formal schema, or install the local wrapper from <a href="__BASE_URL__/mcp">/mcp</a>.</p>
   <div class="hero-stats">
     <div class="hero-stat"><strong>8</strong><span>Detectors</span></div>
-    <div class="hero-stat"><strong>0-100</strong><span>Risk Score</span></div>
+    <div class="hero-stat"><strong>4</strong><span>Policy Actions</span></div>
     <div class="hero-stat"><strong>Base</strong><span>Mainnet Only</span></div>
     <div class="hero-stat"><strong>Proxy</strong><span>Impl Aware</span></div>
   </div>
@@ -1334,7 +1335,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 <aside class="hero-side">
   <div class="mini-label">Agent Entry</div>
   <pre>curl -s "__BASE_URL__/skill.md"</pre>
-  <p>Then call <code>/analyze</code> with an x402-capable client and use the returned <code>score</code>, <code>level</code>, and <code>findings</code> as your first-pass screening signal.</p>
+  <p>Then call <code>/analyze</code> with an x402-capable client and use the returned <code>decision</code>, <code>recommended_policy</code>, and supporting findings as your first-pass gate.</p>
 </aside>
 </section>
 
@@ -1348,20 +1349,20 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
   </div>
   <div class="callout">
     <div class="kicker">Step 02</div>
-    <p>Call <code>/analyze</code> with a Base contract address, let your x402 client handle payment, and use the returned score and findings before your workflow proceeds.</p>
+    <p>Call <code>/analyze</code> with a Base contract address, let your x402 client handle payment, and use the returned decision and policy recommendation before your workflow proceeds.</p>
   </div>
 </div>
 <pre>curl -s "__BASE_URL__/skill.md"
 
 curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
-<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Screen Base contracts before your agent buys, routes funds, approves, or interacts.</p>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Use Augur as a pre-transaction gate before your agent buys, routes funds, approves, pays, or interacts.</p>
 </div>
 
 <div class="section">
 <h2>What it does</h2>
-<p class="section-copy">Augur is a deterministic contract-risk screen for Base agents and the workflows around them. It gives you a fast first pass before you trust a contract.</p>
-<p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a composite 0&ndash;100 risk score with detailed findings.</p>
+<p class="section-copy">Augur is a deterministic contract admission gate for Base agents and the workflows around them. It gives you a fast first pass before you trust a contract.</p>
+<p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a default decision, policy recommendation, supporting findings, and a composite 0&ndash;100 score.</p>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
   <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
@@ -1399,7 +1400,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">
-Pay with any x402-compatible client. Returns JSON with score, level, decision, recommended_policy, findings, and category_scores for a Base mainnet contract.
+Pay with any x402-compatible client. Returns JSON with decision, recommended_policy, findings, score, level, and category_scores for a Base mainnet contract.
 </p>
 </div>
 
@@ -1655,7 +1656,7 @@ ul{margin:8px 0 0 18px}
 <div class="step"><strong>1. Request analysis</strong><br>Call <code>GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006</code>.</div>
 <div class="step"><strong>2. Receive a 402</strong><br>Augur returns <code>402 Payment Required</code> with a base64-encoded <code>Payment-Required</code> header describing the exact USDC payment on Base.</div>
 <div class="step"><strong>3. Sign and attach payment</strong><br>Your x402 client signs the payment authorization from your wallet and retries the same request with a <code>PAYMENT-SIGNATURE</code> header.</div>
-<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the contract score, level, decision, recommended_policy, findings, and proxy details if present.</div>
+<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the decision, recommended_policy, supporting findings, score, level, and proxy details if present.</div>
 </div>
 
 <div class="section">
@@ -1850,7 +1851,7 @@ def _render_intent_page(base_url: str, path: str) -> str:
             "url": base_url,
         },
         "about": [
-            "Base mainnet smart contract risk scoring",
+            "Base mainnet smart contract admission control",
             "x402-paid API",
             title,
         ],
@@ -1950,13 +1951,13 @@ a{{color:#90cdf4}}
 LLMS_TXT = """\
 # Augur
 
-> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score, a default decision, and findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract admission control for agents on Base. Returns a default decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
 
 ## What It Does
 
 Augur fetches on-chain bytecode for a Base mainnet smart contract (EIP-155:8453) \
-and runs 8 deterministic detectors to produce a composite risk score from 0 (safe) to 100 (critical).
-Screen Base contracts before your agent buys, routes funds, approves, or interacts.
+and runs 8 deterministic detectors to produce a default decision, policy recommendation, supporting findings, and a composite score from 0 (safe) to 100 (critical).
+Use Augur before your agent buys, routes funds, approves, pays, or interacts.
 A `safe` result means no major bytecode-level risk signals were detected in this scan, not that the contract is audited or guaranteed safe.
 
 ## How to Call
@@ -1999,7 +2000,7 @@ SKILL_MD = """\
 ---
 name: augur
 version: 1.0.0
-description: Deterministic Base contract risk screening for agents. Analyze a contract, get a 0-100 score plus a first-pass policy recommendation, and pay per call with x402.
+description: Deterministic Base contract admission control for agents. Analyze a contract, get a first-pass decision plus policy recommendation and supporting findings, and pay per call with x402.
 homepage: __BASE_URL__
 license: MIT
 tags: [security, smart-contracts, base, bytecode-analysis, x402, agents]
@@ -2013,14 +2014,14 @@ payment:
 
 # Augur
 
-Use Augur when you need a fast deterministic first-pass contract screen on a Base mainnet contract. Screen Base contracts before your agent buys, routes funds, approves, or interacts.
+Use Augur when you need a fast deterministic first-pass contract gate on a Base mainnet contract. Use it before your agent buys, routes funds, approves, pays, or interacts.
 
 ## Fastest Path
 
 1. Read this file or `__BASE_URL__/openapi.json`
 2. Call `GET __BASE_URL__/analyze?address={base_contract_address}`
 3. If you receive `402`, let your x402 client pay `$0.10` USDC on Base and retry with `PAYMENT-SIGNATURE`
-4. Read `score`, `level`, `decision`, `recommended_policy`, `findings`, `category_scores`, and optional `implementation`
+4. Read `decision`, `recommended_policy`, `findings`, `score`, `level`, `category_scores`, and optional `implementation`
 
 ## Endpoint
 
@@ -2082,14 +2083,14 @@ Proxy contracts can include a nested `implementation` analysis so downstream pol
 LLMS_FULL_TXT = """\
 # Augur - Full Documentation
 
-> Deterministic Base contract risk screening for agents on Base. Returns a 0-100 score, a default decision, and findings. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract admission control for agents on Base. Returns a default decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
 
 ## Overview
 
-Augur is a paid HTTP API for deterministic first-pass contract risk screening on Base (EIP-155:8453). \
-Screen Base contracts before your agent buys, routes funds, approves, or interacts. \
+Augur is a paid HTTP API for deterministic pre-transaction contract admission control on Base (EIP-155:8453). \
+Use Augur before your agent buys, routes funds, approves, pays, or interacts. \
 It uses deterministic bytecode pattern matching (no LLM) for fast, reliable results. \
-It is a fast bytecode screen, not a full security audit, simulator, runtime monitor, or guarantee. \
+It is a fast bytecode gate, not a full security audit, simulator, runtime monitor, or guarantee. \
 Payment is via the x402 HTTP payment protocol - no API key, no signup, no subscription.
 
 ## Endpoint
@@ -2348,20 +2349,20 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         "GET /analyze": RouteConfig(
             accepts=payment_option,
             description=(
-                "Base smart contract security analysis - bytecode risk scoring "
+                "Base smart contract admission control - deterministic bytecode policy gating "
                 "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
-                "selfdestruct, proxy, deployer reputation). Returns a 0-100 "
-                'risk score with proxy resolution. "safe" is not a guarantee.'
+                "selfdestruct, proxy, deployer reputation). Returns a decision, "
+                'policy recommendation, supporting findings, and a 0-100 score with proxy resolution. "safe" is not a guarantee.'
             ),
             extensions=get_bazaar,
         ),
         "POST /analyze": RouteConfig(
             accepts=payment_option,
             description=(
-                "Base smart contract security analysis - bytecode risk scoring "
+                "Base smart contract admission control - deterministic bytecode policy gating "
                 "with 8 detectors (delegatecall, hidden mint, fee-on-transfer, "
-                "selfdestruct, proxy, deployer reputation). Returns a 0-100 "
-                'risk score with proxy resolution. "safe" is not a guarantee.'
+                "selfdestruct, proxy, deployer reputation). Returns a decision, "
+                'policy recommendation, supporting findings, and a 0-100 score with proxy resolution. "safe" is not a guarantee.'
             ),
             extensions=post_bazaar,
         ),
@@ -2642,9 +2643,9 @@ def create_app(
             "@type": "WebAPI",
             "name": "Augur",
             "description": (
-                "Deterministic Base contract risk screening for agents on Base. "
-                "Runs deterministic bytecode detectors and returns a 0-100 score, "
-                "decision, and findings."
+                "Deterministic Base contract admission control for agents on Base. "
+                "Runs deterministic bytecode detectors and returns a decision, "
+                "policy recommendation, supporting findings, and a 0-100 score."
             ),
             "url": base_url,
             "provider": {
@@ -2669,14 +2670,14 @@ def create_app(
                     "name": "What does Augur do?",
                     "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": (
-                            "Augur is a deterministic Base contract risk-screening API "
+                        "text": (
+                            "Augur is a deterministic Base contract admission-control API "
                             "for agents and the developers building them. It fetches on-chain "
                             "bytecode for a contract on Base and runs "
                             "8 detectors (proxy, reentrancy, selfdestruct, honeypot, hidden mint, "
                             "fee manipulation, delegatecall, deployer reputation) to produce a "
-                            "composite 0-100 risk score with detailed findings before a workflow "
-                            "decides whether to proceed."
+                            "default decision, policy recommendation, supporting findings, and a "
+                            "composite 0-100 score before a workflow decides whether to proceed."
                         ),
                     },
                 },
@@ -2925,17 +2926,17 @@ def create_app(
             "name_for_human": "Augur",
             "name_for_model": "augur",
             "description_for_human": (
-                "Base mainnet smart contract bytecode risk scoring via x402. "
+                "Base mainnet smart contract admission control via x402. "
                 "Analyzes bytecode for proxy, reentrancy, selfdestruct, "
                 "honeypot, hidden mint, fee manipulation, delegatecall, and "
-                "deployer reputation patterns. Returns a 0-100 risk score, "
-                "findings, and a first-pass policy recommendation."
+                "deployer reputation patterns. Returns a first-pass decision, "
+                "policy recommendation, supporting findings, and a 0-100 score."
             ),
             "description_for_model": (
                 "Analyze Base mainnet smart contract bytecode. "
-                "Send a Base contract address to /analyze and receive a 0-100 "
-                "risk score, a default decision, and detailed findings from 8 "
-                'detectors. "safe" is not a guarantee or audit result. '
+                "Send a Base contract address to /analyze and receive a default "
+                "decision, policy recommendation, detailed findings from 8 "
+                'detectors, and a 0-100 score. "safe" is not a guarantee or audit result. '
                 "Requires x402 payment of $0.10 USDC on Base."
             ),
             "auth": {"type": "none"},
@@ -2953,9 +2954,9 @@ def create_app(
         return jsonify({
             "name": "Augur",
             "description": (
-                "Deterministic Base contract risk screening for agents on Base. "
-                "Analyzes bytecode patterns and returns a 0-100 risk score, "
-                "decision, and findings. "
+                "Deterministic Base contract admission control for agents on Base. "
+                "Analyzes bytecode patterns and returns a default decision, "
+                "policy recommendation, supporting findings, and a 0-100 score. "
                 "Pay $0.10/call via x402 in USDC on Base."
             ),
             "provider": {"organization": "risk-api"},
@@ -2977,10 +2978,11 @@ def create_app(
             "skills": [
                 {
                     "id": "analyze-contract",
-                    "name": "Risk Classification (OASF 1304)",
+                    "name": "Contract Admission Decision (OASF 1304)",
                     "description": (
                         "Fetch on-chain bytecode for a Base mainnet contract address "
-                        "and run 8 detectors to produce a 0-100 risk score."
+                        "and run 8 detectors to produce a first-pass decision, "
+                        "policy recommendation, and supporting score."
                     ),
                     "tags": ["oasf:security_privacy"],
                 },
@@ -3013,20 +3015,20 @@ def create_app(
                 f"{base_url}/analyze",
             ],
             "instructions": (
-                "# Augur - Deterministic Base Contract Risk Screening\n\n"
-                "Bytecode-level risk scoring for Base mainnet smart contracts. "
+                "# Augur - Deterministic Base Contract Admission Control\n\n"
+                "Bytecode-level admission control for Base mainnet smart contracts. "
                 "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
                 "selfdestruct, reentrancy patterns, honeypot, proxy detection, "
-                "deployer reputation (explorer-backed). Returns a 0-100 composite "
-                "risk score with per-category breakdown.\n\n"
+                "deployer reputation (explorer-backed). Returns a default decision, "
+                "policy recommendation, supporting findings, and a 0-100 composite score.\n\n"
                 "## Usage\n\n"
                 "GET /analyze?address={base_contract_address}\n"
                 "POST /analyze with JSON body: {\"address\": \"0x...\"}\n\n"
                 "## Output\n\n"
-                "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
-                "high=56-75, critical=76-100)\n"
                 "- `decision`: allow, warn, manual_review, or block\n"
                 "- `recommended_policy`: action, summary, and machine-readable reason codes\n"
+                "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
+                "high=56-75, critical=76-100)\n"
                 '- `safe`: no major bytecode-level risk signals detected in this scan, not a guarantee\n'
                 "- `findings`: array of detector results with severity and points\n"
                 "- `category_scores`: per-category breakdown\n"
@@ -3070,11 +3072,11 @@ def create_app(
             "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
             "name": "Augur",
             "description": (
-                "Deterministic Base contract risk screening for agents on Base. "
+                "Deterministic Base contract admission control for agents on Base. "
                 "Analyzes bytecode patterns (proxy detection, reentrancy, "
                 "selfdestruct, honeypot, hidden mint, fee manipulation, "
-                "delegatecall, deployer reputation) and returns a composite 0-100 "
-                'risk score, default decision, and findings for first-pass screening decisions. "safe" is not a guarantee or audit. '
+                "delegatecall, deployer reputation) and returns a default decision, "
+                'policy recommendation, supporting findings, and a composite 0-100 score for first-pass screening decisions. "safe" is not a guarantee or audit. '
                 "Pay $0.10/call via x402 in USDC on Base. "
                 "Endpoint: GET /analyze?address={base_contract_address}"
             ),
@@ -3112,7 +3114,7 @@ def create_app(
             },
             "openapi_url": f"{base_url}/openapi.json",
             "capabilities": [
-                "contract risk scoring",
+                "contract admission control",
                 "proxy detection",
                 "bytecode analysis",
                 "honeypot detection",

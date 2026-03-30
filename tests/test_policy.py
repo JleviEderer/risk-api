@@ -34,7 +34,7 @@ def test_low_score_with_honeypot_blocks():
     assert PolicyReasonCode.HONEYPOT_SIGNAL.value in result.reason_codes
 
 
-def test_hidden_mint_signal_blocks_even_when_score_is_low():
+def test_hidden_mint_signal_recommends_manual_review_even_when_score_is_low():
     result = derive_policy(
         score=25,
         level=RiskLevel.LOW,
@@ -44,7 +44,7 @@ def test_hidden_mint_signal_blocks_even_when_score_is_low():
         category_scores={"hidden_mint": 25},
     )
 
-    assert result.action == PolicyAction.BLOCK
+    assert result.action == PolicyAction.MANUAL_REVIEW
     assert PolicyReasonCode.HIDDEN_MINT_SIGNAL.value in result.reason_codes
 
 

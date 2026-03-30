@@ -1,4 +1,4 @@
-"""Register risk-api on MoltMart marketplace (Base mainnet).
+"""Register Augur on MoltMart marketplace (Base mainnet).
 
 MoltMart is an x402-native agent marketplace on Base that uses ERC-8004
 for identity verification. Registration is free and fully API-driven.
@@ -36,22 +36,22 @@ WALLET_FILE = Path.home() / ".automaton" / "wallet.json"
 
 AGENT_NAME = "Augur"
 AGENT_DESCRIPTION = (
-    "Base mainnet smart contract bytecode risk scoring API for agents. "
+    "Deterministic Base contract admission control for agents on Base. "
     "Analyzes bytecode patterns (proxy detection, reentrancy, selfdestruct, "
     "honeypot, hidden mint, fee manipulation, delegatecall) and deployer "
-    'reputation. Returns a composite 0-100 risk score with severity levels. '
+    'reputation. Returns a default decision, policy recommendation, supporting findings, and a composite 0-100 score. '
     '"safe" is not a guarantee or audit. Pay $0.10/call via x402 in USDC on Base.'
 )
 
 SERVICE_LISTING = {
     "name": "Augur",
     "description": (
-        "Analyzes Base mainnet smart contract bytecode for security risks. "
+        "Analyzes Base mainnet smart contract bytecode for pre-transaction admission decisions. "
         "Detects proxy patterns (EIP-1967/1822/OZ), reentrancy guards, "
         "selfdestruct, honeypot patterns, hidden mint functions, fee manipulation, "
         "and delegatecall usage. For proxy contracts, automatically resolves and "
-        "analyzes the implementation. Returns a composite risk score (0-100) with "
-        "per-detector findings and severity level (safe/low/medium/high/critical). "
+        "analyzes the implementation. Returns a default decision, policy recommendation, "
+        "per-detector findings, and a composite score (0-100). "
         '"safe" is not a guarantee or audit. Deployer reputation check via a public explorer '
         "when history data is available."
     ),
@@ -74,7 +74,7 @@ SERVICE_LISTING = {
         "x402 protocol — send $0.10 USDC on Base via the `PAYMENT-SIGNATURE` header. "
         "The server returns HTTP 402 with payment details if no valid payment is included.\n\n"
         "### Response\n"
-        "Returns JSON with `score` (0-100), `risk_level`, and `findings` array."
+        "Returns JSON with `decision`, `recommended_policy`, `score` (0-100), `level`, and `findings`."
     ),
     "input_schema": {
         "type": "object",
@@ -93,14 +93,23 @@ SERVICE_LISTING = {
             "address": {"type": "string", "description": "Analyzed contract address"},
             "score": {
                 "type": "integer",
-                "description": "Composite risk score 0-100 (higher = riskier)",
+                "description": "Composite score 0-100 (higher = riskier)",
                 "minimum": 0,
                 "maximum": 100,
             },
-            "risk_level": {
+            "level": {
                 "type": "string",
-                "description": "Human-readable risk level",
+                "description": "Risk level bucket",
                 "enum": ["safe", "low", "medium", "high", "critical"],
+            },
+            "decision": {
+                "type": "string",
+                "description": "Default first-pass action",
+                "enum": ["allow", "warn", "manual_review", "block"],
+            },
+            "recommended_policy": {
+                "type": "object",
+                "description": "Policy recommendation with action, summary, and reason codes",
             },
             "findings": {
                 "type": "array",
@@ -116,7 +125,7 @@ SERVICE_LISTING = {
                 },
             },
         },
-        "required": ["address", "score", "risk_level", "findings"],
+        "required": ["address", "score", "level", "decision", "recommended_policy", "findings"],
     },
     "example_request": {
         "address": "0x4200000000000000000000000000000000000006",
@@ -124,7 +133,13 @@ SERVICE_LISTING = {
     "example_response": {
         "address": "0x4200000000000000000000000000000000000006",
         "score": 0,
-        "risk_level": "safe",
+        "level": "safe",
+        "decision": "allow",
+        "recommended_policy": {
+            "action": "allow",
+            "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+            "reason_codes": [],
+        },
         "findings": [],
         "metadata": {
             "chain": "base",

@@ -18,7 +18,7 @@ One thing Ive been thinking about a lot: if autonomous agents are going to inter
 I built Augur around this problem (ignore the terrible logo for now lol..been too busy building)
 https://augurrisk.com
 
-Its a contract risk screen for agents, paid per call via x402. I have made it easy to plug into agent workflows without the usual signup / API key friction.
+Its deterministic contract admission control for agents, paid per call via x402. I have made it easy to plug into agent workflows without the usual signup / API key friction.
 
 I also put up a public proof page here:
 https://augurrisk.com/reports/base-bluechip-bytecode-snapshot
@@ -42,7 +42,7 @@ Would genuinely love to get your feedback on where something like this feels use
 ### Priority 2
 - Surface: Base Discord
 - Status: planned
-- Angle: Base-specific contract risk screen for autonomous agents
+- Angle: Base-specific contract admission control for autonomous agents
 - Note: lead with Base relevance and the proof page
 
 ### Priority 3
@@ -86,5 +86,5 @@ Would genuinely love to get your feedback on where something like this feels use
 ### Priority 9
 - Surface: Hacker News `Show HN`
 - Status: optional
-- Angle: I built a Base contract risk screen for autonomous agents with a public proof page
+- Angle: I built a Base contract admission gate for autonomous agents with a public proof page
 - Note: only do this if ready to handle blunt technical feedback

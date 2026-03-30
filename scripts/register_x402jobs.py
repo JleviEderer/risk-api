@@ -1,4 +1,4 @@
-"""Register/manage risk-api on x402.jobs marketplace.
+"""Register/manage Augur on x402.jobs marketplace.
 
 Usage:
     python scripts/register_x402jobs.py              # Create new resource
@@ -30,11 +30,11 @@ API_BASE = "https://api.x402.jobs/api/v1"
 RESOURCE = {
     "name": "Augur",
     "description": (
-        "Base mainnet smart contract bytecode risk scoring API for agents. "
+        "Deterministic Base contract admission control for agents on Base. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "
         "selfdestruct, honeypot, hidden mint, fee manipulation, "
-        "delegatecall, deployer reputation) and returns a composite 0-100 "
-        'risk score with severity levels (safe/low/medium/high/critical). '
+        "delegatecall, deployer reputation) and returns a default decision, "
+        'policy recommendation, supporting findings, and a composite 0-100 score. '
         '"safe" is not a guarantee or audit. Pay $0.10/call via x402 in USDC on Base.'
     ),
     # Include default address (WETH) so x402.jobs "Run" button works out of box.
@@ -46,7 +46,7 @@ RESOURCE = {
     "tags": [
         "security",
         "smart-contract",
-        "risk-scoring",
+        "admission-control",
         "evm",
         "base",
         "defi",
@@ -54,7 +54,7 @@ RESOURCE = {
         "bytecode-analysis",
     ],
     "capabilities": [
-        "contract risk scoring",
+        "contract admission control",
         "proxy detection",
         "bytecode analysis",
         "honeypot pattern detection",
@@ -70,6 +70,8 @@ RESOURCE = {
     ),
     "response_schema": {
         "address": "string",
+        "decision": "allow | warn | manual_review | block",
+        "recommended_policy": "{action, summary, reason_codes}",
         "score": "integer (0-100)",
         "level": "safe | low | medium | high | critical",
         "bytecode_size": "integer",
@@ -210,7 +212,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 def main() -> None:
     load_dotenv()
 
-    parser = argparse.ArgumentParser(description="Manage risk-api on x402.jobs")
+    parser = argparse.ArgumentParser(description="Manage Augur on x402.jobs")
     parser.add_argument("--key", help="x402.jobs API key (or set X402_JOBS_API_KEY in .env)")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--list", action="store_true", help="List your resources (shows UUIDs)")

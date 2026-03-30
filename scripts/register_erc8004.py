@@ -1,4 +1,4 @@
-"""Register risk-api on ERC-8004 Identity Registry (Base mainnet).
+"""Register Augur on ERC-8004 Identity Registry (Base mainnet).
 
 Usage:
     python scripts/register_erc8004.py                          # register new agent
@@ -31,11 +31,11 @@ METADATA = {
     "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
     "name": "Augur",
     "description": (
-        "Base mainnet smart contract bytecode risk scoring API for agents. "
+        "Deterministic Base contract admission control for agents on Base. "
         "Analyzes bytecode patterns (proxy detection, reentrancy, "
         "selfdestruct, honeypot, hidden mint, fee manipulation, "
-        "delegatecall, deployer reputation) and returns a composite 0-100 "
-        'risk score with findings. "safe" is not a guarantee or audit. '
+        "delegatecall, deployer reputation) and returns a default decision, "
+        'policy recommendation, supporting findings, and a composite 0-100 score. "safe" is not a guarantee or audit. '
         "Pay $0.10/call via x402 in USDC on Base. "
         "Endpoint: GET https://augurrisk.com/analyze?address={base_contract_address}"
     ),

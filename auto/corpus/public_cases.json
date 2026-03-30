@@ -101,6 +101,22 @@
     }
   },
   {
+    "id": "standard-dispatch-revert-not-honeypot",
+    "name": "Standard dispatcher default revert is not a honeypot",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "honeypot"],
+    "blind_spot": "honeypot_dispatcher_false_positive",
+    "bytecode": "0x63a9059cbb1461001057600080fd000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "expected": {
+      "score": 0,
+      "level": "safe",
+      "decision": "allow",
+      "reason_codes": [],
+      "findings_exclude": ["honeypot"]
+    }
+  },
+  {
     "id": "serialization-non-proxy-omits-implementation",
     "name": "Non-proxy snapshots omit implementation instead of null",
     "kind": "serialization",
@@ -204,15 +220,15 @@
     }
   },
   {
-    "id": "hidden-mint-block",
-    "name": "Hidden mint blocks first-pass automation",
+    "id": "hidden-mint-manual-review",
+    "name": "Hidden mint requires manual review instead of auto-block",
     "kind": "bytecode",
     "source": "public",
     "tags": ["policy", "hidden_mint"],
-    "blind_spot": "hidden_mint_permissive_policy",
+    "blind_spot": "hidden_mint_auto_block",
     "bytecode": "0x63a0712d68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
     "expected": {
-      "decision": "block",
+      "decision": "manual_review",
       "reason_codes_include": ["hidden_mint_signal"]
     }
   },

@@ -1,5 +1,7 @@
 # Augur Product Wedge Memo
 
+> Update: for the current product-direction call, read `docs/PRODUCT_DIRECTION_UPDATE.md` first. This memo is still useful background, but the 2026-03-19 update is the newer strategy layer.
+
 > Date: 2026-03-11
 
 ## Bottom Line

@@ -323,7 +323,7 @@ def test_agent_metadata_endpoint(client):
     data = resp.get_json()
     assert data["type"] == "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
     assert data["name"] == "Augur"
-    assert "Deterministic Base contract risk screening for agents on Base" in data["description"]
+    assert "Deterministic Base contract admission control for agents on Base" in data["description"]
     assert "not a guarantee or audit" in data["description"]
     assert data["x402Support"] is True
     assert data["active"] is True
@@ -342,7 +342,7 @@ def test_agent_metadata_endpoint(client):
     }
     assert "/openapi.json" in data["openapi_url"]
     assert isinstance(data["capabilities"], list)
-    assert "contract risk scoring" in data["capabilities"]
+    assert "contract admission control" in data["capabilities"]
     assert "proxy detection" in data["capabilities"]
 
 
@@ -452,7 +452,7 @@ def test_analyze_raw_delegatecall_response_requires_manual_review(client):
 
 
 @responses.activate
-def test_analyze_hidden_mint_response_blocks(client):
+def test_analyze_hidden_mint_response_requires_manual_review(client):
     bytecode = "0x63a0712d68" + "00" * 200
     responses.post(RPC_URL, json={"jsonrpc": "2.0", "id": 1, "result": bytecode})
 
@@ -463,7 +463,7 @@ def test_analyze_hidden_mint_response_blocks(client):
     data = resp.get_json()
     assert data["score"] == 25
     assert data["level"] == "low"
-    assert data["decision"] == "block"
+    assert data["decision"] == "manual_review"
     assert "hidden_mint_signal" in data["recommended_policy"]["reason_codes"]
 
 
@@ -890,12 +890,12 @@ def test_a2a_agent_card_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["name"] == "Augur"
-    assert "Deterministic Base contract risk screening for agents on Base" in data["description"]
+    assert "Deterministic Base contract admission control for agents on Base" in data["description"]
     assert data["version"] == "1.0.0"
     assert data["capabilities"]["streaming"] is False
     assert len(data["skills"]) == 1
     assert data["skills"][0]["id"] == "analyze-contract"
-    assert data["skills"][0]["name"] == "Risk Classification (OASF 1304)"
+    assert data["skills"][0]["name"] == "Contract Admission Decision (OASF 1304)"
     assert "oasf:security_privacy" in data["skills"][0]["tags"]
     assert data["interfaces"][0]["type"] == "http"
     assert data["security"] == []
@@ -979,7 +979,7 @@ def test_wellknown_x402_returns_discovery_doc(client):
     assert len(data["resources"]) == 1
     assert data["resources"][0].endswith("/analyze")
     assert isinstance(data["instructions"], str)
-    assert "risk score" in data["instructions"].lower()
+    assert "admission control" in data["instructions"].lower()
     assert "8 detectors" in data["instructions"]
     assert "delegatecall" in data["instructions"]
     assert "Base mainnet" in data["instructions"]

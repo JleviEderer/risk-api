@@ -26,7 +26,7 @@ import requests
 
 PINATA_PIN_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS"
 
-# Public base URL for the risk-api (used in metadata fields that need absolute URLs)
+# Public base URL for the API (used in metadata fields that need absolute URLs)
 BASE_URL = "https://augurrisk.com"
 
 # ERC-8004 agent registration
@@ -45,11 +45,11 @@ def build_metadata() -> dict[str, object]:
         "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
         "name": "Augur",
         "description": (
-            "Base mainnet smart contract bytecode risk scoring API for agents. "
+            "Deterministic Base contract admission control for agents on Base. "
             "Analyzes bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
-            "delegatecall, deployer reputation) and returns a composite 0-100 "
-            'risk score with findings. "safe" is not a guarantee or audit. '
+            "delegatecall, deployer reputation) and returns a default decision, "
+            'policy recommendation, supporting findings, and a composite 0-100 score. "safe" is not a guarantee or audit. '
             "Pay $0.10/call via x402 in USDC on Base. "
             "Endpoint: GET /analyze?address={base_contract_address}"
         ),
@@ -88,7 +88,7 @@ def build_metadata() -> dict[str, object]:
         },
         "openapi_url": f"{BASE_URL}/openapi.json",
         "capabilities": [
-            "contract risk scoring",
+            "contract admission control",
             "proxy detection",
             "bytecode analysis",
             "honeypot detection",

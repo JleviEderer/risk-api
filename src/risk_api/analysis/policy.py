@@ -53,11 +53,11 @@ class PolicyResult:
 
 
 _BLOCK_REASON_CODES = {
-    PolicyReasonCode.HIDDEN_MINT_SIGNAL.value,
     PolicyReasonCode.HONEYPOT_SIGNAL.value,
 }
 
 _MANUAL_REVIEW_REASON_CODES = {
+    PolicyReasonCode.HIDDEN_MINT_SIGNAL.value,
     PolicyReasonCode.PROXY_LOGIC_UNRESOLVED.value,
     PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value,
     PolicyReasonCode.SELFDESTRUCT_SIGNAL.value,

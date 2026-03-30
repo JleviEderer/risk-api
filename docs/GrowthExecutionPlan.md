@@ -1,6 +1,6 @@
 # Augur - Growth Execution Plan
 
-> Last updated: 2026-03-08
+> Last updated: 2026-03-26
 
 This document is the operating backlog for traffic, conversion, and revenue growth.
 
@@ -8,7 +8,8 @@ North star:
 - Increase organic paid calls to `/analyze`
 
 Companion strategy memo:
-- See `docs/PRODUCT_WEDGE_MEMO.md` for the current product-positioning view: Augur as a narrow Base contract admission gate, not a broad execution-security suite.
+- See `docs/PRODUCT_DIRECTION_UPDATE.md` for the current product-direction view: Augur as pre-transaction contract admission control for agents on Base.
+- Treat `docs/PRODUCT_WEDGE_MEMO.md` as background context, not the newest call.
 
 Leading indicators:
 - paid conversion rate from unique visitors
@@ -91,6 +92,13 @@ Now:
 - Build an MCP wrapper or MCP-compatible packaging surface
 
 Next:
+- Keep registry and directory hygiene as maintenance, not the whole distribution strategy
+- Add AI-answer visibility work as a separate track from registries:
+  - monitor whether Augur is cited or recommended in ChatGPT, Perplexity, Claude, and Gemini answers
+  - improve citation-friendly proof, examples, and third-party mentions
+- Treat operator ecosystems as their own track:
+  - test OpenClaw and similar skill or workflow ecosystems as installable operator-channel distribution
+  - keep that separate from public registry work
 - Add framework-specific wrappers only if demand appears
 - LangChain tool definition
 - OpenAI function schema
@@ -99,6 +107,10 @@ Next:
 Success criteria:
 - Augur appears in higher-signal ecosystem surfaces
 - developers can integrate Augur through tool-first workflows, not just raw HTTP
+- discoverability work is split cleanly across:
+  - registries and directories
+  - AI-answer visibility
+  - operator ecosystems and installable workflows
 
 ### 5. Buyer-Intent Surface Area
 
@@ -132,11 +144,14 @@ Now:
 
 Next:
 - Turn report findings into short X threads and developer-oriented posts
+- Test whether AI-answer visibility tools or GEO-style workflows help Augur appear in answer engines
+- Reuse proof and machine-readable docs anywhere third-party communities, operator ecosystems, or answer-engine workflows pull source material from
 - Repeat only if posts generate qualified traffic
 
 Success criteria:
 - at least one external community post drives traffic from relevant developers
 - proof content gets reused in landing pages and registry descriptions
+- answer-engine visibility improves without confusing that work with registry cleanup
 
 ### 7. Measurement
 
@@ -159,9 +174,22 @@ Success criteria:
 
 ---
 
-## Current Sprint Checklist
+## Status
 
-Use this as the execution order for the current push. Do not start lower-priority growth work while higher-priority trust issues are still open.
+As of 2026-03-26:
+
+- the early trust, canonical-domain, packaging, and proof baseline is mostly complete
+- the main unfinished growth items are still targeted distribution plus better source attribution
+- the next growth work should be treated as three separate channels:
+  - registry and directory maintenance
+  - AI-answer visibility and citation work
+  - operator ecosystems such as OpenClaw and installable workflow surfaces
+
+---
+
+## Baseline Checklist
+
+Use this as the historical baseline for what has already been handled versus what is still open.
 
 ### P0 - Trust and Correctness
 
@@ -289,24 +317,36 @@ Use this as the execution order for the current push. Do not start lower-priorit
   Done means: major acquisition surfaces can be compared with simple data.
   Status: app-level request logging now exists in `src/risk_api/app.py` for the landing page, payment page, buyer-intent pages, key machine-readable discovery docs, and `/analyze`, including `host`, `referer`, `request_id`, and stage summaries in `/stats`. Production is now using a Fly-mounted SQLite-backed event store via `ANALYTICS_DB_PATH`, so `/stats` and `/dashboard` survive restarts on the active machine volume. Edge-layer visibility for old-domain `403` traffic and any future multi-machine analytics design are still not complete.
 
+### P2 - New Distribution Tracks
+
+- [ ] `G-018` Add AI-answer visibility as a measured workstream
+  Output: one lightweight process for checking whether Augur appears in answer-engine responses and which proof or documentation surfaces get cited.
+  Why now: Augur has a real discoverability problem that is not the same as missing directory listings.
+  Depends on: `G-014`, `G-017`.
+  Done means: AI-answer visibility is tracked separately from registry status and community-post traffic.
+
+- [ ] `G-019` Test one operator-ecosystem distribution path
+  Output: one deliberate experiment in an operator ecosystem such as OpenClaw or a nearby installable-skill workflow surface.
+  Why now: installable workflows are a different acquisition channel from public directories and may fit agent operators better.
+  Depends on: `G-009`, `G-015`.
+  Done means: one operator-channel experiment is executed and judged on qualified traffic or integration pull, not vanity impressions.
+
 ---
 
 ## Sequencing
 
 ### Now
 
-1. `G-001` through `G-006`
-2. `G-016` in parallel once `G-001` is defined
-3. `G-007`
-4. `G-010` through `G-012`
-5. `G-008` through `G-009`
+1. `G-015`
+2. `G-017`
+3. `G-018`
+4. `G-019`
 
 ### Next
 
-1. `G-013`
-2. `G-014`
-3. `G-015`
-4. `G-017`
+1. tighten any remaining duplicated discovery metadata if public wording changes again
+2. expand proof and machine-readable surfaces only if those channels show traction
+3. add framework-specific wrappers only if there is real integration pull
 
 ### Later
 

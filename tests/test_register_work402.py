@@ -29,8 +29,10 @@ class TestAgentProfile:
     def test_wallet_address_matches(self) -> None:
         assert AGENT_PROFILE["wallet_address"] == WALLET_ADDRESS
 
-    def test_bio_mentions_risk_scoring(self) -> None:
-        assert "risk scoring" in AGENT_PROFILE["bio"].lower()
+    def test_bio_mentions_admission_control(self) -> None:
+        bio = AGENT_PROFILE["bio"].lower()
+        assert "admission control" in bio
+        assert "default decision" in bio
 
     def test_bio_mentions_x402(self) -> None:
         assert "x402" in AGENT_PROFILE["bio"]
