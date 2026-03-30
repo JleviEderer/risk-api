@@ -6,12 +6,12 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 
 | Registry | Status | URL / ID | How to Update | Env Vars | Last Verified |
 |----------|--------|----------|---------------|----------|---------------|
-| ERC-8004 | Live | [Agent #19074](https://8004scan.io/agents/base/19074) | `scripts/register_erc8004.py` | wallet key | 2026-03-08 |
-| x402.jobs | Live | [x402.jobs listing](https://www.x402.jobs/resources/augurrisk-com/augur-base) | `scripts/register_x402jobs.py` | `X402_JOBS_API_KEY` | 2026-03-08 |
-| MoltMart | Live | [moltmart.app](https://moltmart.app) | `scripts/register_moltmart.py` | `MOLTMART_API_KEY`, `MOLTMART_SERVICE_ID` | 2026-02-25 |
-| Work402 | Live (testnet) | [work402.com](https://work402.com) | `scripts/register_work402.py` | `WORK402_DID` | 2026-02-25 |
-| IPFS | Live | `QmUUtXC4uSTMfTUBNhnWncGUShJ6qnw8YWdNSU9g49hFfV` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-02 |
-| 8004scan | Live (unverified wallet) | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | - | 2026-03-08 |
+| ERC-8004 | Live | [Agent #19074](https://8004scan.io/agents/base/19074) | `scripts/register_erc8004.py` | wallet key | 2026-03-29 |
+| x402.jobs | Live | [x402.jobs listing](https://www.x402.jobs/resources/augurrisk-com/augur-base) | `scripts/register_x402jobs.py` | `X402_JOBS_API_KEY` | 2026-03-29 |
+| MoltMart | Live | [moltmart.app](https://moltmart.app) | `scripts/register_moltmart.py` | `MOLTMART_API_KEY`, `MOLTMART_SERVICE_ID` | 2026-03-29 |
+| Work402 | Live (testnet) | [work402.com](https://work402.com) | `scripts/register_work402.py` | `WORK402_DID` | 2026-03-29 |
+| IPFS | Live | `QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-29 |
+| 8004scan | Live but stale/cached | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | - | 2026-03-29 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | - | 2026-03-01 |
 | x402 Bazaar | Historical / unverified | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | - | 2026-03-08 |
 | Coinbase Bazaar | Not confirmed in public feed | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`augurrisk.com/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-03-10 |
@@ -34,7 +34,7 @@ The important distinction is:
 | MoltMart | script-driven | updated in repo | rerun `scripts/register_moltmart.py --update <SERVICE_ID>` | verify public listing/service view shows the new positioning and response fields |
 | Work402 (testnet) | script-driven | updated in repo | rerun `scripts/register_work402.py` if we still care about the testnet listing | verify public agent profile text reflects admission-control language |
 | x402scan | manual / browser-driven | no repo automation here | update manually if the listing exposes editable metadata | verify listing text manually in browser |
-| x402.org/ecosystem | curated / manual upstream | no direct script update | verify current listing; open a PR only if stale wording is visible | confirm public ecosystem entry text and link are still acceptable |
+| x402.org/ecosystem | curated / manual upstream | no direct script update | verify current listing; if stale, open or update a PR in `coinbase/x402` | confirm public ecosystem entry text and link are still acceptable |
 | Coinbase public discovery feed | external / auto-indexed | repo/app ready after deploy | do at least one real paid call after deploy, then re-check feed | rerun `scripts/check_cdp_discovery.py` carefully and/or inspect the public feed |
 | x402list.fun | external / stale third-party state | repo/app already point at canonical domain | verify only; do not expect repo changes alone to fix it | check whether legacy `risk-api.life.conway.tech` listing is still stale |
 | Historical x402 Bazaar manual ID | historical | no current repo action needed | leave alone unless we decide to revive that path explicitly | treat as historical until a live public surface is found |
@@ -53,7 +53,22 @@ If the goal is full public alignment rather than only local repo correctness, do
 5. Manually audit the public external surfaces against this file.
 6. Treat Coinbase feed visibility and `x402list.fun` as external-state checks, not purely repo-side checks.
 
-## Current Audit Status (2026-03-08)
+## 2026-03-29 Recheck
+
+This is the current post-deploy, post-update snapshot after the script-driven alignment pass and browser recheck.
+
+| Surface | Current State | Evidence | Notes |
+|---------|---------------|----------|-------|
+| [ERC-8004 agent #19074](https://www.8004scan.io/agents/base/19074) | Updated on-chain | `scripts/register_erc8004.py --update-uri ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` succeeded on 2026-03-29 with tx `24cc2388aa6a2b714f783ffb4f24888c35ed9c761a50854156e01adcce79d733`. | Treat the chain update as done even though the 8004scan UI still looks stale. |
+| [8004scan agent #19074](https://www.8004scan.io/agents/base/19074) | Stale or cached | Browser recheck on 2026-03-29 still showed the older score-first wording and the old-looking truncated agent URI. | Needs later recheck or manual refresh path; do not assume the UI reflects the current on-chain URI yet. |
+| [x402.jobs listing route](https://www.x402.jobs/resources/augurrisk-com/augur-base) | Correct | Public page recheck on 2026-03-29 showed the new admission-control wording and `augurrisk.com` endpoint. | Treat x402.jobs as aligned. |
+| [MoltMart service](https://moltmart.app/services/984bf985-8f69-4237-b0e4-cd5452f1c489) | Correct | Public page recheck on 2026-03-29 showed the new admission-control wording. | Treat MoltMart as aligned. |
+| [Work402 agent](https://www.work402.com/agents/did%3Aerc8004%3A37906) | Correct | Public page recheck on 2026-03-29 showed the new admission-control wording for `did:erc8004:37906`. | Treat Work402 as aligned if we still care about the testnet-style listing. |
+| [x402.org ecosystem](https://www.x402.org/ecosystem) | Stale wording, PR open | Public card recheck on 2026-03-29 still showed the older score-first wording. Follow-up upstream PR is [coinbase/x402 #1869](https://github.com/coinbase/x402/pull/1869). | This surface is curated from the `coinbase/x402` site repo, not from the script-driven listings. |
+| [Coinbase public x402 discovery feed](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) | Not confirmed in public feed | `python scripts/check_cdp_discovery.py --max-pages 5` returned `NOT_FOUND` over the first 5 pages / 500 items on 2026-03-29. | Still looks like indexing/feed behavior or support-escalation territory. |
+| [x402list.fun legacy provider page](https://x402list.fun/provider/risk-api.life.conway.tech) | Stale | Browser/API recheck on 2026-03-29 still pointed at the legacy Conway domain rather than `augurrisk.com`. | Keep treating this as external stale state rather than a repo-controlled bug. |
+
+## Historical Audit Status (2026-03-08)
 
 Use this table as the current `G-004` source of truth. The list above still includes historical or manual registrations; this table records what was verifiable from live public surfaces on 2026-03-08.
 

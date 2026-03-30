@@ -73,6 +73,8 @@
    Do instead: in posts, replies, and ecosystem submissions, lead with `contract admission control for agents` or `pre-transaction contract gate`, and use the proof page as supporting evidence rather than making `0-100 risk score` the headline.
 8. **[2026-03-10] Treat OpenClaw as a secondary agent-builder channel**
    Do instead: test `r/OpenClaw` or OpenClaw Discord after Base/x402-first outreach, and avoid using the AI-only OpenClaw forum as the main posting surface.
+9. **[2026-03-29] `x402.org/ecosystem` copy updates are manual PR work**
+   Do instead: treat `x402.org/ecosystem` as curated content in `coinbase/x402`; script-driven runs update x402.jobs, MoltMart, and Work402, but stale ecosystem wording needs its own upstream PR.
 
 ## Research Hygiene
 1. **[2026-03-10] Keep raw LLM research out of tracked docs**

@@ -4,9 +4,9 @@
 - Date: 2026-03-29
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `pending current session`
+- Repo code baseline: `5a4c561`
 - Deployed app baseline: `dee071e`
-- Status: green on deployed app baseline `dee071e`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Verification is green: `python -m pytest -q` passed at `345`, `python auto/loop.py` passed at `47/47`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: green on deployed app baseline `dee071e` and repo baseline `5a4c561`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. Verification is green: `python -m pytest -q` passed at `345`, `python auto/loop.py` passed at `47/47`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -47,10 +47,18 @@
     - authenticated API now shows the admission-control / `decision` / `recommended_policy` wording
   - Work402 seller alias `Augur` already exists as `did:erc8004:37906`
     - rerunning onboarding returns `409` alias conflict, which confirms the existing DID rather than indicating a fresh failure
-  - current external audit status after the update pass:
+  - current external audit status after the update pass and browser recheck:
+    - x402.jobs public page shows the new admission-control wording
+    - MoltMart public page shows the new admission-control wording
+    - Work402 public page shows the new admission-control wording for `did:erc8004:37906`
+    - `8004scan` still shows the older score-first wording despite the successful on-chain URI update to `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
     - `x402.org/ecosystem` still contains `Augur` and `augurrisk.com`, but page HTML still reads more like the older `risk scoring` wording than the new admission-control framing
     - Coinbase public discovery feed still returned `NOT_FOUND` over the first `5` pages / `500` items when checked with `python scripts/check_cdp_discovery.py --max-pages 5`
     - `x402list.fun` is still stale on `risk-api.life.conway.tech` and still does not mention `augurrisk.com`
+- Opened the follow-up curated-listing PR on 2026-03-29:
+  - `coinbase/x402` PR `#1869` (`Refresh Augur ecosystem listing copy`)
+  - updates `typescript/site/app/ecosystem/partners-data/augur/metadata.json` in the upstream site repo
+  - purpose: move the Augur ecosystem card from the old score-first wording to the current admission-control wording
 - Found an ops-script safety bug during the external pass:
   - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
   - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`
@@ -477,10 +485,11 @@
     - `/stats` and `/dashboard` stay useful hints, but not the source of truth
     - treat `curl/...` and similar agents as intent signals, not proof of a human at the keyboard
 - `coinbase/x402` PR `#1515` is merged into `main`.
+- `coinbase/x402` follow-up PR `#1869` is open for the wording refresh on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: finish the remaining external audit items and manual follow-ups against `docs/REGISTRATIONS.md`
-  - second: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the live wording shift
-  - third: only then treat public/distribution alignment as complete and resume broader outreach work
+  - first: finish the two remaining external follow-ups against `docs/REGISTRATIONS.md`: 8004scan refresh/caching and the open `x402.org/ecosystem` wording PR
+  - second: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
+  - third: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the live wording shift
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:
@@ -507,8 +516,7 @@
 
 1. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
    - verify whether 8004scan has refreshed from the new `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` URI
-   - inspect the public x402.jobs listing text after the successful update to resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`
-   - decide whether `x402.org/ecosystem` needs a wording PR because the page HTML still looks score-first
+   - watch `coinbase/x402` PR `#1869` and confirm the public `x402.org/ecosystem` card refreshes after merge
    - keep `x402list.fun` classified as stale external state unless the directory itself updates
 2. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
 3. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
@@ -563,8 +571,8 @@
    - `python auto/loop.py` passed at `47/47` on 2026-03-29
    - do not change detector logic until you first add a new hidden candidate or holdout case
 5. Next execution step is the remaining external audit pass:
-   - verify 8004scan and x402.jobs public text after the successful updates
-   - decide whether `x402.org/ecosystem` needs a follow-up PR
+   - verify whether 8004scan refreshes from the new IPFS URI
+   - watch `coinbase/x402` PR `#1869` and confirm `x402.org/ecosystem` refreshes after merge
    - keep `x402list.fun` as stale unless the external directory changes
 6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
