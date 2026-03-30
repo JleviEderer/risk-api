@@ -186,3 +186,30 @@ def test_high_score_recommends_block():
     assert result.action == PolicyAction.BLOCK
     assert "high_risk_score" in result.reason_codes
     assert "hidden_mint_signal" in result.reason_codes
+
+
+def test_managed_proxy_admin_surface_recommends_manual_review_even_when_high():
+    result = derive_policy(
+        score=70,
+        level=RiskLevel.HIGH,
+        findings=[
+            Finding("delegatecall", Severity.INFO, "Proxy delegatecall", "d", 10),
+            Finding("proxy", Severity.INFO, "Proxy contract detected", "d", 10),
+            Finding("impl_delegatecall", Severity.HIGH, "Raw DELEGATECALL", "d", 15),
+            Finding("impl_hidden_mint", Severity.CRITICAL, "Hidden mint", "d", 25),
+        ],
+        category_scores={
+            "delegatecall": 10,
+            "proxy": 10,
+            "impl_delegatecall": 15,
+            "impl_hidden_mint": 25,
+            "impl_suspicious_selector": 10,
+        },
+        proxy_resolution_status=ProxyResolutionStatus.RESOLVED,
+    )
+
+    assert result.action == PolicyAction.MANUAL_REVIEW
+    assert PolicyReasonCode.UPGRADEABLE_PROXY.value in result.reason_codes
+    assert PolicyReasonCode.HIDDEN_MINT_SIGNAL.value in result.reason_codes
+    assert PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value in result.reason_codes
+    assert "issuer-aware override" in result.summary

@@ -237,6 +237,29 @@ def test_analyze_blacklist_selector_without_transfer_warns():
 
 
 @responses.activate
+def test_analyze_managed_proxy_admin_surface_requires_manual_review_instead_of_block():
+    proxy_addr = "0x" + "e1" * 20
+    impl_addr = "0x" + "ab" * 20
+    impl_slot_value = "0x" + "0" * 24 + impl_addr[2:]
+    proxy_bytecode = _proxy_bytecode()
+    impl_bytecode = "0x63a22cb46563a0712d68f4" + "00" * 220
+
+    responses.post(RPC_URL, json=_rpc_response(proxy_bytecode))
+    responses.post(RPC_URL, json=_rpc_response(impl_slot_value))
+    responses.post(RPC_URL, json=_rpc_response(impl_bytecode))
+
+    result = analyze_contract(proxy_addr, RPC_URL)
+
+    assert result.score == 65
+    assert result.level == RiskLevel.HIGH
+    assert result.decision == PolicyAction.MANUAL_REVIEW
+    assert PolicyReasonCode.UPGRADEABLE_PROXY.value in result.recommended_policy.reason_codes
+    assert PolicyReasonCode.HIDDEN_MINT_SIGNAL.value in result.recommended_policy.reason_codes
+    assert PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value in result.recommended_policy.reason_codes
+    assert "issuer-aware override" in result.recommended_policy.summary
+
+
+@responses.activate
 def test_analyze_eoa():
     responses.post(RPC_URL, json=_rpc_response("0x"))
     with pytest.raises(NoBytecodeError, match="No contract bytecode found"):

@@ -300,5 +300,65 @@
       "decision": "warn",
       "reason_codes_include": ["fee_manipulation_signal"]
     }
+  },
+  {
+    "id": "managed-proxy-admin-surface-manual-review",
+    "name": "Managed proxy admin surfaces do not auto-block on score alone",
+    "kind": "policy",
+    "source": "public",
+    "tags": ["policy", "proxy", "hidden_mint"],
+    "blind_spot": "managed_proxy_admin_surface_auto_block",
+    "input": {
+      "score": 70,
+      "level": "high",
+      "proxy_resolution_status": "resolved",
+      "category_scores": {
+        "delegatecall": 10,
+        "proxy": 10,
+        "impl_delegatecall": 15,
+        "impl_hidden_mint": 25,
+        "impl_suspicious_selector": 10
+      },
+      "findings": [
+        {
+          "detector": "delegatecall",
+          "severity": "info",
+          "title": "DELEGATECALL in proxy pattern",
+          "description": "Expected proxy delegatecall.",
+          "points": 10
+        },
+        {
+          "detector": "proxy",
+          "severity": "info",
+          "title": "Proxy contract detected",
+          "description": "Proxy shell detected.",
+          "points": 10
+        },
+        {
+          "detector": "impl_delegatecall",
+          "severity": "high",
+          "title": "Raw DELEGATECALL without proxy pattern",
+          "description": "Implementation uses raw delegatecall.",
+          "points": 15
+        },
+        {
+          "detector": "impl_hidden_mint",
+          "severity": "critical",
+          "title": "Hidden mint capability detected",
+          "description": "Implementation can mint.",
+          "points": 25
+        }
+      ]
+    },
+    "expected": {
+      "decision": "manual_review",
+      "reason_codes_include": [
+        "high_risk_score",
+        "upgradeable_proxy",
+        "hidden_mint_signal",
+        "delegatecall_surface",
+        "raw_delegatecall_surface"
+      ]
+    }
   }
 ]

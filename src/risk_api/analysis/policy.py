@@ -63,6 +63,16 @@ _MANUAL_REVIEW_REASON_CODES = {
     PolicyReasonCode.SELFDESTRUCT_SIGNAL.value,
 }
 
+_MANAGED_PROXY_ADMIN_SURFACE_REASON_CODES = {
+    PolicyReasonCode.HIGH_RISK_SCORE.value,
+    PolicyReasonCode.ELEVATED_RISK_SCORE.value,
+    PolicyReasonCode.UPGRADEABLE_PROXY.value,
+    PolicyReasonCode.HIDDEN_MINT_SIGNAL.value,
+    PolicyReasonCode.DELEGATECALL_SURFACE.value,
+    PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value,
+    PolicyReasonCode.SUSPICIOUS_SELECTOR_SIGNAL.value,
+}
+
 
 def _has_category(category_scores: dict[str, int], category: str) -> bool:
     return category in category_scores or f"impl_{category}" in category_scores
@@ -139,6 +149,15 @@ def _reason_codes(
     return reason_codes
 
 
+def _is_managed_proxy_admin_surface(reason_codes: list[str]) -> bool:
+    codes = set(reason_codes)
+    if PolicyReasonCode.UPGRADEABLE_PROXY.value not in codes:
+        return False
+    if PolicyReasonCode.HIDDEN_MINT_SIGNAL.value not in codes:
+        return False
+    return codes.issubset(_MANAGED_PROXY_ADMIN_SURFACE_REASON_CODES)
+
+
 def derive_policy(
     score: int,
     level: RiskLevel,
@@ -152,6 +171,17 @@ def derive_policy(
         findings=findings,
         proxy_resolution_status=proxy_resolution_status,
     )
+
+    if _is_managed_proxy_admin_surface(reason_codes):
+        return PolicyResult(
+            action=PolicyAction.MANUAL_REVIEW,
+            summary=(
+                "Escalate before interaction. This looks like an upgradeable, "
+                "admin-controlled asset rather than an obvious trap, so require "
+                "an explicit issuer-aware override before the workflow proceeds."
+            ),
+            reason_codes=reason_codes,
+        )
 
     if level in {RiskLevel.HIGH, RiskLevel.CRITICAL} or any(
         code in _BLOCK_REASON_CODES for code in reason_codes
