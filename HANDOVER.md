@@ -4,9 +4,9 @@
 - Date: 2026-03-29
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `5a4c561`
+- Repo code baseline: `f248e80`
 - Deployed app baseline: `dee071e`
-- Status: green on deployed app baseline `dee071e` and repo baseline `5a4c561`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. Verification is green: `python -m pytest -q` passed at `345`, `python auto/loop.py` passed at `47/47`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: green on deployed app baseline `dee071e` and repo baseline `f248e80`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. The newest local quality pass (`f248e80`) also refines policy for managed upgradeable assets so high-score proxy + mint/admin-control surfaces escalate to `manual_review` instead of auto-`block` when there is no clearer hard-stop signal like honeypot or selfdestruct. Verification is green: `python -m pytest -q` passed at `347`, `python auto/loop.py` passed at `48/48`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -59,6 +59,21 @@
   - `coinbase/x402` PR `#1869` (`Refresh Augur ecosystem listing copy`)
   - updates `typescript/site/app/ecosystem/partners-data/augur/metadata.json` in the upstream site repo
   - purpose: move the Augur ecosystem card from the old score-first wording to the current admission-control wording
+- Landed a policy-quality follow-up locally on 2026-03-29:
+  - commit: `f248e80` (`Refine managed proxy policy decisions`)
+  - added a new tracked autoresearch regression for high-score managed proxy admin surfaces
+  - policy now returns `manual_review` instead of auto-`block` when the signal set is:
+    - upgradeable proxy
+    - hidden mint / admin-control surface
+    - delegatecall and optional suspicious selector signals
+    - no harder stop condition like honeypot, selfdestruct, fee manipulation, or unresolved proxy logic
+  - local real-contract recheck from the current code:
+    - Base USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) -> `manual_review`
+    - Base cbBTC (`0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf`) -> `manual_review`
+  - validation passed:
+    - `python auto/loop.py` -> `48/48`
+    - `python -m pytest tests/test_policy.py tests/test_engine.py -q` -> `43 passed`
+    - `python -m pytest -q` -> `347 passed`
 - Found an ops-script safety bug during the external pass:
   - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
   - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`
@@ -432,6 +447,7 @@
   - `recommended_policy` currently includes `action`, `summary`, and `reason_codes`
   - `allow` should be reserved for clean `safe` outputs with no reason codes
   - `honeypot` should still block even at `low`
+  - high-score managed upgradeable assets with mint/admin-control surfaces but no clearer hard-stop signal should default to `manual_review`, not auto-`block`
   - `hidden_mint` should now force at least `manual_review`, not automatic `block`, when it is the main signal
   - raw non-proxy `delegatecall` and `SELFDESTRUCT` should never auto-allow or stay at plain `warn` just because the numeric score is low
   - unresolved proxy logic should be carried as structured engine state and stable reason codes, not inferred from human-readable finding titles
@@ -487,9 +503,10 @@
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - `coinbase/x402` follow-up PR `#1869` is open for the wording refresh on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: finish the two remaining external follow-ups against `docs/REGISTRATIONS.md`: 8004scan refresh/caching and the open `x402.org/ecosystem` wording PR
-  - second: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
-  - third: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the live wording shift
+  - first: add the next hidden holdout batch or real-corpus candidate before changing policy again; `python auto/loop.py` is clean at `48/48` from repo baseline `f248e80`
+  - second: finish the two remaining external follow-ups against `docs/REGISTRATIONS.md`: 8004scan refresh/caching and the open `x402.org/ecosystem` wording PR
+  - third: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
+  - fourth: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:

@@ -49,11 +49,13 @@
    Do instead: if Augur moves beyond raw contract screening, extend it as destination-aware preflight for concrete actions like `deposit`, `approve`, `route`, or `pay`; validate claimed protocol + chain + recipient consistency, but do not drift into a generic phishing browser, wallet shield, or broad anti-scam suite.
 7. **[2026-03-29] Keep the policy layer thin and explicit**
    Do instead: keep `allow` for clean `safe` outputs only, `warn` for residual non-blocking signals, `manual_review` for unresolved proxy/raw `DELEGATECALL`/`SELFDESTRUCT`/mint-capability-only cases, and `block` for honeypot or genuinely high-risk combinations rather than drifting into a complex custom policy engine.
-8. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
+8. **[2026-03-29] Managed upgradeable assets should escalate, not auto-block, on admin surfaces alone**
+   Do instead: when a proxy-managed asset scores high because of upgradeability, mint/admin-control surface, delegatecall, and suspicious-selector signals, but not honeypot/selfdestruct/fee-manipulation-style hard stops, default to `manual_review` with an issuer-aware override summary instead of a flat `block`.
+9. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
    Do instead: if a contract has high-severity non-proxy `delegatecall`, force at least `manual_review` in policy even when the numeric score is only `15`.
-9. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
+10. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
    Do instead: put reproducible cases in `auto/corpus/public_cases.json` or local `*.local.json` files, run `python auto/bench.py`, and only change implementation after the failure is locked into the corpus or pytest.
-10. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
+11. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
    Do instead: use `auto/corpus/public_cases.json` for durable regressions, but keep the real search pressure in hidden `auto/corpus/*.local.json` holdouts and `auto/candidates/*.local.json` discoveries so the loop cannot simply memorize the public cases.
 
 ## Distribution
