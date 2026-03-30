@@ -10,7 +10,7 @@
 4. **[2026-03-16] Do not let orphan malicious selectors silently pass**
    Do instead: if a selector is in the malicious table but no concrete detector surfaces it, route it through the `suspicious_selector` warning path instead of returning clean `allow`.
 5. **[2026-03-16] Run hidden discovery batches serially**
-   Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable; for this single-machine Fly app, keep `auto_stop_machines` off so production does not depend on the flaky auto-wake path.
+   Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable; for this single-machine Fly app, keep `auto_stop_machines` off so production does not depend on the flaky auto-wake path, and after the selector/proxy-wrapper corpus goes green, move the next batch to under-covered families like `deployer_reputation`, proxy `no_code`, and `reentrancy` instead of spending another round on alias churn.
 6. **[2026-03-16] Keep fee/limit alias matching shared**
    Do instead: when you add fee-control selector aliases, reuse one label matcher across `detect_fee_manipulation()` and orphan-selector filtering so known limit controls warn at `15` instead of double-counting as `suspicious_selector`; keep transaction-limit aliases like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` plus broader limit-control aliases like `setMaxWalletAmount`, `setMaxHoldAmount`, and `setMaxTransferAmount` in that same family.
 7. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
