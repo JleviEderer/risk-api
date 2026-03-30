@@ -12,6 +12,7 @@ Requires:
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import sys
@@ -220,14 +221,18 @@ def update_uri(agent_id: int, new_uri: str) -> None:
 
 
 def main() -> None:
-    if "--update-uri" in sys.argv:
-        idx = sys.argv.index("--update-uri")
-        # Use next positional arg as URI if provided, else default HTTP URL
-        if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
-            uri = sys.argv[idx + 1]
-        else:
-            uri = AGENT_METADATA_URL
-        update_uri(AGENT_ID, uri)
+    parser = argparse.ArgumentParser(description="Register or update Augur on ERC-8004.")
+    parser.add_argument(
+        "--update-uri",
+        nargs="?",
+        const=AGENT_METADATA_URL,
+        metavar="URI",
+        help="Update agent #19074 to the provided URI, or the default HTTP metadata URL.",
+    )
+    args = parser.parse_args()
+
+    if args.update_uri is not None:
+        update_uri(AGENT_ID, args.update_uri)
     else:
         register()
 

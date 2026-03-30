@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from unittest.mock import patch, MagicMock
 
 import responses
@@ -91,6 +93,16 @@ class TestServiceListing:
 
 class TestAgentMetadata:
     """Verify agent registration metadata."""
+
+    def test_help_exits_cleanly(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "scripts/register_moltmart.py", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+        assert "Register or update Augur on MoltMart." in result.stdout
 
     def test_agent_name(self) -> None:
         assert AGENT_NAME == "Augur"

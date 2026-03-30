@@ -119,6 +119,16 @@ class TestPinToIpfs:
 
 
 class TestCLI:
+    def test_help_exits_cleanly(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "scripts/pin_metadata_ipfs.py", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+        assert "Pin Augur ERC-8004 metadata JSON to IPFS via Pinata." in result.stdout
+
     def test_missing_jwt_exits_with_error(self) -> None:
         """Running without PINATA_JWT should exit with error."""
         import os
@@ -138,33 +148,41 @@ class TestCLI:
 
 
 class TestRegisterErc8004UpdateUri:
+    def test_help_exits_cleanly(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "scripts/register_erc8004.py", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+        assert "Register or update Augur on ERC-8004." in result.stdout
+
     def test_update_uri_accepts_custom_uri(self) -> None:
         """--update-uri with a positional arg should use that arg."""
-        # We test the arg parsing logic, not the actual transaction
-        args = ["script", "--update-uri", "ipfs://QmTestCid123"]
-        idx = args.index("--update-uri")
-        if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
-            uri = args[idx + 1]
-        else:
-            uri = "https://augurrisk.com/agent-metadata.json"
-        assert uri == "ipfs://QmTestCid123"
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--update-uri", nargs="?", const="https://augurrisk.com/agent-metadata.json")
+        args = parser.parse_args(["--update-uri", "ipfs://QmTestCid123"])
+        assert args.update_uri == "ipfs://QmTestCid123"
 
     def test_update_uri_falls_back_to_default(self) -> None:
         """--update-uri without a positional arg should use default URL."""
-        args = ["script", "--update-uri"]
-        idx = args.index("--update-uri")
-        if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
-            uri = args[idx + 1]
-        else:
-            uri = "https://augurrisk.com/agent-metadata.json"
-        assert uri == "https://augurrisk.com/agent-metadata.json"
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--update-uri", nargs="?", const="https://augurrisk.com/agent-metadata.json")
+        args = parser.parse_args(["--update-uri"])
+        assert args.update_uri == "https://augurrisk.com/agent-metadata.json"
 
     def test_update_uri_ignores_next_flag(self) -> None:
         """--update-uri followed by another flag should use default."""
-        args = ["script", "--update-uri", "--dry-run"]
-        idx = args.index("--update-uri")
-        if idx + 1 < len(args) and not args[idx + 1].startswith("--"):
-            uri = args[idx + 1]
-        else:
-            uri = "https://augurrisk.com/agent-metadata.json"
-        assert uri == "https://augurrisk.com/agent-metadata.json"
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--update-uri", nargs="?", const="https://augurrisk.com/agent-metadata.json")
+        parser.add_argument("--dry-run", action="store_true")
+        args = parser.parse_args(["--update-uri", "--dry-run"])
+        assert args.update_uri == "https://augurrisk.com/agent-metadata.json"
+        assert args.dry_run is True

@@ -4,9 +4,9 @@
 - Date: 2026-03-29
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `dee071e`
+- Repo code baseline: `pending current session`
 - Deployed app baseline: `dee071e`
-- Status: green on deployed app baseline `dee071e`. The paid false-positive fix and admission-control metadata alignment are now committed, pushed, and live. Verification is green: `python -m pytest -q` passed at `341`, `python auto/loop.py` passed at `47/47`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and live checks confirmed the updated admission-control wording on `https://augurrisk.com/`, `https://augurrisk.com/openapi.json`, `https://augurrisk.com/skill.md`, `https://augurrisk.com/llms.txt`, `https://augurrisk.com/llms-full.txt`, `https://augurrisk.com/.well-known/agent-card.json`, `https://augurrisk.com/agent-metadata.json`, `https://augurrisk.com/.well-known/x402`, and `https://augurrisk.com/health`. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: green on deployed app baseline `dee071e`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Verification is green: `python -m pytest -q` passed at `345`, `python auto/loop.py` passed at `47/47`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -36,6 +36,28 @@
     - `https://augurrisk.com/health`
   - those live surfaces now reflect the `admission control` / `decision` / `recommended_policy` wording that was still missing before deploy
   - stale registration-script test expectations were also updated so the current metadata payloads and examples validate cleanly
+- Ran the external alignment pass on 2026-03-29:
+  - pinned new IPFS metadata CID: `QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
+  - verified the pinned metadata via `https://gateway.pinata.cloud/ipfs/QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
+  - updated ERC-8004 agent `19074` to `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
+    - tx: `24cc2388aa6a2b714f783ffb4f24888c35ed9c761a50854156e01adcce79d733`
+  - updated x402.jobs resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`
+    - public API path: `https://api.x402.jobs/api/v1/resources/augurrisk-com/augur-base`
+  - updated MoltMart service `984bf985-8f69-4237-b0e4-cd5452f1c489`
+    - authenticated API now shows the admission-control / `decision` / `recommended_policy` wording
+  - Work402 seller alias `Augur` already exists as `did:erc8004:37906`
+    - rerunning onboarding returns `409` alias conflict, which confirms the existing DID rather than indicating a fresh failure
+  - current external audit status after the update pass:
+    - `x402.org/ecosystem` still contains `Augur` and `augurrisk.com`, but page HTML still reads more like the older `risk scoring` wording than the new admission-control framing
+    - Coinbase public discovery feed still returned `NOT_FOUND` over the first `5` pages / `500` items when checked with `python scripts/check_cdp_discovery.py --max-pages 5`
+    - `x402list.fun` is still stale on `risk-api.life.conway.tech` and still does not mention `augurrisk.com`
+- Found an ops-script safety bug during the external pass:
+  - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
+  - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`
+  - decoded minted agent id: `37905`
+  - fix landed locally the same session:
+    - `scripts/pin_metadata_ipfs.py`, `scripts/register_erc8004.py`, `scripts/register_moltmart.py`, and `scripts/register_work402.py` now use safe argparse entrypoints
+    - targeted script tests plus full `python -m pytest -q` passed afterward
 - Finished the duplicated registration/discovery metadata wording pass locally on 2026-03-29:
   - updated stale registration surfaces in:
     - `scripts/pin_metadata_ipfs.py`
@@ -456,7 +478,7 @@
     - treat `curl/...` and similar agents as intent signals, not proof of a human at the keyboard
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - Current execution priority:
-  - first: rerun the script-driven external listing updates and audit the live external surfaces against `docs/REGISTRATIONS.md`
+  - first: finish the remaining external audit items and manual follow-ups against `docs/REGISTRATIONS.md`
   - second: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the live wording shift
   - third: only then treat public/distribution alignment as complete and resume broader outreach work
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
@@ -483,16 +505,14 @@
 - [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
 - [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
 
-1. Update the script-driven external listings that still depend on repo payloads:
-   - `scripts/pin_metadata_ipfs.py`
-   - `scripts/register_erc8004.py`
-   - `scripts/register_x402jobs.py`
-   - `scripts/register_moltmart.py`
-   - `scripts/register_work402.py` if the testnet listing still matters
-2. After those reruns, audit the live public surfaces in `docs/REGISTRATIONS.md` instead of assuming the scripts were enough.
-3. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
-4. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-5. Revise the LLM discoverability artifacts on the next pass:
+1. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
+   - verify whether 8004scan has refreshed from the new `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` URI
+   - inspect the public x402.jobs listing text after the successful update to resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`
+   - decide whether `x402.org/ecosystem` needs a wording PR because the page HTML still looks score-first
+   - keep `x402list.fun` classified as stale external state unless the directory itself updates
+2. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
+3. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+4. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
@@ -542,13 +562,11 @@
 4. The latest hidden discovery rerun is already green:
    - `python auto/loop.py` passed at `47/47` on 2026-03-29
    - do not change detector logic until you first add a new hidden candidate or holdout case
-5. Next execution step is the external alignment pass in `docs/REGISTRATIONS.md`:
-   - `scripts/pin_metadata_ipfs.py`
-   - `scripts/register_erc8004.py`
-   - `scripts/register_x402jobs.py`
-   - `scripts/register_moltmart.py`
-   - `scripts/register_work402.py` only if the testnet listing is still worth maintaining
-6. After those reruns, audit the live third-party surfaces instead of assuming the repo updates propagated:
+5. Next execution step is the remaining external audit pass:
+   - verify 8004scan and x402.jobs public text after the successful updates
+   - decide whether `x402.org/ecosystem` needs a follow-up PR
+   - keep `x402list.fun` as stale unless the external directory changes
+6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
    - x402.jobs
    - MoltMart

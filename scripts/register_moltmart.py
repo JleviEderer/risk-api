@@ -20,6 +20,7 @@ Docs: https://moltmart.app/skill.md
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -353,32 +354,40 @@ def cmd_show(api_key: str) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Register or update Augur on MoltMart.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--recover", action="store_true", help="Recover the MoltMart API key.")
+    group.add_argument(
+        "--register-only", action="store_true", help="Register the agent only without listing the service."
+    )
+    group.add_argument(
+        "--list-service", action="store_true", help="Create a new MoltMart service listing."
+    )
+    group.add_argument("--update", metavar="SERVICE_ID", help="Update an existing MoltMart service.")
+    group.add_argument("--show", action="store_true", help="Show the current MoltMart agent profile.")
+    args = parser.parse_args()
+
     load_dotenv()
 
-    if "--recover" in sys.argv:
+    if args.recover:
         cmd_recover()
         return
 
-    if "--register-only" in sys.argv:
+    if args.register_only:
         cmd_register()
         return
 
-    if "--list-service" in sys.argv:
+    if args.list_service:
         api_key = _get_api_key()
         cmd_list_service(api_key)
         return
 
-    if "--update" in sys.argv:
-        idx = sys.argv.index("--update")
-        if idx + 1 >= len(sys.argv):
-            print("ERROR: --update requires a SERVICE_ID")
-            sys.exit(1)
-        service_id = sys.argv[idx + 1]
+    if args.update:
         api_key = _get_api_key()
-        cmd_update_service(api_key, service_id)
+        cmd_update_service(api_key, args.update)
         return
 
-    if "--show" in sys.argv:
+    if args.show:
         api_key = _get_api_key()
         cmd_show(api_key)
         return

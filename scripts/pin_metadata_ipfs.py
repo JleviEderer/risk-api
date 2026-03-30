@@ -17,6 +17,7 @@ Requires:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -134,6 +135,10 @@ def pin_to_ipfs(metadata: dict[str, object], jwt: str) -> str:
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description="Pin Augur ERC-8004 metadata JSON to IPFS via Pinata.",
+    ).parse_args()
+
     jwt = os.environ.get("PINATA_JWT", "").strip()
     if not jwt:
         print("ERROR: PINATA_JWT env var is required", file=sys.stderr)

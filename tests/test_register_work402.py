@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 import responses
 
@@ -17,6 +19,16 @@ from scripts.register_work402 import (
 
 class TestAgentProfile:
     """Verify the agent profile payload is well-formed."""
+
+    def test_help_exits_cleanly(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "scripts/register_work402.py", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+        assert "Register or inspect Augur on Work402." in result.stdout
 
     def test_has_required_fields(self) -> None:
         required = ["name", "bio", "role", "wallet_address"]

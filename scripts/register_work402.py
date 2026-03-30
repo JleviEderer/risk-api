@@ -15,6 +15,7 @@ Docs: https://www.work402.com/hire/skill.md
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 
@@ -115,9 +116,13 @@ def cmd_show() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Register or inspect Augur on Work402.")
+    parser.add_argument("--show", action="store_true", help="Show the current Work402 agents list.")
+    args = parser.parse_args()
+
     load_dotenv()
 
-    if "--show" in sys.argv:
+    if args.show:
         cmd_show()
     else:
         cmd_onboard()
