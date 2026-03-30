@@ -91,21 +91,21 @@
 ## Validation
 1. **[2026-03-29] A healthy live app can still be metadata-stale**
    Do instead: before touching third-party listings, fetch `https://augurrisk.com/`, `openapi.json`, `skill.md`, `llms*.txt`, `/.well-known/agent-card.json`, `agent-metadata.json`, and `/.well-known/x402` and confirm the actual live wording matches the repo change you plan to propagate.
-2. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
+2. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
+   Do instead: if `flyctl deploy --remote-only` times out during health polling, immediately check `flyctl status --app augurrisk`; if the machine image/version advanced but the machine is stopped, manually start it and re-check public health before assuming the deploy failed or rolled back.
+3. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
    Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
-3. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
+4. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
-4. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
+5. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
-5. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+6. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
    Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
-6. **[2026-03-16] Public examples must round-trip through the live serializer**
+7. **[2026-03-16] Public examples must round-trip through the live serializer**
    Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
-7. **[2026-03-16] Keep private detector holdouts out of git**
+8. **[2026-03-16] Keep private detector holdouts out of git**
    Do instead: store hidden autoresearch cases as `auto/corpus/*.local.json` or `auto/candidates/*.local.json`; load them locally with `python auto/bench.py` but do not promote them until they are ready to become public regressions.
-8. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
+9. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
    Do instead: keep `auto/bench.py` checking proof-report `decision` and `recommended_policy` against current `derive_policy()` semantics; a dated snapshot can keep old scores/findings, but stale policy recommendations should fail loudly unless you intentionally preserve historical policy and relax the check.
-9. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
+10. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
    Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint.
-10. **[2026-03-16] Do not collapse proxy `no_code` into transport failure**
-   Do instead: if a proxy implementation address resolves but `eth_getCode` returns `0x`, emit `ProxyResolutionStatus.NO_CODE` plus `proxy_logic_no_code`; keep the action at `manual_review`, but preserve the distinction from RPC/lookup `fetch_failed`.

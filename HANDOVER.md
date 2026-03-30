@@ -4,9 +4,9 @@
 - Date: 2026-03-30
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `6bd331e` plus an uncommitted metadata-trailer pass
-- Deployed app baseline: `6bd331e`
-- Status: green on deployed app baseline `6bd331e`; local repo work now also includes an uncommitted Solidity-metadata pass aimed at shared implementation families. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, and `x402.org/ecosystem` now also refreshed to the new Augur copy; 8004scan still appears to be the remaining stale/cached external surface against the older score-first copy. The newest local quality passes now cover three adjacent issues: managed upgradeable assets escalate to `manual_review` instead of auto-`block`, 45-byte EIP-1167 clone shells no longer present as raw `DELEGATECALL` plus tiny-bytecode false alarms, and Solidity CBOR metadata trailers are now stripped before disassembly so metadata bytes do not create fake opcode findings. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Repo code baseline: `fef6a10`
+- Deployed app baseline: `fef6a10`
+- Status: green on deployed app baseline `fef6a10`. The Solidity-metadata pass is now committed, pushed, and deployed, so the live app includes the hidden-batch fix that strips Solidity CBOR metadata trailers before disassembly. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, and `x402.org/ecosystem` now also refreshed to the new Augur copy; 8004scan still appears to be the remaining stale/cached external surface against the older score-first copy. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `git push origin master` succeeded, and `flyctl status --app augurrisk` now shows machine version `93` started with `1` passing health check on image `deployment-01KMZY1M26RA9Z4GS4RF6H1CCV`. The deploy quirk to remember from this session: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -107,6 +107,14 @@
     - `python auto/loop.py` -> `52/52`
     - `python -m pytest tests/test_disassembler.py tests/test_engine.py tests/test_patterns.py tests/test_scoring.py -q` -> `80 passed`
     - `python -m pytest -q` -> `356 passed`
+- Committed, pushed, and deployed the Solidity-metadata follow-up on 2026-03-30:
+  - commit: `fef6a10` (`Ignore Solidity metadata during disassembly`)
+  - `git push origin master` succeeded
+  - `flyctl deploy --remote-only --app augurrisk` updated the machine image but timed out while polling health because the Machines API hit lease / rate-limit errors
+  - `flyctl machine start 287d341f3e0ed8 --app augurrisk` recovered the app cleanly
+  - final live verification:
+    - `flyctl status --app augurrisk` -> machine version `93`, state `started`, `1` passing health check
+    - `https://augurrisk.com/openapi.json` returned the live API document after recovery
 - Found an ops-script safety bug during the external pass:
   - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
   - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`
@@ -536,10 +544,10 @@
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - `coinbase/x402` follow-up PR `#1869` delivered the wording refresh that is now visible on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: commit the already-validated Solidity-metadata trailer fix and treat that as the new local baseline; `python auto/loop.py` is clean at `52/52` and `python -m pytest -q` is green at `356`
-  - second: finish the remaining external follow-up against `docs/REGISTRATIONS.md`: 8004scan refresh/caching
-  - third: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
-  - fourth: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
+  - first: finish the remaining external follow-up against `docs/REGISTRATIONS.md`: 8004scan refresh/caching
+  - second: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
+  - third: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
+  - fourth: only then start a fresh hidden holdout batch, after adding a new local candidate or holdout first
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:
@@ -564,13 +572,12 @@
 - [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
 - [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
 
-1. Commit the already-validated Solidity metadata-trailer fix so the repo baseline catches up with the green local state.
-2. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
+1. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
    - verify whether 8004scan has refreshed from the new `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` URI
    - keep `x402list.fun` classified as stale external state unless the directory itself updates
-3. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
-4. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-5. Revise the LLM discoverability artifacts on the next pass:
+2. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
+3. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+4. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
@@ -606,8 +613,8 @@
 1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
    - `https://augurrisk.com/health`
    - `https://augurrisk.com/openapi.json`
-   - live deployed baseline is still `6bd331e`
-   - if the public domain ever times out again, check `flyctl status --app augurrisk` immediately; the last real issue was the machine sitting in `stopped` after auto-stop, not bad detector code
+   - live deployed baseline is `fef6a10`
+   - if the public domain ever times out again, check `flyctl status --app augurrisk` immediately; on 2026-03-30 the deploy itself succeeded but the machine needed a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` after Fly Machines API lease/rate-limit errors
 2. The paid-result problem and the wording/deploy work are already landed:
    - Base WETH (`0x4200000000000000000000000000000000000006`) now returns `allow` locally
    - AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`) now returns `manual_review` locally
@@ -620,7 +627,7 @@
 4. The latest hidden discovery rerun is already green:
    - `python auto/loop.py` passed at `52/52` on 2026-03-30
    - `python -m pytest -q` passed at `356`
-   - commit the current metadata-trailer pass before starting a new hidden batch
+   - do not start a new hidden batch until you first add a new local candidate or holdout
 5. Next execution step is the remaining external audit pass:
    - verify whether 8004scan refreshes from the new IPFS URI
    - keep `x402list.fun` as stale unless the external directory changes
