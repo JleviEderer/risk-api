@@ -6,7 +6,7 @@
 - Branch: `master`
 - Repo code baseline: `fef6a10`
 - Deployed app baseline: `fef6a10`
-- Status: green on deployed app baseline `fef6a10`. The Solidity-metadata pass is now committed, pushed, and deployed, so the live app includes the hidden-batch fix that strips Solidity CBOR metadata trailers before disassembly. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, and `x402.org/ecosystem` now also refreshed to the new Augur copy; 8004scan still appears to be the remaining stale/cached external surface against the older score-first copy. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `git push origin master` succeeded, and `flyctl status --app augurrisk` now shows machine version `93` started with `1` passing health check on image `deployment-01KMZY1M26RA9Z4GS4RF6H1CCV`. The deploy quirk to remember from this session: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: green on deployed app baseline `fef6a10`. The Solidity-metadata pass is now committed, pushed, and deployed, so the live app includes the hidden-batch fix that strips Solidity CBOR metadata trailers before disassembly. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, `x402.org/ecosystem` refreshed to the new Augur copy, and 8004scan now refreshed as well. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `git push origin master` succeeded, and `flyctl status --app augurrisk` now shows machine version `93` started with `1` passing health check on image `deployment-01KMZY1M26RA9Z4GS4RF6H1CCV`. The deploy quirk to remember from this session: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -51,7 +51,7 @@
     - x402.jobs public page shows the new admission-control wording
     - MoltMart public page shows the new admission-control wording
     - Work402 public page shows the new admission-control wording for `did:erc8004:37906`
-    - `8004scan` still shows the older score-first wording despite the successful on-chain URI update to `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S`
+    - `8004scan` now shows the refreshed Augur page and current admission-control wording on the public agent profile
     - `x402.org/ecosystem` now shows the refreshed Augur admission-control wording on the public card
     - Coinbase public discovery feed still returned `NOT_FOUND` over the first `5` pages / `500` items when checked with `python scripts/check_cdp_discovery.py --max-pages 5`
     - `x402list.fun` is still stale on `risk-api.life.conway.tech` and still does not mention `augurrisk.com`
@@ -544,10 +544,9 @@
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - `coinbase/x402` follow-up PR `#1869` delivered the wording refresh that is now visible on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: finish the remaining external follow-up against `docs/REGISTRATIONS.md`: 8004scan refresh/caching
-  - second: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
-  - third: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
-  - fourth: only then start a fresh hidden holdout batch, after adding a new local candidate or holdout first
+  - first: re-check the Coinbase public discovery feed or decide whether it is time to escalate to Coinbase/CDP support
+  - second: do one real paid `/analyze` smoke test if we want fresh end-to-end payment evidence after the latest policy pass
+  - third: only then start a fresh hidden holdout batch, after adding a new local candidate or holdout first
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:
@@ -572,12 +571,11 @@
 - [x] Objective 3: decide whether `proxy slot resolved + implementation bytecode = 0x` should stay `fetch_failed` or get its own proxy-resolution status
 - [x] Objective 4: review local holdout/candidate cases and promote only durable representative regressions into `auto/corpus/public_cases.json`
 
-1. Finish the remaining external audit items in `docs/REGISTRATIONS.md`:
-   - verify whether 8004scan has refreshed from the new `ipfs://QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` URI
-   - keep `x402list.fun` classified as stale external state unless the directory itself updates
-2. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
-3. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-4. Revise the LLM discoverability artifacts on the next pass:
+1. Re-check the Coinbase public discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
+2. Keep `x402list.fun` classified as stale external state unless the directory itself updates.
+3. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
+4. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+5. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
@@ -629,7 +627,7 @@
    - `python -m pytest -q` passed at `356`
    - do not start a new hidden batch until you first add a new local candidate or holdout
 5. Next execution step is the remaining external audit pass:
-   - verify whether 8004scan refreshes from the new IPFS URI
+   - re-check the Coinbase public discovery feed
    - keep `x402list.fun` as stale unless the external directory changes
 6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
