@@ -4,9 +4,9 @@
 - Date: 2026-03-29
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `f248e80`
+- Repo code baseline: `f248e80` plus an uncommitted minimal-proxy wrapper pass
 - Deployed app baseline: `dee071e`
-- Status: green on deployed app baseline `dee071e` and repo baseline `f248e80`. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. The newest local quality pass (`f248e80`) also refines policy for managed upgradeable assets so high-score proxy + mint/admin-control surfaces escalate to `manual_review` instead of auto-`block` when there is no clearer hard-stop signal like honeypot or selfdestruct. Verification is green: `python -m pytest -q` passed at `347`, `python auto/loop.py` passed at `48/48`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: green on deployed app baseline `dee071e`; local repo work now also includes an uncommitted EIP-1167 minimal-proxy pass aimed at real wrapper families. The paid false-positive fix and admission-control metadata alignment are live, the script-driven external pass is complete for IPFS / ERC-8004 / x402.jobs / MoltMart, Work402 already has the Augur seller alias as `did:erc8004:37906`, and the side-effectful registration-script help paths have now been hardened locally. Public rechecks show x402.jobs, MoltMart, and Work402 on the new admission-control wording; `x402.org/ecosystem` is still stale and now has a follow-up wording PR open (`coinbase/x402` `#1869`), while 8004scan still appears stale/cached against the older score-first copy. The newest local quality passes now cover both managed upgradeable assets and standard clone wrappers: high-score proxy + mint/admin-control surfaces escalate to `manual_review` instead of auto-`block`, and 45-byte EIP-1167 clone shells no longer present as raw `DELEGATECALL` plus tiny-bytecode false alarms. Verification is green: `python -m pytest -q` passed at `353`, `python auto/loop.py` passed at `50/50`, `python -m py_compile scripts/pin_metadata_ipfs.py scripts/register_erc8004.py scripts/register_x402jobs.py scripts/register_moltmart.py scripts/register_work402.py` passed, and direct `--help` invocations on the previously dangerous scripts now exit cleanly without writes. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
@@ -74,6 +74,23 @@
     - `python auto/loop.py` -> `48/48`
     - `python -m pytest tests/test_policy.py tests/test_engine.py -q` -> `43 passed`
     - `python -m pytest -q` -> `347 passed`
+- Landed the next hidden-batch follow-up locally on 2026-03-29:
+  - standard 45-byte EIP-1167 clone wrappers are now recognized as proxies instead of raw `DELEGATECALL` shells
+  - `resolve_implementation()` now extracts clone targets from runtime bytecode, so wrapper contracts can surface their shared implementation analysis without depending on storage-slot proxies
+  - added/promoted regressions in:
+    - `auto/corpus/public_cases.json`
+    - `tests/test_patterns.py`
+    - `tests/test_scoring.py`
+    - `tests/test_engine.py`
+  - local holdout that originally failed was `minimal_proxy_clone_raw_delegatecall`
+  - real spot-check after the fix:
+    - Beefy/Aerodrome-style Base wrapper `0x09139A80454609B69700836a9eE12Db4b5DBB15f` now resolves implementation `0x9818df1bdce8d0e79b982e2c3a93ac821b3c17e0`
+    - the wrapper shell now reports `delegatecall` as expected minimal-proxy behavior plus `proxy` detection, instead of `tiny_bytecode` + raw-shell framing
+    - resulting score on that wrapper moved from a misleading shell-only `25` to an implementation-aware `45`; decision stays `manual_review` because the shared implementation still has real delegatecall/suspicious-selector surface
+  - validation passed:
+    - `python auto/loop.py` -> `50/50`
+    - `python -m pytest tests/test_patterns.py tests/test_scoring.py tests/test_engine.py -q` -> `70 passed`
+    - `python -m pytest -q` -> `353 passed`
 - Found an ops-script safety bug during the external pass:
   - `scripts/register_erc8004.py --help` does not behave like help; because the script ignores `--help`, it executed the default `register()` path and created a second ERC-8004 agent
   - accidental tx: `0d09b847ae49c28dfba251485076170ae0ea45aa3eefe4a131a560c3d3fc45b2`

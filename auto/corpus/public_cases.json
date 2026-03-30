@@ -360,5 +360,26 @@
         "raw_delegatecall_surface"
       ]
     }
+  },
+  {
+    "id": "minimal-proxy-shell-warn",
+    "name": "Standard minimal proxy shell is treated as a proxy, not raw delegatecall",
+    "kind": "bytecode",
+    "source": "public",
+    "tags": ["policy", "proxy", "wrapper"],
+    "blind_spot": "minimal_proxy_clone_raw_delegatecall",
+    "bytecode": "0x363d3d373d3d3d363d7311111111111111111111111111111111111111115af43d82803e903d91602b57fd5bf3",
+    "expected": {
+      "score": 20,
+      "level": "low",
+      "decision": "warn",
+      "reason_codes_include": ["upgradeable_proxy", "delegatecall_surface"],
+      "reason_codes_exclude": ["raw_delegatecall_surface", "tiny_bytecode_signal"],
+      "findings_include": ["proxy", "delegatecall"],
+      "category_scores_include": {
+        "proxy": 10,
+        "delegatecall": 10
+      }
+    }
   }
 ]

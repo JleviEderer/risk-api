@@ -41,6 +41,14 @@ def test_tiny_bytecode_not_for_proxy():
     assert "tiny_bytecode" not in result.category_scores
 
 
+def test_tiny_bytecode_not_for_minimal_proxy():
+    bytecode = "363d3d373d3d3d363d73" + "11" * 20 + "5af43d82803e903d91602b57fd5bf3"
+    instructions = disassemble(bytecode)
+    findings = run_all_detectors(instructions)
+    result = compute_score(findings, instructions, bytecode)
+    assert "tiny_bytecode" not in result.category_scores
+
+
 def test_category_cap_prevents_overflow():
     # Multiple selfdestruct findings should still cap at 30
     findings = [

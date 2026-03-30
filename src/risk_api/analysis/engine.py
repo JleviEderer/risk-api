@@ -19,6 +19,7 @@ from risk_api.analysis.patterns import (
     Finding,
     OZ_IMPL_SLOT,
     Severity,
+    extract_minimal_proxy_target,
     run_all_detectors,
 )
 from risk_api.analysis.reputation import detect_deployer_reputation
@@ -104,8 +105,20 @@ def clear_analysis_cache() -> None:
     _analysis_cache.clear()
 
 
-def resolve_implementation(address: str, rpc_url: str) -> str | None:
+def resolve_implementation(
+    address: str, rpc_url: str, bytecode_hex: str | None = None
+) -> str | None:
     """Try each known proxy storage slot and return the implementation address."""
+    if bytecode_hex is not None:
+        minimal_proxy_target = extract_minimal_proxy_target(disassemble(bytecode_hex))
+        if minimal_proxy_target is not None:
+            logger.debug(
+                "Resolved EIP-1167 implementation for %s: %s",
+                address,
+                minimal_proxy_target,
+            )
+            return minimal_proxy_target
+
     for slot_name, slot_bytes in _IMPL_SLOTS:
         slot_hex = "0x" + slot_bytes.hex()
         try:
@@ -231,7 +244,7 @@ def analyze_contract(
     is_proxy = any(f.detector == "proxy" for f in findings)
     if is_proxy:
         proxy_resolution_status = ProxyResolutionStatus.UNRESOLVED
-        impl_address = resolve_implementation(address, rpc_url)
+        impl_address = resolve_implementation(address, rpc_url, bytecode_hex=bytecode_hex)
         if impl_address is None:
             findings.append(
                 _unresolved_proxy_finding(

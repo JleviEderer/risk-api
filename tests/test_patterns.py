@@ -6,6 +6,7 @@ from risk_api.analysis.patterns import (
     detect_hidden_mint,
     detect_honeypot_patterns,
     detect_proxy_patterns,
+    extract_minimal_proxy_target,
     detect_reentrancy_risk,
     detect_selfdestruct,
     run_all_detectors,
@@ -47,6 +48,16 @@ def test_detect_delegatecall_with_proxy():
     assert findings[0].points == 10
 
 
+def test_detect_delegatecall_with_minimal_proxy():
+    bytecode = "363d3d373d3d3d363d73" + "11" * 20 + "5af43d82803e903d91602b57fd5bf3"
+    instructions = disassemble(bytecode)
+    findings = detect_delegatecall(instructions)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.INFO
+    assert findings[0].points == 10
+    assert "minimal proxy" in findings[0].title.lower()
+
+
 def test_detect_reentrancy_risk():
     # CALL (0xF1) followed by SSTORE (0x55)
     bytecode = "f155"  # CALL then SSTORE
@@ -72,6 +83,21 @@ def test_detect_proxy_patterns():
     assert len(findings) == 1
     assert findings[0].severity == Severity.INFO
     assert findings[0].detector == "proxy"
+
+
+def test_detect_proxy_patterns_minimal_proxy():
+    bytecode = "363d3d373d3d3d363d73" + "11" * 20 + "5af43d82803e903d91602b57fd5bf3"
+    instructions = disassemble(bytecode)
+    findings = detect_proxy_patterns(instructions)
+    assert len(findings) == 1
+    assert findings[0].detector == "proxy"
+    assert "Minimal proxy" in findings[0].title
+
+
+def test_extract_minimal_proxy_target():
+    bytecode = "363d3d373d3d3d363d73" + "11" * 20 + "5af43d82803e903d91602b57fd5bf3"
+    instructions = disassemble(bytecode)
+    assert extract_minimal_proxy_target(instructions) == "0x" + "11" * 20
 
 
 def test_detect_proxy_patterns_absent():

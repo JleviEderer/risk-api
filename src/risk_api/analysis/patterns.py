@@ -70,6 +70,9 @@ PROXY_SLOTS = {
     OZ_ADMIN_SLOT,
 }
 
+_MINIMAL_PROXY_PREFIX = bytes.fromhex("363d3d373d3d3d363d73")
+_MINIMAL_PROXY_SUFFIX = bytes.fromhex("5af43d82803e903d91602b57fd5bf3")
+
 
 def detect_selfdestruct(instructions: list[Instruction]) -> list[Finding]:
     """Detect SELFDESTRUCT opcode (0xFF). Critical - can destroy contract."""
@@ -97,12 +100,12 @@ def detect_delegatecall(instructions: list[Instruction]) -> list[Finding]:
     """Detect DELEGATECALL (0xF4). Downgrade severity if proxy context detected."""
     findings: list[Finding] = []
     has_delegatecall = False
-    is_proxy = _has_proxy_slots(instructions)
+    proxy_kind = _proxy_kind(instructions)
 
     for instr in instructions:
         if instr.opcode == 0xF4 and not has_delegatecall:
             has_delegatecall = True
-            if is_proxy:
+            if proxy_kind == "storage_slot":
                 findings.append(
                     Finding(
                         detector="delegatecall",
@@ -111,6 +114,20 @@ def detect_delegatecall(instructions: list[Instruction]) -> list[Finding]:
                         description=(
                             "Contract uses DELEGATECALL with standard proxy storage "
                             "slots (EIP-1967/1822). This is expected proxy behavior."
+                        ),
+                        points=10,
+                        offset=instr.offset,
+                    )
+                )
+            elif proxy_kind == "minimal_proxy":
+                findings.append(
+                    Finding(
+                        detector="delegatecall",
+                        severity=Severity.INFO,
+                        title="DELEGATECALL in minimal proxy pattern",
+                        description=(
+                            "Contract matches the standard EIP-1167 minimal proxy "
+                            "runtime. This delegatecall is expected proxy behavior."
                         ),
                         points=10,
                         offset=instr.offset,
@@ -160,9 +177,10 @@ def detect_reentrancy_risk(instructions: list[Instruction]) -> list[Finding]:
 
 
 def detect_proxy_patterns(instructions: list[Instruction]) -> list[Finding]:
-    """Detect EIP-1967/1822 proxy storage slots in PUSH32 instructions."""
+    """Detect common proxy patterns such as storage-slot and minimal proxies."""
     findings: list[Finding] = []
-    if _has_proxy_slots(instructions):
+    proxy_kind = _proxy_kind(instructions)
+    if proxy_kind == "storage_slot":
         findings.append(
             Finding(
                 detector="proxy",
@@ -171,6 +189,19 @@ def detect_proxy_patterns(instructions: list[Instruction]) -> list[Finding]:
                 description=(
                     "Contract uses standard proxy storage slots (EIP-1967 or "
                     "EIP-1822). The implementation contract should also be analyzed."
+                ),
+                points=10,
+            )
+        )
+    elif proxy_kind == "minimal_proxy":
+        findings.append(
+            Finding(
+                detector="proxy",
+                severity=Severity.INFO,
+                title="Minimal proxy clone detected",
+                description=(
+                    "Contract matches the standard EIP-1167 minimal proxy runtime. "
+                    "The implementation contract should also be analyzed."
                 ),
                 points=10,
             )
@@ -287,3 +318,31 @@ def _has_proxy_slots(instructions: list[Instruction]) -> bool:
         if instr.name == "PUSH32" and instr.operand in PROXY_SLOTS:
             return True
     return False
+
+
+def extract_minimal_proxy_target(instructions: list[Instruction]) -> str | None:
+    """Return the implementation for a standard EIP-1167 runtime, if present."""
+    bytecode = _instructions_to_bytes(instructions)
+    if len(bytecode) != 45:
+        return None
+    if not bytecode.startswith(_MINIMAL_PROXY_PREFIX):
+        return None
+    if not bytecode.endswith(_MINIMAL_PROXY_SUFFIX):
+        return None
+    start = len(_MINIMAL_PROXY_PREFIX)
+    return "0x" + bytecode[start : start + 20].hex()
+
+
+def _instructions_to_bytes(instructions: list[Instruction]) -> bytes:
+    return b"".join(
+        bytes([instr.opcode]) + (instr.operand or b"")
+        for instr in instructions
+    )
+
+
+def _proxy_kind(instructions: list[Instruction]) -> str | None:
+    if _has_proxy_slots(instructions):
+        return "storage_slot"
+    if extract_minimal_proxy_target(instructions) is not None:
+        return "minimal_proxy"
+    return None

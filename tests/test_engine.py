@@ -34,6 +34,15 @@ def _proxy_bytecode() -> str:
     return "0x7f" + EIP1967_HEX + "f4" + "00" * 200
 
 
+def _minimal_proxy_clone_bytecode(impl_addr: str = IMPL_ADDR) -> str:
+    """Standard EIP-1167 runtime with an embedded implementation address."""
+    return (
+        "0x363d3d373d3d3d363d73"
+        + impl_addr
+        + "5af43d82803e903d91602b57fd5bf3"
+    )
+
+
 def _clean_impl_bytecode() -> str:
     """Clean implementation bytecode: >200 bytes, no risky patterns."""
     return "0x" + "6080604052" + "00" * 200
@@ -315,6 +324,16 @@ def test_resolve_implementation_eip1967():
     assert result == "0x" + IMPL_ADDR
 
 
+def test_resolve_implementation_minimal_proxy_from_bytecode():
+    addr = "0x" + "9a" * 20
+    result = resolve_implementation(
+        addr,
+        RPC_URL,
+        bytecode_hex=_minimal_proxy_clone_bytecode(),
+    )
+    assert result == "0x" + IMPL_ADDR
+
+
 @responses.activate
 def test_resolve_implementation_fallthrough_to_eip1822():
     """EIP-1967 empty, EIP-1822 returns valid address."""
@@ -379,6 +398,27 @@ def test_analyze_proxy_resolves_implementation():
     assert result.decision == PolicyAction.MANUAL_REVIEW
     assert result.proxy_resolution_status == ProxyResolutionStatus.RESOLVED
     assert any(f.detector == "impl_selfdestruct" for f in result.findings)
+
+
+@responses.activate
+def test_analyze_minimal_proxy_resolves_implementation_from_bytecode():
+    proxy_addr = "0x" + "98" * 20
+    responses.post(RPC_URL, json=_rpc_response(_minimal_proxy_clone_bytecode()))
+    responses.post(RPC_URL, json=_rpc_response(_clean_impl_bytecode()))
+
+    result = analyze_contract(proxy_addr, RPC_URL)
+
+    assert result.implementation is not None
+    assert result.implementation.address == "0x" + IMPL_ADDR
+    assert result.proxy_resolution_status == ProxyResolutionStatus.RESOLVED
+    assert result.score == 20
+    assert result.level == RiskLevel.LOW
+    assert result.decision == PolicyAction.WARN
+    assert "tiny_bytecode" not in result.category_scores
+    assert PolicyReasonCode.UPGRADEABLE_PROXY.value in result.recommended_policy.reason_codes
+    assert PolicyReasonCode.RAW_DELEGATECALL_SURFACE.value not in result.recommended_policy.reason_codes
+    assert any(f.detector == "proxy" for f in result.findings)
+    assert any(f.detector == "delegatecall" for f in result.findings)
 
 
 @responses.activate
