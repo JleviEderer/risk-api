@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from flask import Response, request
 
-from risk_api.app import PROTECTED_ROUTES, create_app
+from risk_api.app import ANALYZE_REQUEST_METHODS, PROTECTED_ROUTES, create_app
 from risk_api.config import Config
 
 # Bazaar extension data matching what _setup_x402_middleware registers.
@@ -113,6 +113,8 @@ def _fake_x402_middleware_setup(app, config: Config) -> bool:
     @app.before_request
     def x402_payment_gate():
         if request.path not in PROTECTED_ROUTES:
+            return None
+        if request.method not in ANALYZE_REQUEST_METHODS:
             return None
 
         method = "GET" if request.method == "HEAD" else request.method

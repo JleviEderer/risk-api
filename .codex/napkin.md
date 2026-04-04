@@ -10,13 +10,13 @@
 4. **[2026-03-16] Do not let orphan malicious selectors silently pass**
    Do instead: if a selector is in the malicious table but no concrete detector surfaces it, route it through the `suspicious_selector` warning path instead of returning clean `allow`.
 5. **[2026-03-16] Run hidden discovery batches serially**
-   Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable; for this single-machine Fly app, keep `auto_stop_machines` off so production does not depend on the flaky auto-wake path, and after the selector/proxy-wrapper corpus goes green, move the next batch to under-covered families like `deployer_reputation`, proxy `no_code`, and `reentrancy` instead of spending another round on alias churn.
+   Do instead: land, verify, and deploy each hidden holdout batch before starting the next one so each loop runs against the latest baseline and failures stay attributable; for this single-machine Fly app, keep `auto_stop_machines` off so production does not depend on the flaky auto-wake path, and after the selector/proxy-wrapper corpus goes green, move the next batch to under-covered families like `deployer_reputation`, proxy `no_code`, and `reentrancy` instead of spending another round on alias churn. When a hidden case depends on mocked RPC or explorer behavior, express it as an `analysis` case in `auto_bench` rather than flattening it into a lossy pure-policy surrogate.
 6. **[2026-03-16] Keep fee/limit alias matching shared**
    Do instead: when you add fee-control selector aliases, reuse one label matcher across `detect_fee_manipulation()` and orphan-selector filtering so known limit controls warn at `15` instead of double-counting as `suspicious_selector`; keep transaction-limit aliases like `setMaxBuyAmount`, `setTxLimit`, and `setMaxTxnAmount` plus broader limit-control aliases like `setMaxWalletAmount`, `setMaxHoldAmount`, and `setMaxTransferAmount` in that same family.
 7. **[2026-03-16] Delay full serial-batch autopilot until the fix pattern stabilizes**
    Do instead: keep the human in the loop between hidden batches while the research loop is still shaping itself; only automate commit/push/deploy-to-next-batch chaining after the allowed fix surfaces and stop conditions are explicit.
 8. **[2026-03-17] `deployer_reputation` should use public Base Blockscout first**
-   Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency.
+   Do instead: use Blockscout creator lookup plus tx-history probes as the default deployer-reputation path, keep explorer failure distinct from true `NOT_FOUND`, keep throttling/soft-error handling, and treat `BLOCKSCOUT_API_KEY` as optional higher-limit support rather than making a paid Etherscan key the default dependency. Hidden coverage should include partial explorer failure too, so a failed age probe or tx-count probe does not erase the other surviving deployer signal.
 9. **[2026-03-29] Registration scripts are duplicated and easy to misuse**
    Do instead: when discovery wording or output shape changes, update not only `src/risk_api/app.py` plus `pin_metadata_ipfs.py` / `register_erc8004.py` / `register_x402jobs.py`, but also marketplace-specific scripts like `register_moltmart.py` and `register_work402.py`; keep argparse help paths safe and source-inspect operator scripts before assuming a flag is dry-run only.
 10. **[2026-03-30] Treat wrapper families through executable bytecode only**
@@ -89,23 +89,25 @@
    Do instead: treat repeated `Base-only deterministic prefilter` framing and zero unprompted mentions as a category/distribution signal before deciding on a product pivot into simulation.
 
 ## Validation
-1. **[2026-03-29] A healthy live app can still be metadata-stale**
+1. **[2026-04-03] Do not let `/analyze` hooks override Flask's method contract**
+   Do instead: keep address validation and x402 gating limited to the real `/analyze` request methods (`GET`, `POST`, `HEAD`) so `OPTIONS` stays ungated and unsupported methods return Flask's native `405` instead of misleading `422`/`402` responses.
+2. **[2026-03-29] A healthy live app can still be metadata-stale**
    Do instead: before touching third-party listings, fetch `https://augurrisk.com/`, `openapi.json`, `skill.md`, `llms*.txt`, `/.well-known/agent-card.json`, `agent-metadata.json`, and `/.well-known/x402` and confirm the actual live wording matches the repo change you plan to propagate.
-2. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
+3. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
    Do instead: if `flyctl deploy --remote-only` times out during health polling, immediately check `flyctl status --app augurrisk`; if the machine image/version advanced but the machine is stopped, manually start it and re-check public health before assuming the deploy failed or rolled back.
-3. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
+4. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
    Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
-4. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
+5. **[2026-03-10] Treat Coinbase ecosystem and Bazaar as separate discovery surfaces**
    Do instead: verify `https://www.x402.org/ecosystem` and `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources` independently; a live ecosystem listing does not prove CDP feed visibility.
-5. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
+6. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
    Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
-6. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
-   Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard.
-7. **[2026-03-16] Public examples must round-trip through the live serializer**
+7. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+   Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard. Keep `/stats` fail-soft on malformed JSONL rows rather than letting one bad log line break the public ops view.
+8. **[2026-03-16] Public examples must round-trip through the live serializer**
    Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
-8. **[2026-03-16] Keep private detector holdouts out of git**
+9. **[2026-03-16] Keep private detector holdouts out of git**
    Do instead: store hidden autoresearch cases as `auto/corpus/*.local.json` or `auto/candidates/*.local.json`; load them locally with `python auto/bench.py` but do not promote them until they are ready to become public regressions.
-9. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
+10. **[2026-03-16] Proof reports can still drift semantically even when serializer shape matches**
    Do instead: keep `auto/bench.py` checking proof-report `decision` and `recommended_policy` against current `derive_policy()` semantics; a dated snapshot can keep old scores/findings, but stale policy recommendations should fail loudly unless you intentionally preserve historical policy and relax the check.
-10. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
-   Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint.
+11. **[2026-03-16] Use `python auto/loop.py` for routine autoresearch runs**
+   Do instead: treat `auto/loop.py` as the default human-facing runner; it writes `auto/runs/latest.json` and prints a compact grouped summary, while `auto/bench.py` remains the raw JSON/benchmark entrypoint. For `/analyze`, reject malformed POST JSON and conflicting query-vs-body addresses before the x402 gate so callers do not pay for ambiguous input.

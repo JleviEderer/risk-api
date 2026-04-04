@@ -1,14 +1,56 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-03-30
+- Date: 2026-04-03
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
 - Repo code baseline: `fef6a10`
 - Deployed app baseline: `fef6a10`
-- Status: green on deployed app baseline `fef6a10`. The Solidity-metadata pass is now committed, pushed, and deployed, so the live app includes the hidden-batch fix that strips Solidity CBOR metadata trailers before disassembly. Current public rechecks show `augurrisk.com` live on the current admission-control wording, `x402.jobs`, MoltMart, and Work402 on the new admission-control wording, `x402.org/ecosystem` refreshed to the new Augur copy, and 8004scan now refreshed as well. Verification is green: `python -m pytest -q` passed at `356`, `python auto/loop.py` passed at `52/52`, `git push origin master` succeeded, and `flyctl status --app augurrisk` now shows machine version `93` started with `1` passing health check on image `deployment-01KMZY1M26RA9Z4GS4RF6H1CCV`. The deploy quirk to remember from this session: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The next hidden-batch target is now clearer than the external checklist: the local selector / proxy-wrapper / metadata corpora are already saturated, so the next useful pressure should go at `deployer_reputation`, proxy `no_code` semantics, and a small `reentrancy` sanity slice. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: deployed production is still green on baseline `fef6a10`, and the local workspace is now ahead with uncommitted autoresearch + endpoint-hardening follow-ups. The live app still includes the committed Solidity-metadata pass, and current public rechecks still show `augurrisk.com` live on the admission-control wording plus refreshed external surfaces on `x402.jobs`, MoltMart, Work402, `x402.org/ecosystem`, and 8004scan. Local verification is green on the current workspace: `python -m pytest -q` passed at `363`, `python auto/loop.py` passed at `59/59`, and the latest endpoint-method/OpenAPI pass `python -m pytest tests/test_app.py -q` passed at `151`. The deploy quirk to remember from this session remains the same: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The next useful pressure is no longer selector churn; it is keeping the new hidden `analysis` holdouts and stricter `/analyze` input contract in place while returning to production/discovery proof such as the Coinbase public feed or a real paid `/analyze` smoke. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
+- Hardened `/analyze` method-contract behavior and docs locally on 2026-04-03:
+  - `src/risk_api/app.py` now skips address validation and x402 gating for methods outside the real `/analyze` contract, so Flask handles `OPTIONS` and unsupported methods normally instead of returning misleading `422` errors
+  - `/analyze` now responds with the default Flask `OPTIONS` behavior and returns `405 Method Not Allowed` for unsupported methods like `PUT`, `PATCH`, and `DELETE`
+  - the POST `422` OpenAPI examples now explicitly document conflicting query/body addresses, malformed JSON bodies, and non-object JSON bodies
+  - test coverage added in `tests/test_app.py` for:
+    - ungated `OPTIONS /analyze`
+    - unsupported-method `405` behavior with and without x402 enabled
+    - POST `422` OpenAPI body-error examples
+  - the fake x402 test gate in `tests/conftest.py` now mirrors the real method contract instead of intercepting unsupported methods
+  - verification passed:
+    - `python -m pytest tests/test_app.py -q` -> `151 passed`
+- Hardened `/analyze` input handling and endpoint resilience locally on 2026-03-30:
+  - `src/risk_api/app.py` now rejects malformed POST JSON bodies and conflicting `address` values between query params and JSON body before the x402 paywall instead of silently choosing one
+  - fixed request logging to keep recording only the resolved address after the parser signature change
+  - added app regressions in `tests/test_app.py` for:
+    - matching query/body POSTs still succeeding
+    - conflicting query/body POSTs returning `422`
+    - malformed JSON bodies returning `422`
+    - non-object JSON bodies returning `422`
+    - malformed JSON still returning `422` before x402 payment
+  - added `/stats` resilience coverage in `tests/test_logging.py` so malformed JSONL lines are ignored instead of breaking the endpoint
+  - extended the ignored local hidden holdout batch with two deployer-reputation partial-failure cases:
+    - age lookup fails but low-tx warning survives
+    - tx-count lookup fails but young-wallet warning survives
+  - verification passed:
+    - `python -m pytest tests/test_app.py tests/test_logging.py -q` -> `155 passed`
+    - `python auto/loop.py` -> `59/59`
+    - `python -m pytest -q` -> `363 passed`
+- Extended the local autoresearch harness on 2026-03-30 so hidden cases can run a fully mocked `analyze_contract()` pass instead of only pure bytecode/policy checks:
+  - `src/risk_api/auto_bench.py` now supports an `analysis` case kind with mocked RPC and Blockscout responses
+  - `auto/README.md` documents the new case kind for explorer-backed and proxy-runtime coverage
+  - `tests/test_auto_bench.py` now verifies the mocked analysis path
+  - local hidden batch added under ignored `auto/corpus/*.local.json` now pressures:
+    - `deployer_reputation` creator `NOT_FOUND`
+    - `deployer_reputation` fresh wallet + low tx count
+    - proxy implementation `NO_CODE`
+    - proxy `FETCH_FAILED` vs `NO_CODE` reason-code separation
+    - a `reentrancy` lookahead-boundary sanity case
+  - verification passed:
+    - `python -m pytest tests/test_auto_bench.py -q` -> `4 passed`
+    - `python auto/loop.py` -> `57/57`
+    - `python -m pytest -q` -> `357 passed`
 - Fixed the paid blue-chip false-positive path locally on 2026-03-29:
   - narrowed `detect_honeypot_patterns()` so ordinary dispatcher/default-`REVERT` flow no longer counts as a honeypot; the detector now only fires on blacklist-style transfer controls until a stronger transfer-path heuristic exists
   - changed `hidden_mint` from automatic `block` to `manual_review` when it is the main signal, so governed mint-capability tokens do not hard-block by default
@@ -545,9 +587,9 @@
 - `coinbase/x402` PR `#1515` is merged into `main`.
 - `coinbase/x402` follow-up PR `#1869` delivered the wording refresh that is now visible on `x402.org/ecosystem`.
 - Current execution priority:
-  - first: start the next hidden holdout batch by adding local cases for `deployer_reputation`, proxy `no_code`, and a small `reentrancy` slice
-  - second: run `python auto/loop.py` and only change implementation if that new batch exposes a reproducible failure
-  - third: after the hidden batch lands, return to the Coinbase public discovery feed check or paid `/analyze` smoke evidence
+  - first: keep the new local hidden batch in place and only change implementation if future `python auto/loop.py` runs expose a real disagreement in those `analysis` holdouts
+  - second: return to the Coinbase public discovery feed check or paid `/analyze` smoke evidence
+  - third: keep `x402list.fun` treated as external stale state unless the directory itself updates
 - OpenClaw looks relevant for agent-builder reach, but it should stay behind Base/x402-first distribution.
 - Treat `x402.org/ecosystem` and the CDP `discovery/resources` feed as separate surfaces; being live on the former does not imply the latter is queryable.
 - Existing upstream follow-up:
@@ -580,36 +622,37 @@
 3. Re-check the Coinbase public discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
 4. Keep `x402list.fun` classified as stale external state unless the directory itself updates.
 5. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
-6. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
-7. Revise the LLM discoverability artifacts on the next pass:
+7. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
+8. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
    - capture entity-resolution failures explicitly
    - fill missing rank/provenance fields in the filled CSV
-8. Use the LLM memo to tighten both category wording and entity disambiguation around `Augur Risk`, `augurrisk.com`, and Base-first deterministic contract gating before broader promotion.
-9. Do one real paid end-to-end MCP test with a wallet configured before any broader MCP push or npm patch release.
-10. Watch:
+9. Use the LLM memo to tighten both category wording and entity disambiguation around `Augur Risk`, `augurrisk.com`, and Base-first deterministic contract gating before broader promotion.
+10. Do one real paid end-to-end MCP test with a wallet configured before any broader MCP push or npm patch release.
+11. Watch:
    - `proof_report_view`
    - `top_referers`
    - `/how-payment-works` visits
    - unpaid `402` attempts
    - paid requests
-11. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
-12. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
-13. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
-14. Use real paid-call observations, not only `/stats`, to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
-15. In the next session, start a fresh hidden holdout discovery batch:
+12. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
+13. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
+14. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
+15. Use real paid-call observations, not only `/stats`, to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
+16. In the next session, start a fresh hidden holdout discovery batch:
    - use `python auto/loop.py` as the default runner
    - run one batch at a time; do not queue multiple hidden discovery batches before you know what the previous one changed
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
    - the most recent local additions already cover dispatcher/default-`REVERT`, mint-capability-only `manual_review`, clone-wrapper, and Solidity-metadata behavior
-   - next target families should be `deployer_reputation`, proxy `no_code`, and `reentrancy`, not more selector aliases unless a new real failure points back there
+   - the current local hidden batch now also covers `analysis`-path deployer `NOT_FOUND`, fresh/low-tx, partial explorer failures, proxy `NO_CODE`, proxy `FETCH_FAILED`, and a reentrancy lookahead boundary
+   - next target families should now move past that set unless a new real failure points back there
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
-16. Automation follow-up:
+17. Automation follow-up:
    - keep serial hidden-batch runs manual for now while the fixes are still shaping the research workflow
    - later, build a guarded local orchestrator that can run `N` serial batches end-to-end: hidden batch -> validation -> commit -> push -> deploy -> live verify -> next batch
    - first version should stay constrained to narrow selector/policy research surfaces and fail closed on ambiguous results
-15. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
+18. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
@@ -630,13 +673,14 @@
    - it did not overlap with the paid `/analyze` burst
    - if it happens again, consider a memory bump or more direct memory profiling
 4. The latest hidden discovery rerun is already green:
-   - `python auto/loop.py` passed at `52/52` on 2026-03-30
-   - `python -m pytest -q` passed at `356`
+   - `python auto/loop.py` passed at `59/59` on 2026-03-30
+   - `python -m pytest -q` passed at `363`
    - do not start a new hidden batch until you first add a new local candidate or holdout
-5. Next execution step is the new hidden batch:
-   - add local cases for `deployer_reputation`, proxy `no_code`, and `reentrancy`
-   - run `python auto/loop.py`
-   - only after that, return to the Coinbase public discovery feed and `x402list.fun`
+5. The endpoint method-contract follow-up is already landed locally:
+   - `/analyze` now leaves `OPTIONS` and unsupported methods to Flask instead of masking them with `422`
+   - POST `422` OpenAPI examples now explicitly cover conflicting query/body addresses plus malformed and non-object JSON bodies
+   - `python -m pytest tests/test_app.py -q` passed at `151`
+   - next step is the Coinbase public discovery feed and `x402list.fun`
 6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
    - x402.jobs

@@ -235,6 +235,36 @@ def test_analyze_head_with_address_returns_402(client_with_x402):
     assert resp.status_code == 402
 
 
+def test_analyze_options_returns_default_allow_header(client):
+    resp = client.open("/analyze", method="OPTIONS")
+
+    assert resp.status_code == 200
+    assert set(resp.headers["Allow"].split(", ")) == {"GET", "POST", "HEAD", "OPTIONS"}
+
+
+def test_analyze_options_not_behind_paywall(client_with_x402):
+    resp = client_with_x402.open("/analyze", method="OPTIONS")
+
+    assert resp.status_code == 200
+    assert set(resp.headers["Allow"].split(", ")) == {"GET", "POST", "HEAD", "OPTIONS"}
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+def test_analyze_unsupported_methods_return_405(client, method):
+    resp = client.open("/analyze", method=method)
+
+    assert resp.status_code == 405
+    assert set(resp.headers["Allow"].split(", ")) == {"GET", "POST", "HEAD", "OPTIONS"}
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+def test_analyze_unsupported_methods_stay_405_with_x402(client_with_x402, method):
+    resp = client_with_x402.open("/analyze", method=method)
+
+    assert resp.status_code == 405
+    assert set(resp.headers["Allow"].split(", ")) == {"GET", "POST", "HEAD", "OPTIONS"}
+
+
 def test_x402_returns_402_without_payment(client_with_x402):
     """With x402 middleware enabled, /analyze should return 402 without payment."""
     addr = "0x" + "ab" * 20
@@ -641,10 +671,76 @@ def test_analyze_post_with_query_param(client):
     assert data["decision"] == "allow"
 
 
+@responses.activate
+def test_analyze_post_with_matching_query_and_json_body(client):
+    """POST /analyze should accept matching query and JSON addresses."""
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": bytecode},
+    )
+    addr = "0x" + "ab" * 20
+    resp = client.post(f"/analyze?address={addr}", json={"address": addr})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["address"] == addr
+    assert data["decision"] == "allow"
+
+
+def test_analyze_post_rejects_conflicting_query_and_json_addresses(client):
+    query_addr = "0x" + "ab" * 20
+    body_addr = "0x" + "cd" * 20
+
+    resp = client.post(
+        f"/analyze?address={query_addr}",
+        json={"address": body_addr},
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Conflicting 'address' values in query parameter and JSON body"
+
+
+def test_analyze_post_rejects_malformed_json_body(client):
+    resp = client.post(
+        "/analyze",
+        data='{"address":',
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Malformed JSON body"
+
+
+def test_analyze_post_rejects_non_object_json_body(client):
+    resp = client.post(
+        "/analyze",
+        data='["0x4200000000000000000000000000000000000006"]',
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "JSON body must be an object containing 'address'"
+
+
 def test_analyze_post_missing_address(client):
     """POST /analyze with no address should return 422."""
     resp = client.post("/analyze", json={})
     assert resp.status_code == 422
+
+
+def test_analyze_post_malformed_json_returns_422_without_payment(client_with_x402):
+    resp = client_with_x402.post(
+        "/analyze",
+        data='{"address":',
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Malformed JSON body"
 
 
 def test_x402_post_returns_402_without_payment(client_with_x402):
@@ -1557,6 +1653,22 @@ def test_openapi_get_422_has_example(client):
     assert "error" in example
     examples = data["paths"]["/analyze"]["get"]["responses"]["422"]["content"]["application/json"]["examples"]
     assert "no_bytecode" in examples
+
+
+def test_openapi_post_422_has_body_error_examples(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    examples = data["paths"]["/analyze"]["post"]["responses"]["422"]["content"][
+        "application/json"
+    ]["examples"]
+
+    assert examples["conflicting_query_and_json_address"]["value"]["error"] == (
+        "Conflicting 'address' values in query parameter and JSON body"
+    )
+    assert examples["malformed_json_body"]["value"]["error"] == "Malformed JSON body"
+    assert examples["non_object_json_body"]["value"]["error"] == (
+        "JSON body must be an object containing 'address'"
+    )
 
 
 def test_openapi_post_200_has_example(client):

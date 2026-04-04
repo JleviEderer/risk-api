@@ -36,6 +36,7 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 # Routes that require x402 payment
 PROTECTED_ROUTES = {"/analyze"}
+ANALYZE_REQUEST_METHODS = {"GET", "POST", "HEAD"}
 
 SAFE_EXAMPLE_ADDRESS = "0x4200000000000000000000000000000000000006"
 PROXY_EXAMPLE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -156,14 +157,27 @@ def _render_machine_doc(template: str, base_url: str) -> str:
     )
 
 
-def _extract_requested_address() -> str:
+def _extract_requested_address() -> tuple[str, str | None]:
     """Read the requested address from query params or JSON body."""
-    address = request.args.get("address", "").strip()
-    if not address and request.is_json:
-        body = request.get_json(silent=True)
-        if body and isinstance(body, dict):
-            address = str(body.get("address", "")).strip()
-    return address
+    query_address = request.args.get("address", "").strip()
+    if request.method != "POST" or not request.is_json:
+        return query_address, None
+
+    body = request.get_json(silent=True)
+    if body is None:
+        raw_body = request.get_data(cache=True, as_text=True)
+        if raw_body.strip():
+            return "", "Malformed JSON body"
+        return query_address, None
+
+    if not isinstance(body, dict):
+        return "", "JSON body must be an object containing 'address'"
+
+    body_address = str(body.get("address", "")).strip()
+    if query_address and body_address and query_address != body_address:
+        return "", "Conflicting 'address' values in query parameter and JSON body"
+
+    return query_address or body_address, None
 
 
 def _bytecode_size(bytecode_hex: str) -> int:
@@ -419,6 +433,27 @@ OPENAPI_SPEC: dict[str, object] = {
                                         "value": {
                                             "error": _no_bytecode_error(
                                                 SAFE_EXAMPLE_ADDRESS
+                                            ),
+                                        },
+                                    },
+                                    "conflicting_query_and_json_address": {
+                                        "value": {
+                                            "error": (
+                                                "Conflicting 'address' values in "
+                                                "query parameter and JSON body"
+                                            ),
+                                        },
+                                    },
+                                    "malformed_json_body": {
+                                        "value": {
+                                            "error": "Malformed JSON body",
+                                        },
+                                    },
+                                    "non_object_json_body": {
+                                        "value": {
+                                            "error": (
+                                                "JSON body must be an object "
+                                                "containing 'address'"
                                             ),
                                         },
                                     },
@@ -2384,6 +2419,8 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
     def x402_payment_gate():
         if request.path not in PROTECTED_ROUTES:
             return None
+        if request.method not in ANALYZE_REQUEST_METHODS:
+            return None
 
         # HEAD should be gated same as GET for payment purposes;
         # x402 SDK only registers GET/POST routes.
@@ -2519,7 +2556,7 @@ def _setup_request_logging(app: Flask) -> None:
             entry["funnel_stage"] = funnel_stage
 
         if request.path == "/analyze":
-            entry["address"] = _extract_requested_address()
+            entry["address"] = _extract_requested_address()[0]
             error_type = request.environ.get("analyze_error_type")
             if isinstance(error_type, str) and error_type:
                 entry["error_type"] = error_type
@@ -2588,8 +2625,19 @@ def create_app(
         """Reject malformed /analyze requests before the x402 paywall."""
         if request.path != "/analyze":
             return None
+        if request.method not in ANALYZE_REQUEST_METHODS:
+            return None
 
-        address = _extract_requested_address()
+        address, address_error = _extract_requested_address()
+
+        if address_error is not None:
+            request.environ["funnel_stage"] = "invalid_address"
+            request.environ["analyze_error_type"] = (
+                "conflicting_address"
+                if "Conflicting" in address_error
+                else "invalid_json_body"
+            )
+            return jsonify({"error": address_error}), 422
 
         if not address:
             request.environ["funnel_stage"] = "invalid_address"
