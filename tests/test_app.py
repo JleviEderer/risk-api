@@ -301,6 +301,9 @@ def test_x402_402_response_has_bazaar_extension(client_with_x402):
     input_schema = schema.get("properties", {}).get("input", {})
     query_schema = input_schema.get("properties", {}).get("queryParams", {})
     assert "address" in query_schema.get("properties", {}), "Missing address in schema"
+    assert "action" in query_schema.get("properties", {}), "Missing action in schema"
+    assert "spender" in query_schema.get("properties", {}), "Missing spender in schema"
+    assert "chain" in query_schema.get("properties", {}), "Missing chain in schema"
 
     # Check output example is present
     output_data = info.get("output", {})
@@ -338,6 +341,9 @@ def test_x402_402_post_has_bazaar_body_extension(client_with_x402):
     input_schema = schema.get("properties", {}).get("input", {})
     body_schema = input_schema.get("properties", {}).get("body", {})
     assert "address" in body_schema.get("properties", {}), "Missing address in body schema"
+    assert "action" in body_schema.get("properties", {}), "Missing action in body schema"
+    assert "spender" in body_schema.get("properties", {}), "Missing spender in body schema"
+    assert "chain" in body_schema.get("properties", {}), "Missing chain in body schema"
 
 
 def test_x402_health_not_gated(client_with_x402):
@@ -723,6 +729,136 @@ def test_analyze_post_rejects_non_object_json_body(client):
     assert resp.status_code == 422
     data = resp.get_json()
     assert data["error"] == "JSON body must be an object containing 'address'"
+
+
+@responses.activate
+def test_analyze_get_with_approve_action_returns_action_evaluation(client):
+    bytecode = "0x" + "6080604052" + "00" * 200
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": bytecode},
+    )
+
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    resp = client.get(
+        f"/analyze?address={addr}&action=approve&spender={spender}&chain=base"
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["decision"] == "allow"
+    assert data["action_context"] == {
+        "action": "approve",
+        "spender": spender,
+        "chain": "base",
+    }
+    assert data["action_evaluation"]["decision"] == "warn"
+    assert data["action_evaluation"]["recommended_policy"]["action"] == "warn"
+    assert "action_approve_requested" in data["action_evaluation"][
+        "recommended_policy"
+    ]["reason_codes"]
+
+
+@responses.activate
+def test_analyze_warn_contract_with_approve_action_escalates_to_manual_review(client):
+    bytecode = "0x63f34eb0b8" + "00" * 200
+    responses.post(
+        RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "result": bytecode},
+    )
+
+    addr = "0x" + "f4" * 20
+    spender = "0x" + "34" * 20
+    resp = client.get(f"/analyze?address={addr}&action=approve&spender={spender}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["decision"] == "warn"
+    assert data["action_evaluation"]["decision"] == "manual_review"
+    assert "fee_manipulation_signal" in data["action_evaluation"][
+        "recommended_policy"
+    ]["reason_codes"]
+    assert "action_approve_requested" in data["action_evaluation"][
+        "recommended_policy"
+    ]["reason_codes"]
+
+
+def test_analyze_rejects_unsupported_action_before_payment(client_with_x402):
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.get(f"/analyze?address={addr}&action=swap")
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Unsupported action: swap. Only 'approve' is currently supported."
+
+
+def test_analyze_rejects_unsupported_chain_before_payment(client_with_x402):
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.get(f"/analyze?address={addr}&action=approve&chain=ethereum")
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Unsupported chain: ethereum. Only 'base' is currently supported."
+
+
+def test_analyze_rejects_missing_spender_for_approve_before_payment(client_with_x402):
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.get(f"/analyze?address={addr}&action=approve")
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Missing 'spender' for action 'approve'"
+
+
+def test_analyze_rejects_invalid_spender_for_approve_before_payment(client_with_x402):
+    addr = "0x" + "ab" * 20
+    resp = client_with_x402.get(
+        f"/analyze?address={addr}&action=approve&spender=0x1234"
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Invalid Ethereum address: 0x1234"
+
+
+def test_analyze_rejects_spender_without_action_before_payment(client_with_x402):
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    resp = client_with_x402.get(f"/analyze?address={addr}&spender={spender}")
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Field 'spender' requires 'action'"
+
+
+def test_analyze_post_rejects_conflicting_action_between_query_and_json_body(client):
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+
+    resp = client.post(
+        f"/analyze?address={addr}&action=approve&spender={spender}",
+        json={"address": addr, "action": "swap", "spender": spender},
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Conflicting 'action' values in query parameter and JSON body"
+
+
+def test_analyze_post_rejects_conflicting_spender_between_query_and_json_body(client):
+    addr = "0x" + "ab" * 20
+    query_spender = "0x" + "12" * 20
+    body_spender = "0x" + "34" * 20
+
+    resp = client.post(
+        f"/analyze?address={addr}&action=approve&spender={query_spender}",
+        json={"address": addr, "action": "approve", "spender": body_spender},
+    )
+
+    assert resp.status_code == 422
+    data = resp.get_json()
+    assert data["error"] == "Conflicting 'spender' values in query parameter and JSON body"
 
 
 def test_analyze_post_missing_address(client):
@@ -1669,6 +1805,24 @@ def test_openapi_post_422_has_body_error_examples(client):
     assert examples["non_object_json_body"]["value"]["error"] == (
         "JSON body must be an object containing 'address'"
     )
+    assert examples["unsupported_action"]["value"]["error"] == (
+        "Unsupported action: swap. Only 'approve' is currently supported."
+    )
+    assert examples["missing_spender"]["value"]["error"] == (
+        "Missing 'spender' for action 'approve'"
+    )
+    assert examples["invalid_spender"]["value"]["error"] == (
+        "Invalid Ethereum address: 0x1234"
+    )
+    assert examples["unsupported_chain"]["value"]["error"] == (
+        "Unsupported chain: ethereum. Only 'base' is currently supported."
+    )
+    assert examples["conflicting_action"]["value"]["error"] == (
+        "Conflicting 'action' values in query parameter and JSON body"
+    )
+    assert examples["conflicting_spender"]["value"]["error"] == (
+        "Conflicting 'spender' values in query parameter and JSON body"
+    )
 
 
 def test_openapi_post_200_has_example(client):
@@ -1677,6 +1831,37 @@ def test_openapi_post_200_has_example(client):
     example = data["paths"]["/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]
     assert example["score"] == 0
     assert example["level"] == "safe"
+
+
+def test_openapi_get_supports_action_aware_query_parameters(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    parameters = data["paths"]["/analyze"]["get"]["parameters"]
+    names = {parameter["name"] for parameter in parameters}
+
+    assert {"address", "action", "spender", "chain"}.issubset(names)
+
+
+def test_openapi_get_200_has_approve_action_example(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    examples = data["paths"]["/analyze"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["examples"]
+
+    assert examples["approve_action"]["value"]["action_context"]["action"] == "approve"
+    assert examples["approve_action"]["value"]["action_evaluation"]["decision"] == "warn"
+
+
+def test_openapi_schemas_include_action_evaluation(client):
+    resp = client.get("/openapi.json")
+    data = resp.get_json()
+    schemas = data["components"]["schemas"]
+
+    assert "ActionContext" in schemas
+    assert "ActionEvaluation" in schemas
+    assert "action_context" in schemas["AnalysisResult"]["properties"]
+    assert "action_evaluation" in schemas["AnalysisResult"]["properties"]
 
 
 def test_openapi_schemas_have_descriptions(client):
@@ -1698,6 +1883,7 @@ def test_openapi_schemas_have_descriptions(client):
     assert "raw_delegatecall_surface" in schemas["PolicyReasonCode"]["enum"]
     assert "proxy_logic_no_code" in schemas["PolicyReasonCode"]["enum"]
     assert "proxy_logic_nested_proxy" in schemas["PolicyReasonCode"]["enum"]
+    assert "action_approve_requested" in schemas["PolicyReasonCode"]["enum"]
 
 
 # --- FAQPage structured data tests ---

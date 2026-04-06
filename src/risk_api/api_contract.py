@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from risk_api.analysis.action_policy import ActionContext, ActionEvaluation
 from risk_api.analysis.engine import AnalysisResult, ImplementationResult
 from risk_api.analysis.patterns import Finding, Severity
 from risk_api.analysis.policy import (
@@ -15,18 +16,19 @@ from risk_api.analysis.policy import (
 from risk_api.analysis.scoring import RiskLevel
 
 
-def serialize_analysis_result(result: AnalysisResult) -> dict[str, object]:
+def serialize_analysis_result(
+    result: AnalysisResult,
+    *,
+    action_context: ActionContext | None = None,
+    action_evaluation: ActionEvaluation | None = None,
+) -> dict[str, object]:
     """Serialize an analysis result into the public wire shape."""
     response_data: dict[str, object] = {
         "address": result.address,
         "score": result.score,
         "level": result.level.value,
         "decision": result.decision.value,
-        "recommended_policy": {
-            "action": result.recommended_policy.action.value,
-            "summary": result.recommended_policy.summary,
-            "reason_codes": result.recommended_policy.reason_codes,
-        },
+        "recommended_policy": _serialize_policy(result.recommended_policy),
         "bytecode_size": result.bytecode_size,
         "findings": [_serialize_finding(finding) for finding in result.findings],
         "category_scores": result.category_scores,
@@ -34,6 +36,21 @@ def serialize_analysis_result(result: AnalysisResult) -> dict[str, object]:
 
     if result.implementation is not None:
         response_data["implementation"] = _serialize_implementation(result.implementation)
+
+    if action_context is not None:
+        response_data["action_context"] = {
+            "action": action_context.action.value,
+            "spender": action_context.spender,
+            "chain": action_context.chain,
+        }
+
+    if action_evaluation is not None:
+        response_data["action_evaluation"] = {
+            "decision": action_evaluation.decision.value,
+            "recommended_policy": _serialize_policy(
+                action_evaluation.recommended_policy
+            ),
+        }
 
     return response_data
 
@@ -108,6 +125,14 @@ def _serialize_implementation(implementation: ImplementationResult) -> dict[str,
         "bytecode_size": implementation.bytecode_size,
         "findings": [_serialize_finding(finding) for finding in implementation.findings],
         "category_scores": implementation.category_scores,
+    }
+
+
+def _serialize_policy(policy: PolicyResult) -> dict[str, object]:
+    return {
+        "action": policy.action.value,
+        "summary": policy.summary,
+        "reason_codes": policy.reason_codes,
     }
 
 

@@ -35,6 +35,21 @@ _ADDRESS_SCHEMA = {
             "pattern": "^0x[0-9a-fA-F]{40}$",
             "description": "EVM contract address (0x-prefixed, 40 hex chars)",
         },
+        "action": {
+            "type": "string",
+            "enum": ["approve"],
+            "description": "Optional action-aware policy context.",
+        },
+        "spender": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "Optional spender address for action-aware context.",
+        },
+        "chain": {
+            "type": "string",
+            "enum": ["base"],
+            "description": "Optional chain context for action-aware policy.",
+        },
     },
     "required": ["address"],
 }

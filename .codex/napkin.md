@@ -37,25 +37,27 @@
 ## Growth
 1. **[2026-03-10] Use the live proof report as the first outreach artifact**
    Do instead: point early traffic to `https://augurrisk.com/reports/base-bluechip-bytecode-snapshot` before building more proof pages.
-2. **[2026-03-19] Finish the turn from contract scoring to action-aware admission control**
+2. **[2026-04-06] Keep action-aware V1 narrow and additive**
+   Do instead: for the first action-aware pass, support only `approve`, keep the contract engine and top-level `decision` unchanged, add `action_context` plus `action_evaluation` alongside the existing policy, and avoid claiming protocol-target validation or simulation until there is a real trusted source of truth.
+3. **[2026-03-19] Finish the turn from contract scoring to action-aware admission control**
    Do instead: keep Augur as `Base contract admission control for agents`, but treat the current `decision` / `recommended_policy` layer as v1; move next toward action-aware pre-transaction gates for `buy`, `approve`, `route`, `bridge`, or `pay` decisions, and do not respond by building a wallet product.
-3. **[2026-03-19] Public copy should now lead with admission control, not scoring**
+4. **[2026-03-19] Public copy should now lead with admission control, not scoring**
    Do instead: use `Deterministic Base contract admission control for agents` or `pre-transaction contract admission control for agents on Base` as the lead framing on current public surfaces; keep the 0-100 score as supporting output, not the headline.
-4. **[2026-03-19] Explain the trigger moment in action terms**
+5. **[2026-03-19] Explain the trigger moment in action terms**
    Do instead: pair the headline with a concrete sentence like `Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts`, and keep one compact use-case block on human-facing surfaces.
-5. **[2026-03-19] Agent-native services only win if delegation beats self-computation**
+6. **[2026-03-19] Agent-native services only win if delegation beats self-computation**
    Do instead: when choosing roadmap work, prefer changes that make Augur more obviously worth calling than rebuilding in-agent: faster response, clearer policy output, stronger reliability, better edge-case coverage, and more machine-readable trust surfaces; publish concrete trust signals like uptime history, latency percentiles, and accuracy evidence, and return confidence metadata when uncertainty is real.
-6. **[2026-03-20] Keep action-aware expansion narrow and recipient-aware**
+7. **[2026-03-20] Keep action-aware expansion narrow and recipient-aware**
    Do instead: if Augur moves beyond raw contract screening, extend it as destination-aware preflight for concrete actions like `deposit`, `approve`, `route`, or `pay`; validate claimed protocol + chain + recipient consistency, but do not drift into a generic phishing browser, wallet shield, or broad anti-scam suite.
-7. **[2026-03-29] Keep the policy layer thin and explicit**
+8. **[2026-03-29] Keep the policy layer thin and explicit**
    Do instead: keep `allow` for clean `safe` outputs only, `warn` for residual non-blocking signals, `manual_review` for unresolved proxy/raw `DELEGATECALL`/`SELFDESTRUCT`/mint-capability-only cases, and `block` for honeypot or genuinely high-risk combinations rather than drifting into a complex custom policy engine.
-8. **[2026-03-29] Managed upgradeable assets should escalate, not auto-block, on admin surfaces alone**
+9. **[2026-03-29] Managed upgradeable assets should escalate, not auto-block, on admin surfaces alone**
    Do instead: when a proxy-managed asset scores high because of upgradeability, mint/admin-control surface, delegatecall, and suspicious-selector signals, but not honeypot/selfdestruct/fee-manipulation-style hard stops, default to `manual_review` with an issuer-aware override summary instead of a flat `block`.
-9. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
+10. **[2026-03-16] Do not let raw `DELEGATECALL` hide inside the `safe` bucket**
    Do instead: if a contract has high-severity non-proxy `delegatecall`, force at least `manual_review` in policy even when the numeric score is only `15`.
-10. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
+11. **[2026-03-16] Use the new `auto/` harness for detector research, not free-form agent edits**
    Do instead: put reproducible cases in `auto/corpus/public_cases.json` or local `*.local.json` files, run `python auto/bench.py`, and only change implementation after the failure is locked into the corpus or pytest.
-11. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
+12. **[2026-03-16] Keep the tracked autoresearch corpus intentionally small**
    Do instead: use `auto/corpus/public_cases.json` for durable regressions, but keep the real search pressure in hidden `auto/corpus/*.local.json` holdouts and `auto/candidates/*.local.json` discoveries so the loop cannot simply memorize the public cases.
 
 ## Distribution

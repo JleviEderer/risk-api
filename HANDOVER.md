@@ -1,14 +1,49 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-04-03
+- Date: 2026-04-06
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
 - Repo code baseline: `fef6a10`
 - Deployed app baseline: `fef6a10`
-- Status: deployed production is still green on baseline `fef6a10`, and the local workspace is now ahead with uncommitted autoresearch + endpoint-hardening follow-ups. The live app still includes the committed Solidity-metadata pass, and current public rechecks still show `augurrisk.com` live on the admission-control wording plus refreshed external surfaces on `x402.jobs`, MoltMart, Work402, `x402.org/ecosystem`, and 8004scan. Local verification is green on the current workspace: `python -m pytest -q` passed at `363`, `python auto/loop.py` passed at `59/59`, and the latest endpoint-method/OpenAPI pass `python -m pytest tests/test_app.py -q` passed at `151`. The deploy quirk to remember from this session remains the same: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The next useful pressure is no longer selector churn; it is keeping the new hidden `analysis` holdouts and stricter `/analyze` input contract in place while returning to production/discovery proof such as the Coinbase public feed or a real paid `/analyze` smoke. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Status: deployed production is still green on baseline `fef6a10`, and the local workspace is now ahead with uncommitted autoresearch plus the first narrow action-aware admission-control pass. The live app still includes the committed Solidity-metadata pass, and current public rechecks still show `augurrisk.com` live on the admission-control wording plus refreshed external surfaces on `x402.jobs`, MoltMart, Work402, `x402.org/ecosystem`, and 8004scan. Local verification is green on the current workspace: `python -m pytest -q` passed at `387`, `python auto/loop.py` passed at `59/59`, and the latest app/OpenAPI pass `python -m pytest tests/test_app.py -q` passed at `163`. The new action-aware `approve` path is local only and has not been deployed yet. The deploy quirk to remember from this session remains the same: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The next useful pressure is no longer selector churn; it is deciding whether to ship the new local action-aware `approve` layer after any remaining machine-doc / duplicated-metadata alignment, while keeping the hidden `analysis` holdouts in place. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 
 ## What Changed
+- Implemented a narrow action-aware admission-control V1 locally on 2026-04-06:
+  - `GET` and `POST /analyze` now accept optional action context fields:
+    - `action`
+    - `spender`
+    - `chain`
+  - V1 is intentionally narrow:
+    - only `action=approve` is accepted
+    - only `chain=base` is accepted when `chain` is supplied
+    - `spender` is required for `approve`
+    - unsupported action values, unsupported chain values, missing spender, malformed spender, and query/body conflicts on the new fields all return `422` before the x402 paywall
+  - the contract-level `decision` and `recommended_policy` remain unchanged when no action context is provided
+  - valid action context now adds:
+    - `action_context`
+    - `action_evaluation`
+  - `action_evaluation` is additive rather than replacing the core contract engine:
+    - clean `allow` contracts escalate to action-level `warn` for `approve`
+    - contract-level `warn` escalates to action-level `manual_review`
+    - `manual_review` and `block` remain at least as severe
+    - new reason code: `action_approve_requested`
+  - implementation shape:
+    - new module `src/risk_api/analysis/action_policy.py`
+    - shared request-field parser / validator in `src/risk_api/app.py`
+    - additive wire serialization in `src/risk_api/api_contract.py`
+    - OpenAPI and Bazaar discovery schemas now expose the optional action-aware fields and response objects
+  - coverage added in:
+    - `tests/test_action_policy.py`
+    - `tests/test_app.py`
+    - `tests/conftest.py` fake Bazaar schema updated to match the new input contract
+  - verification passed:
+    - `python -m pytest tests/test_action_policy.py tests/test_app.py -k "approve or spender or action_evaluation or action_aware or unsupported_action or unsupported_chain or action_context or bazaar or openapi" -q` -> `26 passed`
+    - `python -m pytest tests/test_app.py -q` -> `163 passed`
+    - `python -m pytest -q` -> `387 passed`
+  - important shipping caveat:
+    - this API change is local only right now
+    - if the action-aware layer is going to ship publicly, the duplicated machine/discovery metadata outside `src/risk_api/app.py` should be reviewed for alignment before deploy
 - Hardened `/analyze` method-contract behavior and docs locally on 2026-04-03:
   - `src/risk_api/app.py` now skips address validation and x402 gating for methods outside the real `/analyze` contract, so Flask handles `OPTIONS` and unsupported methods normally instead of returning misleading `422` errors
   - `/analyze` now responds with the default Flask `OPTIONS` behavior and returns `405 Method Not Allowed` for unsupported methods like `PUT`, `PATCH`, and `DELETE`
@@ -20,6 +55,28 @@
   - the fake x402 test gate in `tests/conftest.py` now mirrors the real method contract instead of intercepting unsupported methods
   - verification passed:
     - `python -m pytest tests/test_app.py -q` -> `151 passed`
+- Confirmed a real paid production smoke test on 2026-04-03 using the Conway wallet against the live deployed agent wallet:
+  - command path used the existing local flow from `scripts/test_x402_client.py`
+  - payer wallet: `0x79301Cf19Aaea29fbe40F0F5B78F73e2c3b0a2b8`
+  - payee / agent wallet: `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891`
+  - target endpoint: `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`
+  - observed flow: `402 -> signed PAYMENT-SIGNATURE -> 200`
+  - live result:
+    - `decision`: `allow`
+    - `score`: `0`
+    - `level`: `safe`
+    - `findings`: `0`
+  - practical read:
+    - the x402 payment path is currently working end to end on production
+    - the current live policy for Base WETH now returns the clean result, not the older deployer-reputation warning result captured in older notes
+- Re-checked the Coinbase public discovery feed on 2026-04-03 local time (`2026-04-04T04:06:55Z` script timestamp) after the successful paid smoke:
+  - command: `python scripts/check_cdp_discovery.py --max-pages 5 --limit 100 --page-delay 0.75 --max-retries 4 --retry-delay 5`
+  - result: `status=NOT_FOUND`
+  - coverage scanned: `5` pages / `500` items
+  - keyword matches: `0`
+  - practical read:
+    - successful paid settlement plus correct live x402 metadata still do not imply public-feed visibility
+    - this remains CDP feed/indexing or support-escalation territory, not a repo/runtime bug
 - Hardened `/analyze` input handling and endpoint resilience locally on 2026-03-30:
   - `src/risk_api/app.py` now rejects malformed POST JSON bodies and conflicting `address` values between query params and JSON body before the x402 paywall instead of silently choosing one
   - fixed request logging to keep recording only the resolved address after the parser signature change
@@ -619,9 +676,11 @@
    - proxy `no_code` vs `fetch_failed` semantics
    - one or two `reentrancy` edge cases
 2. Run `python auto/loop.py` and only change implementation if those new cases fail reproducibly.
-3. Re-check the Coinbase public discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
+3. Escalate the Coinbase/CDP public discovery-feed gap with the current evidence set:
+   - real paid production smoke succeeded on 2026-04-03
+   - public feed recheck on 2026-04-03 local time still returned `NOT_FOUND` over the first `5` pages / `500` items
 4. Keep `x402list.fun` classified as stale external state unless the directory itself updates.
-5. Do one real paid `/analyze` smoke test to confirm the payment flow and output quality end to end from the current deployed baseline.
+5. If you want stronger evidence before support escalation, do a broader but rate-limited feed scan beyond the first `500` items.
 7. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
 8. Revise the LLM discoverability artifacts on the next pass:
    - separate clean runs from contaminated runs
@@ -635,7 +694,7 @@
    - `/how-payment-works` visits
    - unpaid `402` attempts
    - paid requests
-12. Re-check CDP discovery feed visibility without tripping `429`, or escalate to Coinbase/CDP support with the successful-settlement evidence.
+12. If CDP support is not contacted yet, use the 2026-04-03 paid-smoke success plus the current `NOT_FOUND` public-feed scan as the escalation packet.
 13. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
 14. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
 15. Use real paid-call observations, not only `/stats`, to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
@@ -680,7 +739,7 @@
    - `/analyze` now leaves `OPTIONS` and unsupported methods to Flask instead of masking them with `422`
    - POST `422` OpenAPI examples now explicitly cover conflicting query/body addresses plus malformed and non-object JSON bodies
    - `python -m pytest tests/test_app.py -q` passed at `151`
-   - next step is the Coinbase public discovery feed and `x402list.fun`
+   - next step is Coinbase/CDP support escalation or a broader rate-limited public-feed scan, then `x402list.fun`
 6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
    - x402.jobs
@@ -689,9 +748,10 @@
    - x402.org/ecosystem
    - Coinbase public discovery feed
    - x402list.fun as an external stale-state check
-8. Optional runtime proof if desired:
-   - do one real paid `/analyze` smoke check after the next fix to confirm both payment flow and output quality end to end
-   - this is useful evidence, but not a blocker for normal next work
+8. Runtime proof is now present from 2026-04-03:
+   - a real paid `/analyze` smoke succeeded from the Conway wallet to the live agent wallet
+   - Base WETH returned `allow` / `0` / `safe` with `0` findings
+   - use that success when reasoning about CDP/discovery visibility versus app-route health
 9. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
 10. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
    - use `python auto/loop.py`

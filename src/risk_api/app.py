@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import logging
 import re
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from flask import Flask, Response, current_app, jsonify, redirect, request
 
 from risk_api.api_contract import normalize_analysis_snapshot, serialize_analysis_result
+from risk_api.analysis.action_policy import (
+    ActionContext,
+    AnalyzeAction,
+    derive_action_evaluation,
+)
 from risk_api.analytics import (
     append_sqlite_entry,
     build_stats_payload,
@@ -43,6 +49,13 @@ PROXY_EXAMPLE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 PROXY_IMPLEMENTATION_EXAMPLE_ADDRESS = "0x2cE6409Bc2Ff3E36834E44e15bbE83e4aD02d779"
 NO_BYTECODE_ERROR_TEMPLATE = "No contract bytecode found at Base address: {address}"
 BASE_ADDRESS_DESCRIPTION = "Base mainnet contract address (0x-prefixed, 40 hex chars)"
+SPENDER_ADDRESS_DESCRIPTION = (
+    "Base mainnet spender address for approve action context "
+    "(0x-prefixed, 40 hex chars)"
+)
+ANALYZE_REQUEST_FIELD_NAMES = ("address", "action", "spender", "chain")
+BASE_CHAIN_NAME = "base"
+APPROVE_EXAMPLE_SPENDER = "0x1111111111111111111111111111111111111111"
 
 
 def _policy_example(
@@ -52,6 +65,40 @@ def _policy_example(
         "action": action,
         "summary": summary,
         "reason_codes": reason_codes,
+    }
+
+
+def _analyze_input_properties() -> dict[str, object]:
+    return {
+        "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": BASE_ADDRESS_DESCRIPTION,
+        },
+        "action": {
+            "type": "string",
+            "enum": [AnalyzeAction.APPROVE.value],
+            "description": (
+                "Optional action-aware policy context. V1 currently supports "
+                "only 'approve'."
+            ),
+        },
+        "spender": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": (
+                "Required when action='approve'. Spender address the agent "
+                "plans to authorize."
+            ),
+        },
+        "chain": {
+            "type": "string",
+            "enum": [BASE_CHAIN_NAME],
+            "description": (
+                "Optional action-aware chain context. Only 'base' is currently "
+                "supported."
+            ),
+        },
     }
 
 
@@ -145,6 +192,24 @@ PROXY_ANALYSIS_EXAMPLE = normalize_analysis_snapshot({
     "proxy_resolution_status": "resolved",
 })
 
+APPROVE_ACTION_ANALYSIS_EXAMPLE = deepcopy(SAFE_ANALYSIS_EXAMPLE)
+APPROVE_ACTION_ANALYSIS_EXAMPLE["action_context"] = {
+    "action": AnalyzeAction.APPROVE.value,
+    "spender": APPROVE_EXAMPLE_SPENDER,
+    "chain": BASE_CHAIN_NAME,
+}
+APPROVE_ACTION_ANALYSIS_EXAMPLE["action_evaluation"] = {
+    "decision": "warn",
+    "recommended_policy": _policy_example(
+        "warn",
+        (
+            "Allow with caution only if this workflow explicitly expects the "
+            "approval. Keep the spender on an allowlist and the approval scope narrow."
+        ),
+        [PolicyReasonCode.ACTION_APPROVE_REQUESTED.value],
+    ),
+}
+
 SAFE_ANALYSIS_EXAMPLE_JSON = json.dumps(SAFE_ANALYSIS_EXAMPLE, indent=2)
 PROXY_ANALYSIS_EXAMPLE_JSON = json.dumps(PROXY_ANALYSIS_EXAMPLE, indent=2)
 
@@ -157,27 +222,96 @@ def _render_machine_doc(template: str, base_url: str) -> str:
     )
 
 
-def _extract_requested_address() -> tuple[str, str | None]:
-    """Read the requested address from query params or JSON body."""
-    query_address = request.args.get("address", "").strip()
+def _extract_analyze_request_fields() -> tuple[dict[str, str], str | None]:
+    """Read supported analyze fields from query params or JSON body."""
+    query_fields = {
+        field: request.args.get(field, "").strip()
+        for field in ANALYZE_REQUEST_FIELD_NAMES
+    }
     if request.method != "POST" or not request.is_json:
-        return query_address, None
+        return query_fields, None
 
     body = request.get_json(silent=True)
     if body is None:
         raw_body = request.get_data(cache=True, as_text=True)
         if raw_body.strip():
-            return "", "Malformed JSON body"
-        return query_address, None
+            return {}, "Malformed JSON body"
+        return query_fields, None
 
     if not isinstance(body, dict):
-        return "", "JSON body must be an object containing 'address'"
+        return {}, "JSON body must be an object containing 'address'"
 
-    body_address = str(body.get("address", "")).strip()
-    if query_address and body_address and query_address != body_address:
-        return "", "Conflicting 'address' values in query parameter and JSON body"
+    body_fields = {
+        field: str(body.get(field, "") or "").strip()
+        for field in ANALYZE_REQUEST_FIELD_NAMES
+    }
+    for field in ANALYZE_REQUEST_FIELD_NAMES:
+        if (
+            query_fields[field]
+            and body_fields[field]
+            and query_fields[field] != body_fields[field]
+        ):
+            return (
+                {},
+                f"Conflicting '{field}' values in query parameter and JSON body",
+            )
 
-    return query_address or body_address, None
+    return {
+        field: query_fields[field] or body_fields[field]
+        for field in ANALYZE_REQUEST_FIELD_NAMES
+    }, None
+
+
+def _extract_requested_address() -> tuple[str, str | None]:
+    fields, error = _extract_analyze_request_fields()
+    if error is not None:
+        return "", error
+    return fields.get("address", ""), None
+
+
+def _validate_action_context(
+    fields: Mapping[str, str],
+) -> tuple[ActionContext | None, str | None, str | None]:
+    action = fields.get("action", "")
+    spender = fields.get("spender", "")
+    chain = fields.get("chain", "")
+
+    if not action:
+        if spender:
+            return None, "missing_action", "Field 'spender' requires 'action'"
+        if chain:
+            return None, "missing_action", "Field 'chain' requires 'action'"
+        return None, None, None
+
+    if action != AnalyzeAction.APPROVE.value:
+        return (
+            None,
+            "unsupported_action",
+            f"Unsupported action: {action}. Only 'approve' is currently supported.",
+        )
+
+    if chain and chain != BASE_CHAIN_NAME:
+        return (
+            None,
+            "unsupported_chain",
+            f"Unsupported chain: {chain}. Only '{BASE_CHAIN_NAME}' is currently supported.",
+        )
+
+    if not spender:
+        return None, "missing_spender", "Missing 'spender' for action 'approve'"
+
+    if not ADDRESS_RE.match(spender):
+        return None, "invalid_spender", f"Invalid Ethereum address: {spender}"
+
+    return (
+        ActionContext(
+            action=AnalyzeAction.APPROVE,
+            spender=spender,
+            chain=chain or BASE_CHAIN_NAME,
+        ),
+        None,
+        None,
+    )
 
 
 def _bytecode_size(bytecode_hex: str) -> int:
@@ -284,7 +418,43 @@ OPENAPI_SPEC: dict[str, object] = {
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
                         "description": BASE_ADDRESS_DESCRIPTION,
-                    }
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "enum": [AnalyzeAction.APPROVE.value],
+                        },
+                        "description": (
+                            "Optional action-aware policy context. Only 'approve' "
+                            "is currently supported."
+                        ),
+                    },
+                    {
+                        "name": "spender",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$",
+                        },
+                        "description": SPENDER_ADDRESS_DESCRIPTION,
+                    },
+                    {
+                        "name": "chain",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "enum": [BASE_CHAIN_NAME],
+                        },
+                        "description": (
+                            "Optional action-aware chain context. Only 'base' is "
+                            "currently supported."
+                        ),
+                    },
                 ],
                 "responses": {
                     "200": {
@@ -304,6 +474,12 @@ OPENAPI_SPEC: dict[str, object] = {
                                             "Proxy contract - resolved implementation requires manual review"
                                         ),
                                         "value": PROXY_ANALYSIS_EXAMPLE,
+                                    },
+                                    "approve_action": {
+                                        "summary": (
+                                            "Approve action context adds an action-level review"
+                                        ),
+                                        "value": APPROVE_ACTION_ANALYSIS_EXAMPLE,
                                     },
                                 },
                             }
@@ -337,6 +513,37 @@ OPENAPI_SPEC: dict[str, object] = {
                                         "value": {
                                             "error": _no_bytecode_error(
                                                 SAFE_EXAMPLE_ADDRESS
+                                            ),
+                                        },
+                                    },
+                                    "unsupported_action": {
+                                        "value": {
+                                            "error": (
+                                                "Unsupported action: swap. Only "
+                                                "'approve' is currently supported."
+                                            ),
+                                        },
+                                    },
+                                    "missing_spender": {
+                                        "value": {
+                                            "error": (
+                                                "Missing 'spender' for action "
+                                                "'approve'"
+                                            ),
+                                        },
+                                    },
+                                    "invalid_spender": {
+                                        "value": {
+                                            "error": (
+                                                "Invalid Ethereum address: 0x1234"
+                                            ),
+                                        },
+                                    },
+                                    "unsupported_chain": {
+                                        "value": {
+                                            "error": (
+                                                "Unsupported chain: ethereum. "
+                                                "Only 'base' is currently supported."
                                             ),
                                         },
                                     },
@@ -377,20 +584,50 @@ OPENAPI_SPEC: dict[str, object] = {
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
                         "description": BASE_ADDRESS_DESCRIPTION,
-                    }
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "enum": [AnalyzeAction.APPROVE.value],
+                        },
+                        "description": (
+                            "Optional action-aware policy context. Only 'approve' "
+                            "is currently supported."
+                        ),
+                    },
+                    {
+                        "name": "spender",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[0-9a-fA-F]{40}$",
+                        },
+                        "description": SPENDER_ADDRESS_DESCRIPTION,
+                    },
+                    {
+                        "name": "chain",
+                        "in": "query",
+                        "required": False,
+                        "schema": {
+                            "type": "string",
+                            "enum": [BASE_CHAIN_NAME],
+                        },
+                        "description": (
+                            "Optional action-aware chain context. Only 'base' is "
+                            "currently supported."
+                        ),
+                    },
                 ],
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "properties": {
-                                    "address": {
-                                        "type": "string",
-                                        "pattern": "^0x[0-9a-fA-F]{40}$",
-                                        "description": BASE_ADDRESS_DESCRIPTION,
-                                    },
-                                },
+                                "properties": _analyze_input_properties(),
                             },
                         }
                     },
@@ -401,6 +638,14 @@ OPENAPI_SPEC: dict[str, object] = {
                         "content": {
                             "application/json": {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
+                                "examples": {
+                                    "safe_contract": {
+                                        "value": SAFE_ANALYSIS_EXAMPLE,
+                                    },
+                                    "approve_action": {
+                                        "value": APPROVE_ACTION_ANALYSIS_EXAMPLE,
+                                    },
+                                },
                                 "example": SAFE_ANALYSIS_EXAMPLE,
                             }
                         },
@@ -454,6 +699,53 @@ OPENAPI_SPEC: dict[str, object] = {
                                             "error": (
                                                 "JSON body must be an object "
                                                 "containing 'address'"
+                                            ),
+                                        },
+                                    },
+                                    "unsupported_action": {
+                                        "value": {
+                                            "error": (
+                                                "Unsupported action: swap. Only "
+                                                "'approve' is currently supported."
+                                            ),
+                                        },
+                                    },
+                                    "missing_spender": {
+                                        "value": {
+                                            "error": (
+                                                "Missing 'spender' for action "
+                                                "'approve'"
+                                            ),
+                                        },
+                                    },
+                                    "invalid_spender": {
+                                        "value": {
+                                            "error": (
+                                                "Invalid Ethereum address: 0x1234"
+                                            ),
+                                        },
+                                    },
+                                    "unsupported_chain": {
+                                        "value": {
+                                            "error": (
+                                                "Unsupported chain: ethereum. "
+                                                "Only 'base' is currently supported."
+                                            ),
+                                        },
+                                    },
+                                    "conflicting_action": {
+                                        "value": {
+                                            "error": (
+                                                "Conflicting 'action' values in "
+                                                "query parameter and JSON body"
+                                            ),
+                                        },
+                                    },
+                                    "conflicting_spender": {
+                                        "value": {
+                                            "error": (
+                                                "Conflicting 'spender' values in "
+                                                "query parameter and JSON body"
                                             ),
                                         },
                                     },
@@ -584,12 +876,71 @@ OPENAPI_SPEC: dict[str, object] = {
                             "Only present for proxy contracts."
                         ),
                     },
+                    "action_context": {
+                        "$ref": "#/components/schemas/ActionContext",
+                        "description": (
+                            "Optional action-aware context supplied by the caller."
+                        ),
+                    },
+                    "action_evaluation": {
+                        "$ref": "#/components/schemas/ActionEvaluation",
+                        "description": (
+                            "Optional action-specific policy layered on top of the "
+                            "contract-level recommendation."
+                        ),
+                    },
                 },
                 "required": [
                     "address", "score", "level", "decision",
                     "recommended_policy", "bytecode_size", "findings",
                     "category_scores",
                 ],
+            },
+            "ActionContext": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [AnalyzeAction.APPROVE.value],
+                        "description": (
+                            "Action-aware policy context. V1 currently supports only "
+                            "'approve'."
+                        ),
+                    },
+                    "spender": {
+                        "type": "string",
+                        "description": (
+                            "Spender address the caller plans to authorize for "
+                            "approve actions."
+                        ),
+                    },
+                    "chain": {
+                        "type": "string",
+                        "enum": [BASE_CHAIN_NAME],
+                        "description": (
+                            "Chain context for the action-aware policy. Only 'base' "
+                            "is currently supported."
+                        ),
+                    },
+                },
+                "required": ["action", "spender", "chain"],
+            },
+            "ActionEvaluation": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": ["allow", "warn", "manual_review", "block"],
+                        "description": (
+                            "Action-specific recommendation after applying the "
+                            "supported action context."
+                        ),
+                    },
+                    "recommended_policy": {
+                        "$ref": "#/components/schemas/PolicyRecommendation",
+                    },
+                },
+                "required": ["decision", "recommended_policy"],
             },
             "PolicyRecommendation": {
                 "type": "object",
@@ -2343,13 +2694,7 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
         resource_server.register_extension(bazaar_resource_server_extension)
 
         address_schema = {
-            "properties": {
-                "address": {
-                    "type": "string",
-                    "pattern": "^0x[0-9a-fA-F]{40}$",
-                    "description": BASE_ADDRESS_DESCRIPTION,
-                },
-            },
+            "properties": _analyze_input_properties(),
             "required": ["address"],
         }
         example_input = {"address": SAFE_EXAMPLE_ADDRESS}
@@ -2556,7 +2901,18 @@ def _setup_request_logging(app: Flask) -> None:
             entry["funnel_stage"] = funnel_stage
 
         if request.path == "/analyze":
-            entry["address"] = _extract_requested_address()[0]
+            request_fields = request.environ.get("analyze_request_fields")
+            if not isinstance(request_fields, Mapping):
+                request_fields, _ = _extract_analyze_request_fields()
+            if isinstance(request_fields, Mapping):
+                if request_fields.get("address"):
+                    entry["address"] = request_fields["address"]
+                if request_fields.get("action"):
+                    entry["action"] = request_fields["action"]
+                if request_fields.get("spender"):
+                    entry["spender"] = request_fields["spender"]
+                if request_fields.get("chain"):
+                    entry["chain"] = request_fields["chain"]
             error_type = request.environ.get("analyze_error_type")
             if isinstance(error_type, str) and error_type:
                 entry["error_type"] = error_type
@@ -2628,16 +2984,18 @@ def create_app(
         if request.method not in ANALYZE_REQUEST_METHODS:
             return None
 
-        address, address_error = _extract_requested_address()
+        request_fields, request_error = _extract_analyze_request_fields()
+        request.environ["analyze_request_fields"] = request_fields
+        address = request_fields.get("address", "")
 
-        if address_error is not None:
+        if request_error is not None:
             request.environ["funnel_stage"] = "invalid_address"
             request.environ["analyze_error_type"] = (
-                "conflicting_address"
-                if "Conflicting" in address_error
+                "conflicting_request_field"
+                if "Conflicting" in request_error
                 else "invalid_json_body"
             )
-            return jsonify({"error": address_error}), 422
+            return jsonify({"error": request_error}), 422
 
         if not address:
             request.environ["funnel_stage"] = "invalid_address"
@@ -2652,8 +3010,17 @@ def create_app(
                 422,
             )
 
+        action_context, action_error_type, action_error = _validate_action_context(
+            request_fields
+        )
+        if action_error is not None:
+            request.environ["funnel_stage"] = "invalid_action_context"
+            request.environ["analyze_error_type"] = action_error_type
+            return jsonify({"error": action_error}), 422
+
         # Store validated address for the route handler
         request.environ["validated_address"] = address
+        request.environ["validated_action_context"] = action_context
         if request.method == "HEAD":
             return None
 
@@ -3189,6 +3556,7 @@ def create_app(
     def analyze():
         # Address already validated by validate_analyze_params before_request hook
         address: str = request.environ["validated_address"]
+        action_context = request.environ.get("validated_action_context")
 
         try:
             result = analyze_contract(
@@ -3208,6 +3576,19 @@ def create_app(
         else:
             request.environ["funnel_stage"] = "analyze_success"
 
-        return jsonify(serialize_analysis_result(result))
+        action_evaluation = (
+            derive_action_evaluation(result.recommended_policy, action_context)
+            if isinstance(action_context, ActionContext)
+            else None
+        )
+        return jsonify(
+            serialize_analysis_result(
+                result,
+                action_context=action_context
+                if isinstance(action_context, ActionContext)
+                else None,
+                action_evaluation=action_evaluation,
+            )
+        )
 
     return app
