@@ -14,6 +14,7 @@ from risk_api.app import (
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.analysis.policy import derive_policy
 from risk_api.chain.rpc import clear_cache
+from risk_api.config import Config
 from risk_api.proof_reports import REPORT_PAGES
 
 
@@ -780,6 +781,116 @@ def test_analyze_warn_contract_with_approve_action_escalates_to_manual_review(cl
         "recommended_policy"
     ]["reason_codes"]
     assert "action_approve_requested" in data["action_evaluation"][
+        "recommended_policy"
+    ]["reason_codes"]
+
+
+def test_analyze_allowlisted_approve_action_can_preserve_allow(test_config):
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    app = create_app(
+        config=Config(
+            wallet_address=test_config.wallet_address,
+            base_rpc_url=test_config.base_rpc_url,
+            facilitator_url=test_config.facilitator_url,
+            network=test_config.network,
+            price=test_config.price,
+            erc8004_agent_id=test_config.erc8004_agent_id,
+            basescan_api_key=test_config.basescan_api_key,
+            public_url=test_config.public_url,
+            cdp_api_key_id=test_config.cdp_api_key_id,
+            cdp_api_key_secret=test_config.cdp_api_key_secret,
+            approve_spender_allowlist=(spender.lower(),),
+        ),
+        enable_x402=False,
+    )
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.get(f"/analyze?address={addr}&action=approve&spender={spender}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["action_evaluation"]["decision"] == "allow"
+    assert data["action_evaluation"]["recommended_policy"]["action"] == "allow"
+    assert "action_approve_spender_allowlisted" in data["action_evaluation"][
+        "recommended_policy"
+    ]["reason_codes"]
+
+
+def test_analyze_non_allowlisted_approve_action_escalates_to_manual_review(test_config):
+    addr = "0x" + "ab" * 20
+    trusted_spender = "0x" + "12" * 20
+    request_spender = "0x" + "34" * 20
+    app = create_app(
+        config=Config(
+            wallet_address=test_config.wallet_address,
+            base_rpc_url=test_config.base_rpc_url,
+            facilitator_url=test_config.facilitator_url,
+            network=test_config.network,
+            price=test_config.price,
+            erc8004_agent_id=test_config.erc8004_agent_id,
+            basescan_api_key=test_config.basescan_api_key,
+            public_url=test_config.public_url,
+            cdp_api_key_id=test_config.cdp_api_key_id,
+            cdp_api_key_secret=test_config.cdp_api_key_secret,
+            approve_spender_allowlist=(trusted_spender.lower(),),
+        ),
+        enable_x402=False,
+    )
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.get(
+            f"/analyze?address={addr}&action=approve&spender={request_spender}"
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["action_evaluation"]["decision"] == "manual_review"
+    assert "action_approve_spender_not_allowlisted" in data["action_evaluation"][
         "recommended_policy"
     ]["reason_codes"]
 
@@ -1884,6 +1995,11 @@ def test_openapi_schemas_have_descriptions(client):
     assert "proxy_logic_no_code" in schemas["PolicyReasonCode"]["enum"]
     assert "proxy_logic_nested_proxy" in schemas["PolicyReasonCode"]["enum"]
     assert "action_approve_requested" in schemas["PolicyReasonCode"]["enum"]
+    assert "action_approve_spender_allowlisted" in schemas["PolicyReasonCode"]["enum"]
+    assert (
+        "action_approve_spender_not_allowlisted"
+        in schemas["PolicyReasonCode"]["enum"]
+    )
 
 
 # --- FAQPage structured data tests ---

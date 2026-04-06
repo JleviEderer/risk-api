@@ -27,6 +27,8 @@ class ProxyResolutionStatus(str, Enum):
 
 class PolicyReasonCode(str, Enum):
     ACTION_APPROVE_REQUESTED = "action_approve_requested"
+    ACTION_APPROVE_SPENDER_ALLOWLISTED = "action_approve_spender_allowlisted"
+    ACTION_APPROVE_SPENDER_NOT_ALLOWLISTED = "action_approve_spender_not_allowlisted"
     PROXY_LOGIC_UNRESOLVED = "proxy_logic_unresolved"
     PROXY_LOGIC_FETCH_FAILED = "proxy_logic_fetch_failed"
     PROXY_LOGIC_NO_CODE = "proxy_logic_no_code"

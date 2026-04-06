@@ -73,3 +73,27 @@ def test_load_config_public_url_set(monkeypatch):
     monkeypatch.setenv("PUBLIC_URL", "https://augurrisk.com")
     config = load_config()
     assert config.public_url == "https://augurrisk.com"
+
+
+def test_load_config_approve_spender_allowlist(monkeypatch):
+    spender = "0x" + "12" * 20
+    upper_hex_spender = "0x" + ("12" * 20).upper()
+    monkeypatch.setenv(
+        "APPROVE_SPENDER_ALLOWLIST",
+        f" {upper_hex_spender} , {spender.lower()} ",
+    )
+
+    config = load_config()
+
+    assert config.approve_spender_allowlist == (spender.lower(),)
+
+
+def test_load_config_rejects_invalid_approve_spender_allowlist(monkeypatch):
+    monkeypatch.setenv("APPROVE_SPENDER_ALLOWLIST", "0x1234")
+
+    with pytest.raises(ConfigError) as exc_info:
+        load_config()
+
+    assert "APPROVE_SPENDER_ALLOWLIST contains invalid Ethereum address" in str(
+        exc_info.value
+    )

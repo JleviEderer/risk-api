@@ -6,9 +6,51 @@
 - Branch: `master`
 - Repo code baseline: `93ba6f0`
 - Deployed app baseline: `93ba6f0`
-- Status: deployed production is green on baseline `93ba6f0`, which now includes the first narrow action-aware admission-control pass for `approve`. The live app is healthy, Fly is on machine version `100` with `1` passing health check, and the live OpenAPI now exposes `ActionContext` / `ActionEvaluation`. The local workspace is still ahead only with unrelated autoresearch/logging follow-ups (`auto_bench`, logging tests, and local scratch dirs), not with undeployed action-aware changes. Local verification for the shipped action-aware slice was green before deploy: `python -m pytest tests/test_app.py -q` passed at `163` and `python -m pytest -q` passed at `387`. The deploy quirk to remember from earlier sessions still matters operationally: `flyctl deploy --remote-only` can time out while polling health even after the machine image updates, but this deploy completed cleanly without the earlier manual-start recovery. The next useful pressure is no longer whether to ship the action-aware `approve` layer; it is deciding whether to broaden or refine that layer while keeping the hidden `analysis` holdouts in place and the CDP discovery issue treated as external indexing/support territory. The only local leftovers are the unrelated scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`, plus the separate local autoresearch/logging follow-up files.
+- Status: deployed production is green on baseline `93ba6f0`, which now includes the first narrow action-aware admission-control pass for `approve`. The live app is healthy, Fly is on machine version `100` with `1` passing health check, and the live OpenAPI now exposes `ActionContext` / `ActionEvaluation`. Local workspace status changed again on 2026-04-06 after that deploy: there are now two undeployed `approve` refinements ready to ship together in one narrow slice:
+  - optional `APPROVE_SPENDER_ALLOWLIST` config for spender-aware action policy
+  - action-aware request observability in request logs (`action_spender_trust`, `action_decision`)
+  The pre-existing unrelated autoresearch/logging follow-ups (`auto_bench`, logging tests, and local scratch dirs) are still present too. Local verification for the shipped action-aware slice was green before deploy: `python -m pytest tests/test_app.py -q` passed at `163` and `python -m pytest -q` passed at `387`. The deploy quirk to remember from earlier sessions still matters operationally: `flyctl deploy --remote-only` can time out while polling health even after the machine image updates, but this deploy completed cleanly without the earlier manual-start recovery. The next useful pressure is to ship the current narrow `approve` refinement set, run a real paid production smoke on the action-aware request shape, and then decide from live evidence whether explicit spender-trust response fields are still needed. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`, plus the separate local autoresearch/logging follow-up files.
 
 ## What Changed
+- Added action-aware request observability locally on 2026-04-06:
+  - `/analyze` request logging now records action-aware `approve` context more explicitly when present
+  - new structured request-log fields:
+    - `action_spender_trust`
+      - `unchecked`
+      - `allowlisted`
+      - `not_allowlisted`
+    - `action_decision`
+      - populated from `action_evaluation.decision` on successful `200` responses
+  - current purpose:
+    - observe whether `approve` requests are actually using configured allowlists
+    - see what action-level decision the current narrow policy is producing in practice
+    - avoid freezing extra public API surface before seeing live evidence
+  - implementation shape:
+    - `src/risk_api/app.py` computes/logs spender trust for validated action-aware requests
+    - `src/risk_api/analysis/action_policy.py` now exports the spender-trust classifier used by both policy derivation and logging
+  - local verification passed:
+    - `python -m pytest tests/test_config.py tests/test_logging.py tests/test_action_policy.py tests/test_app.py -q` -> `196 passed`
+    - `python -m pytest -q` -> `395 passed`
+  - deployment status:
+    - local only, not yet deployed to `augurrisk.com`
+- Refined the action-aware `approve` layer locally on 2026-04-06 with an opt-in spender allowlist path:
+  - new config env: `APPROVE_SPENDER_ALLOWLIST`
+    - comma-separated Base spender addresses
+    - validated at startup and normalized to lowercase
+    - no behavior change when unset
+  - action-policy behavior is now narrower and more useful when the allowlist is configured:
+    - clean base-policy `allow` + allowlisted spender stays action-level `allow`
+    - clean base-policy `allow` + spender not on the allowlist escalates to action-level `manual_review`
+    - warn/manual-review/block contracts still do not downgrade below the base contract policy
+  - new action-level reason codes:
+    - `action_approve_spender_allowlisted`
+    - `action_approve_spender_not_allowlisted`
+  - route wiring now passes the configured spender allowlist into `derive_action_evaluation()`
+  - local verification passed:
+    - `python -m pytest tests/test_config.py tests/test_action_policy.py tests/test_app.py -q` -> `181 passed`
+    - `python -m pytest -q` -> `393 passed`
+  - deployment status:
+    - local only, not yet deployed to `augurrisk.com`
 - Implemented a narrow action-aware admission-control V1 locally on 2026-04-06:
   - `GET` and `POST /analyze` now accept optional action context fields:
     - `action`

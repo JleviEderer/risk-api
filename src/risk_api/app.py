@@ -17,7 +17,9 @@ from flask import Flask, Response, current_app, jsonify, redirect, request
 from risk_api.api_contract import normalize_analysis_snapshot, serialize_analysis_result
 from risk_api.analysis.action_policy import (
     ActionContext,
+    ApproveSpenderTrust,
     AnalyzeAction,
+    classify_approve_spender_trust,
     derive_action_evaluation,
 )
 from risk_api.analytics import (
@@ -2913,6 +2915,12 @@ def _setup_request_logging(app: Flask) -> None:
                     entry["spender"] = request_fields["spender"]
                 if request_fields.get("chain"):
                     entry["chain"] = request_fields["chain"]
+            action_spender_trust = request.environ.get("action_spender_trust")
+            if (
+                isinstance(action_spender_trust, ApproveSpenderTrust)
+                and action_spender_trust
+            ):
+                entry["action_spender_trust"] = action_spender_trust.value
             error_type = request.environ.get("analyze_error_type")
             if isinstance(error_type, str) and error_type:
                 entry["error_type"] = error_type
@@ -2923,6 +2931,11 @@ def _setup_request_logging(app: Flask) -> None:
                 if data and isinstance(data, dict):
                     entry["score"] = data.get("score")
                     entry["level"] = data.get("level")
+                    action_evaluation = data.get("action_evaluation")
+                    if isinstance(action_evaluation, Mapping):
+                        action_decision = action_evaluation.get("decision")
+                        if isinstance(action_decision, str) and action_decision:
+                            entry["action_decision"] = action_decision
             except Exception:
                 pass
 
@@ -3021,6 +3034,15 @@ def create_app(
         # Store validated address for the route handler
         request.environ["validated_address"] = address
         request.environ["validated_action_context"] = action_context
+        if isinstance(action_context, ActionContext):
+            request.environ["action_spender_trust"] = (
+                classify_approve_spender_trust(
+                    action_context.spender,
+                    config.approve_spender_allowlist
+                    if config.approve_spender_allowlist
+                    else None,
+                )
+            )
         if request.method == "HEAD":
             return None
 
@@ -3577,7 +3599,15 @@ def create_app(
             request.environ["funnel_stage"] = "analyze_success"
 
         action_evaluation = (
-            derive_action_evaluation(result.recommended_policy, action_context)
+            derive_action_evaluation(
+                result.recommended_policy,
+                action_context,
+                approve_spender_allowlist=(
+                    config.approve_spender_allowlist
+                    if config.approve_spender_allowlist
+                    else None
+                ),
+            )
             if isinstance(action_context, ActionContext)
             else None
         )

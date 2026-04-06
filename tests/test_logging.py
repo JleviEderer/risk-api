@@ -3,11 +3,13 @@ import logging
 import os
 import sqlite3
 import tempfile
+from unittest.mock import patch
 
 import pytest
 import responses
 
 from risk_api.analytics import append_sqlite_entry
+from risk_api.api_contract import analysis_result_from_snapshot
 from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
 from risk_api.analysis.reputation import BLOCKSCOUT_API, clear_reputation_cache
@@ -182,6 +184,112 @@ def test_no_bytecode_request_is_logged(client_logged, app_with_logging):
     assert entry["error_type"] == "no_bytecode"
 
 
+def test_action_approve_logs_allowlisted_spender_trust(
+    test_config, log_dir, monkeypatch
+):
+    log_path = os.path.join(log_dir, "requests.jsonl")
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", log_path)
+
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    app = create_app(
+        config=Config(
+            wallet_address=test_config.wallet_address,
+            base_rpc_url=test_config.base_rpc_url,
+            facilitator_url=test_config.facilitator_url,
+            network=test_config.network,
+            price=test_config.price,
+            approve_spender_allowlist=(spender.lower(),),
+        ),
+        enable_x402=False,
+    )
+    app.config["TESTING"] = True
+    client = app.test_client()
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.get(f"/analyze?address={addr}&action=approve&spender={spender}")
+
+    assert resp.status_code == 200
+
+    with open(log_path, encoding="utf-8") as handle:
+        lines = [line.strip() for line in handle if line.strip()]
+
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["action"] == "approve"
+    assert entry["spender"] == spender
+    assert entry["action_spender_trust"] == "allowlisted"
+    assert entry["action_decision"] == "allow"
+
+
+def test_action_approve_logs_unchecked_spender_trust_without_allowlist(
+    test_config, log_dir, monkeypatch
+):
+    log_path = os.path.join(log_dir, "requests.jsonl")
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", log_path)
+
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.get(f"/analyze?address={addr}&action=approve&spender={spender}")
+
+    assert resp.status_code == 200
+
+    with open(log_path, encoding="utf-8") as handle:
+        lines = [line.strip() for line in handle if line.strip()]
+
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["action"] == "approve"
+    assert entry["spender"] == spender
+    assert entry["action_spender_trust"] == "unchecked"
+    assert entry["action_decision"] == "warn"
+
+
 @responses.activate
 def test_stats_endpoint(client_logged, app_with_logging):
     bytecode = "0x" + "6080604052" + "00" * 200
@@ -213,6 +321,47 @@ def test_stats_empty_when_no_requests(client_logged):
     assert data["storage_backend"] == "jsonl"
     assert data["storage_durable"] is False
     assert data["funnel"]["landing_views"] == 0
+
+
+def test_stats_ignores_malformed_jsonl_lines(test_config, monkeypatch, tmp_path):
+    log_path = tmp_path / "requests.jsonl"
+    monkeypatch.delenv("ANALYTICS_DB_PATH", raising=False)
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+    log_path.write_text(
+        '\n'.join(
+            [
+                'not-json',
+                json.dumps(
+                    {
+                        "ts": "2026-03-30T12:00:00Z",
+                        "path": "/",
+                        "status": 200,
+                        "paid": False,
+                        "duration_ms": 12,
+                        "user_agent": "pytest-agent",
+                        "method": "GET",
+                        "host": "augurrisk.com",
+                        "referer": "",
+                        "request_id": "req-stats-malformed",
+                        "funnel_stage": "landing_view",
+                    }
+                ),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    resp = client.get("/stats")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["total_requests"] == 1
+    assert data["funnel"]["landing_views"] == 1
+    assert data["top_paths"] == [{"path": "/", "count": 1}]
 
 
 def test_stats_returns_501_without_log_path(test_config, monkeypatch):

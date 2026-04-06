@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 CDP_KEY_FILE = Path.home() / ".config" / "risk-api" / "cdp_api_key.json"
+ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 
 class ConfigError(Exception):
@@ -28,6 +30,31 @@ class Config:
     public_url: str = ""
     cdp_api_key_id: str = ""
     cdp_api_key_secret: str = ""
+    approve_spender_allowlist: tuple[str, ...] = ()
+
+
+def _parse_address_allowlist(env_var: str) -> tuple[str, ...]:
+    raw_value = os.environ.get(env_var, "")
+    if not raw_value.strip():
+        return ()
+
+    addresses: list[str] = []
+    seen: set[str] = set()
+    for raw_part in raw_value.split(","):
+        address = raw_part.strip()
+        if not address:
+            continue
+        if not ADDRESS_RE.match(address):
+            raise ConfigError(
+                f"{env_var} contains invalid Ethereum address: {address}"
+            )
+
+        normalized = address.lower()
+        if normalized not in seen:
+            seen.add(normalized)
+            addresses.append(normalized)
+
+    return tuple(addresses)
 
 
 def load_config() -> Config:
@@ -75,4 +102,7 @@ def load_config() -> Config:
         public_url=os.environ.get("PUBLIC_URL", ""),
         cdp_api_key_id=cdp_key_id,
         cdp_api_key_secret=cdp_key_secret,
+        approve_spender_allowlist=_parse_address_allowlist(
+            "APPROVE_SPENDER_ALLOWLIST"
+        ),
     )
