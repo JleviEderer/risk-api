@@ -4,9 +4,9 @@
 - Date: 2026-04-06
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `fef6a10`
-- Deployed app baseline: `fef6a10`
-- Status: deployed production is still green on baseline `fef6a10`, and the local workspace is now ahead with uncommitted autoresearch plus the first narrow action-aware admission-control pass. The live app still includes the committed Solidity-metadata pass, and current public rechecks still show `augurrisk.com` live on the admission-control wording plus refreshed external surfaces on `x402.jobs`, MoltMart, Work402, `x402.org/ecosystem`, and 8004scan. Local verification is green on the current workspace: `python -m pytest -q` passed at `387`, `python auto/loop.py` passed at `59/59`, and the latest app/OpenAPI pass `python -m pytest tests/test_app.py -q` passed at `163`. The new action-aware `approve` path is local only and has not been deployed yet. The deploy quirk to remember from this session remains the same: `flyctl deploy --remote-only` timed out while polling health because the Fly Machines API hit lease/rate-limit errors, but the machine image did update; a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` restored the app cleanly. The next useful pressure is no longer selector churn; it is deciding whether to ship the new local action-aware `approve` layer after any remaining machine-doc / duplicated-metadata alignment, while keeping the hidden `analysis` holdouts in place. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Repo code baseline: `93ba6f0`
+- Deployed app baseline: `93ba6f0`
+- Status: deployed production is green on baseline `93ba6f0`, which now includes the first narrow action-aware admission-control pass for `approve`. The live app is healthy, Fly is on machine version `100` with `1` passing health check, and the live OpenAPI now exposes `ActionContext` / `ActionEvaluation`. The local workspace is still ahead only with unrelated autoresearch/logging follow-ups (`auto_bench`, logging tests, and local scratch dirs), not with undeployed action-aware changes. Local verification for the shipped action-aware slice was green before deploy: `python -m pytest tests/test_app.py -q` passed at `163` and `python -m pytest -q` passed at `387`. The deploy quirk to remember from earlier sessions still matters operationally: `flyctl deploy --remote-only` can time out while polling health even after the machine image updates, but this deploy completed cleanly without the earlier manual-start recovery. The next useful pressure is no longer whether to ship the action-aware `approve` layer; it is deciding whether to broaden or refine that layer while keeping the hidden `analysis` holdouts in place and the CDP discovery issue treated as external indexing/support territory. The only local leftovers are the unrelated scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`, plus the separate local autoresearch/logging follow-up files.
 
 ## What Changed
 - Implemented a narrow action-aware admission-control V1 locally on 2026-04-06:
@@ -41,9 +41,16 @@
     - `python -m pytest tests/test_action_policy.py tests/test_app.py -k "approve or spender or action_evaluation or action_aware or unsupported_action or unsupported_chain or action_context or bazaar or openapi" -q` -> `26 passed`
     - `python -m pytest tests/test_app.py -q` -> `163 passed`
     - `python -m pytest -q` -> `387 passed`
-  - important shipping caveat:
-    - this API change is local only right now
-    - if the action-aware layer is going to ship publicly, the duplicated machine/discovery metadata outside `src/risk_api/app.py` should be reviewed for alignment before deploy
+  - shipped result:
+    - committed as `93ba6f0` (`Add action-aware approve policy layer`)
+    - `git push origin master` succeeded
+    - `flyctl deploy --remote-only --app augurrisk` succeeded cleanly
+    - live verification after deploy:
+      - `flyctl status --app augurrisk` -> machine version `100`, state `started`, `1` passing health check
+      - `https://augurrisk.com/health` returned `{"status":"ok"}`
+      - `https://augurrisk.com/openapi.json` now includes `ActionContext`
+  - follow-up caveat:
+    - if public machine/discovery docs beyond `openapi.json` start describing the action-aware layer more explicitly, review the duplicated machine-facing copy outside `src/risk_api/app.py` for alignment before the next messaging/discovery push
 - Hardened `/analyze` method-contract behavior and docs locally on 2026-04-03:
   - `src/risk_api/app.py` now skips address validation and x402 gating for methods outside the real `/analyze` contract, so Flask handles `OPTIONS` and unsupported methods normally instead of returning misleading `422` errors
   - `/analyze` now responds with the default Flask `OPTIONS` behavior and returns `405 Method Not Allowed` for unsupported methods like `PUT`, `PATCH`, and `DELETE`
