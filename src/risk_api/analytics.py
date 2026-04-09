@@ -25,6 +25,69 @@ FUNNEL_KEYS = (
     "paid_requests",
 )
 
+TRAFFIC_CLASS_KEYS = (
+    "known_health_check",
+    "known_directory_evaluator_bot",
+    "malformed_probe",
+    "real_unpaid_conversion_attempt",
+    "paid_request",
+    "other_traffic",
+)
+
+MACHINE_DISCOVERY_STAGES = {
+    "skill_doc_fetch",
+    "openapi_fetch",
+    "llms_txt_fetch",
+    "llms_full_fetch",
+    "x402_doc_fetch",
+    "agent_card_fetch",
+    "agent_metadata_fetch",
+    "robots_fetch",
+    "sitemap_fetch",
+}
+
+MACHINE_DISCOVERY_PATHS = {
+    "/skill.md",
+    "/openapi.json",
+    "/llms.txt",
+    "/llms-full.txt",
+    "/.well-known/x402",
+    "/.well-known/agent-card.json",
+    "/agent-metadata.json",
+    "/robots.txt",
+    "/sitemap.xml",
+}
+
+KNOWN_HEALTH_CHECK_UA_SNIPPETS = (
+    "better stack",
+    "better uptime",
+    "healthcheck",
+    "health check",
+    "pingdom",
+    "scoutscore-healthcheck",
+    "statuscake",
+    "uptimerobot",
+    "x402-healthcheck",
+)
+
+KNOWN_EVALUATOR_UA_SNIPPETS = (
+    "agentscore",
+    "bot",
+    "crawler",
+    "satring-scraper",
+    "scoutscore",
+    "scraper",
+    "spider",
+    "thinkbot",
+    "x402audit",
+)
+
+MALFORMED_ANALYZE_STAGES = {
+    "invalid_address",
+    "invalid_action_context",
+    "no_bytecode",
+}
+
 
 def empty_stats_payload() -> dict[str, Any]:
     """Return an empty stats response matching the dashboard contract."""
@@ -35,6 +98,7 @@ def empty_stats_payload() -> dict[str, Any]:
         "storage_path": "",
         "storage_durable": False,
         "funnel": {key: 0 for key in FUNNEL_KEYS},
+        "traffic_classes": {key: 0 for key in TRAFFIC_CLASS_KEYS},
         "stage_counts": {},
         "top_paths": [],
         "top_hosts": [],
@@ -58,6 +122,42 @@ def _normalize_stage(entry: dict[str, Any]) -> str:
     if entry.get("status") == 422:
         return "invalid_address"
     return ""
+
+
+def _ua_contains(user_agent: str, snippets: tuple[str, ...]) -> bool:
+    lower_ua = user_agent.lower()
+    return any(snippet in lower_ua for snippet in snippets)
+
+
+def classify_traffic_class(entry: dict[str, Any]) -> str:
+    """Classify a request so conversion analytics can separate evaluator noise."""
+    existing = entry.get("traffic_class")
+    if isinstance(existing, str) and existing in TRAFFIC_CLASS_KEYS:
+        return existing
+
+    path = entry.get("path", "")
+    status = entry.get("status")
+    user_agent = str(entry.get("user_agent", ""))
+    stage = _normalize_stage(entry)
+
+    if entry.get("paid"):
+        return "paid_request"
+    if path == "/health" or _ua_contains(user_agent, KNOWN_HEALTH_CHECK_UA_SNIPPETS):
+        return "known_health_check"
+    if (
+        path == "/analyze"
+        and (status == 422 or stage in MALFORMED_ANALYZE_STAGES)
+    ):
+        return "malformed_probe"
+    if (
+        stage in MACHINE_DISCOVERY_STAGES
+        or path in MACHINE_DISCOVERY_PATHS
+        or _ua_contains(user_agent, KNOWN_EVALUATOR_UA_SNIPPETS)
+    ):
+        return "known_directory_evaluator_bot"
+    if path == "/analyze" and status == 402:
+        return "real_unpaid_conversion_attempt"
+    return "other_traffic"
 
 
 def _top_items(counter: Counter[str], key_name: str) -> list[dict[str, Any]]:
@@ -85,6 +185,7 @@ def build_stats_payload(
     host_counts: Counter[str] = Counter()
     referer_counts: Counter[str] = Counter()
     funnel = {key: 0 for key in FUNNEL_KEYS}
+    traffic_classes = {key: 0 for key in TRAFFIC_CLASS_KEYS}
 
     for entry in entries:
         total += 1
@@ -92,6 +193,8 @@ def build_stats_payload(
             paid += 1
 
         stage = _normalize_stage(entry)
+        traffic_class = classify_traffic_class(entry)
+        traffic_classes[traffic_class] += 1
 
         dur = entry.get("duration_ms")
         if isinstance(dur, (int, float)):
@@ -189,7 +292,12 @@ def build_stats_payload(
         if isinstance(referer, str) and referer:
             referer_counts[referer] += 1
 
-        recent.append(entry)
+        if entry.get("traffic_class") == traffic_class:
+            recent.append(entry)
+        else:
+            recent_entry = dict(entry)
+            recent_entry["traffic_class"] = traffic_class
+            recent.append(recent_entry)
 
     hourly = [
         {
@@ -221,6 +329,7 @@ def build_stats_payload(
         "storage_path": storage_path,
         "storage_durable": storage_durable,
         "funnel": funnel,
+        "traffic_classes": traffic_classes,
         "stage_counts": dict(stage_counts),
         "top_paths": _top_items(path_counts, "path"),
         "top_hosts": _top_items(host_counts, "host"),

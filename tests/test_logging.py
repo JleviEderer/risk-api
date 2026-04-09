@@ -138,15 +138,21 @@ def test_failed_request_is_logged(client_logged, app_with_logging):
     assert entry["status"] == 422
     assert entry["funnel_stage"] == "invalid_address"
     assert entry["error_type"] == "invalid_address"
+    assert entry["traffic_class"] == "malformed_probe"
     assert "score" not in entry
 
 
-def test_health_not_logged(client_logged, app_with_logging):
+def test_health_is_logged_as_health_check(client_logged, app_with_logging):
     client_logged.get("/health")
     log_path = app_with_logging.config["REQUEST_LOG_PATH"]
-    if os.path.exists(log_path):
-        with open(log_path) as f:
-            assert f.read().strip() == ""
+    with open(log_path) as f:
+        lines = [l.strip() for l in f if l.strip()]
+
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["path"] == "/health"
+    assert entry["funnel_stage"] == "health_check"
+    assert entry["traffic_class"] == "known_health_check"
 
 
 def test_landing_view_is_logged(client_logged, app_with_logging):
@@ -310,6 +316,7 @@ def test_stats_endpoint(client_logged, app_with_logging):
     assert data["storage_durable"] is False
     assert data["funnel"]["landing_views"] == 1
     assert data["funnel"]["paid_requests"] == 0
+    assert data["traffic_classes"]["other_traffic"] == 3
     assert len(data["recent"]) == 3
 
 
@@ -428,6 +435,7 @@ def test_durable_analytics_db_persists_request_events(
     assert data["storage_durable"] is True
     assert data["funnel"]["landing_views"] == 1
     assert data["stage_counts"]["analyze_success"] == 1
+    assert data["traffic_classes"]["other_traffic"] == 2
     assert data["recent"][-1]["path"] == "/analyze"
 
 

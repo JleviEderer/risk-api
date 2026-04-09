@@ -1081,6 +1081,9 @@ def test_stats_reports_new_page_and_source_summaries(
     assert stats["stage_counts"]["intent_proxy_view"] == 1
     assert stats["stage_counts"]["openapi_fetch"] == 1
     assert stats["stage_counts"]["invalid_address"] == 1
+    assert stats["traffic_classes"]["known_directory_evaluator_bot"] == 1
+    assert stats["traffic_classes"]["malformed_probe"] == 1
+    assert stats["traffic_classes"]["other_traffic"] == 2
     assert stats["top_paths"][0]["path"] == "/"
     assert any(item["path"] == "/proxy-risk-api" for item in stats["top_paths"])
     assert stats["top_hosts"] == [{"host": "augurrisk.com", "count": 4}]
@@ -1129,6 +1132,7 @@ def test_stats_fallback_classifies_unpaid_402_requests(
     assert stats["total_requests"] == 1
     assert stats["funnel"]["valid_unpaid_402_attempts"] == 1
     assert stats["stage_counts"]["unpaid_402"] == 1
+    assert stats["traffic_classes"]["real_unpaid_conversion_attempt"] == 1
     assert stats["top_hosts"] == [{"host": "augurrisk.com", "count": 1}]
 
 
@@ -1324,6 +1328,8 @@ def test_wellknown_x402_returns_discovery_doc(client):
     assert isinstance(data["instructions"], str)
     assert "admission control" in data["instructions"].lower()
     assert "8 detectors" in data["instructions"]
+    assert "First successful paid call" in data["instructions"]
+    assert "score=0" in data["instructions"]
     assert "delegatecall" in data["instructions"]
     assert "Base mainnet" in data["instructions"]
     assert "not a guarantee" in data["instructions"]
@@ -1426,7 +1432,9 @@ def test_how_payment_works_page(client):
     assert resp.content_type.startswith("text/html")
     assert b"402 Payment Required" in resp.data
     assert b"PAYMENT-SIGNATURE" in resp.data
+    assert b"First successful paid call" in resp.data
     assert b"/analyze?address=0x4200000000000000000000000000000000000006" in resp.data
+    assert b"score: 0" in resp.data
     assert b"github.com/JleviEderer/risk-api/blob/master" not in resp.data
     assert b"github.com/JleviEderer/risk-api/tree/master" not in resp.data
 
@@ -1762,6 +1770,27 @@ def test_llms_txt_has_example_response(client):
     assert '"level": "safe"' in text
 
 
+def test_llms_txt_documents_action_aware_approve_example(client):
+    resp = client.get("/llms.txt")
+    text = resp.data.decode()
+    assert "Action-Aware Example: Approve" in text
+    assert "action=approve" in text
+    assert '"action_evaluation"' in text
+    assert "spender trust is treated as `unchecked`" in text
+
+
+def test_llms_txt_documents_first_successful_paid_call(client):
+    resp = client.get("/llms.txt")
+    text = resp.data.decode()
+    assert "First Successful Paid Call" in text
+    assert (
+        "GET http://localhost/analyze?address=0x4200000000000000000000000000000000000006"
+        in text
+    )
+    assert 'decision: "allow"' in text
+    assert "returns `422` before payment" in text
+
+
 def test_llms_txt_uses_public_url(app):
     app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
@@ -1804,6 +1833,15 @@ def test_llms_full_txt_has_proxy_example(client):
     assert "implementation" in text
 
 
+def test_llms_full_txt_has_action_aware_approve_example(client):
+    resp = client.get("/llms-full.txt")
+    text = resp.data.decode()
+    assert "Example: Action-Aware Approve Request" in text
+    assert '"action_context"' in text
+    assert '"action_evaluation"' in text
+    assert "action_approve_requested" in text
+
+
 def test_llms_full_txt_uses_public_url(app):
     app.config["PUBLIC_URL"] = "https://augurrisk.com"
     with app.test_client() as c:
@@ -1831,6 +1869,10 @@ def test_skill_md_returns_markdown(client):
     assert "Fastest Path" in text
     assert "PAYMENT-SIGNATURE" in text
     assert "OpenAPI Spec" in text
+    assert "Action-Aware V1" in text
+    assert "action=approve" in text
+    assert "first successful paid call" in text
+    assert "0x4200000000000000000000000000000000000006" in text
 
 
 def test_skill_md_uses_public_url(app):
@@ -1858,6 +1900,9 @@ def test_openapi_get_200_has_examples(client):
     data = resp.get_json()
     examples = data["paths"]["/analyze"]["get"]["responses"]["200"]["content"]["application/json"]["examples"]
     assert "safe_contract" in examples
+    assert examples["safe_contract"]["summary"] == (
+        "Canonical first successful paid call - Base WETH"
+    )
     assert examples["safe_contract"]["value"]["score"] == 0
     assert examples["safe_contract"]["value"]["level"] == "safe"
     assert "proxy_contract" in examples
@@ -1867,6 +1912,16 @@ def test_openapi_get_200_has_examples(client):
     assert examples["proxy_contract"]["value"]["implementation"]["category_scores"] == {
         "selfdestruct": 30
     }
+    parameters = data["paths"]["/analyze"]["get"]["parameters"]
+    address_parameter = next(
+        parameter for parameter in parameters if parameter["name"] == "address"
+    )
+    assert address_parameter["example"] == (
+        "0x4200000000000000000000000000000000000006"
+    )
+    assert "first successful paid-call flow" in data["paths"]["/analyze"]["get"][
+        "responses"
+    ]["402"]["description"]
 
 
 @responses.activate
@@ -1942,6 +1997,12 @@ def test_openapi_post_200_has_example(client):
     example = data["paths"]["/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]
     assert example["score"] == 0
     assert example["level"] == "safe"
+    request_examples = data["paths"]["/analyze"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["examples"]
+    assert request_examples["first_successful_paid_call"]["value"] == {
+        "address": "0x4200000000000000000000000000000000000006"
+    }
 
 
 def test_openapi_get_supports_action_aware_query_parameters(client):
@@ -2039,6 +2100,23 @@ def test_landing_links_llms_txt(client):
     resp = client.get("/")
     assert b"/skill.md" in resp.data
     assert b"/llms.txt" in resp.data
+
+
+def test_landing_documents_action_aware_approve_example(client):
+    resp = client.get("/")
+    text = resp.data.decode()
+    assert "Action-Aware Example: Approve" in text
+    assert "action=approve" in text
+    assert "action-level result becomes <code>warn</code>" in text
+
+
+def test_landing_documents_first_successful_paid_call(client):
+    resp = client.get("/")
+    text = resp.data.decode()
+    assert "First Successful Paid Call" in text
+    assert "canonical integration check" in text
+    assert "/analyze?address=0x4200000000000000000000000000000000000006" in text
+    assert "Expected first success" in text
 
 
 def test_request_log_captures_mcp_page_stage(test_config, monkeypatch, tmp_path):

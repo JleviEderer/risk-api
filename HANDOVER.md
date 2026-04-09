@@ -1,17 +1,130 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-04-06
+- Date: 2026-04-09
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `93ba6f0`
-- Deployed app baseline: `93ba6f0`
-- Status: deployed production is green on baseline `93ba6f0`, which now includes the first narrow action-aware admission-control pass for `approve`. The live app is healthy, Fly is on machine version `100` with `1` passing health check, and the live OpenAPI now exposes `ActionContext` / `ActionEvaluation`. Local workspace status changed again on 2026-04-06 after that deploy: there are now two undeployed `approve` refinements ready to ship together in one narrow slice:
-  - optional `APPROVE_SPENDER_ALLOWLIST` config for spender-aware action policy
-  - action-aware request observability in request logs (`action_spender_trust`, `action_decision`)
-  The pre-existing unrelated autoresearch/logging follow-ups (`auto_bench`, logging tests, and local scratch dirs) are still present too. Local verification for the shipped action-aware slice was green before deploy: `python -m pytest tests/test_app.py -q` passed at `163` and `python -m pytest -q` passed at `387`. The deploy quirk to remember from earlier sessions still matters operationally: `flyctl deploy --remote-only` can time out while polling health even after the machine image updates, but this deploy completed cleanly without the earlier manual-start recovery. The next useful pressure is to ship the current narrow `approve` refinement set, run a real paid production smoke on the action-aware request shape, and then decide from live evidence whether explicit spender-trust response fields are still needed. The only local leftovers are scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`, plus the separate local autoresearch/logging follow-up files.
+- Repo code baseline: `1af2be0`
+- Deployed app baseline: post-`1af2be0` clean-worktree docs deploy (uncommitted local diff in `src/risk_api/app.py`)
+- Status: deployed production is green on the post-`1af2be0` docs-only follow-up. The live app is healthy, Fly is on machine version `104` with `1` passing health check, and the public first-party surfaces now include a concrete action-aware `approve` example on `/`, `/skill.md`, `/llms.txt`, and `/llms-full.txt`. The live OpenAPI still exposes the new `action_approve_spender_allowlisted` / `action_approve_spender_not_allowlisted` reason codes. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
+  - top-level `decision`: `allow`
+  - action-level `decision`: `warn`
+  - action-level reason codes: `action_approve_requested`
+  Live `/stats` now also shows the new request-log observability fields for that paid `approve` request:
+  - `action_spender_trust: unchecked`
+  - `action_decision: warn`
+  The deploy quirk still matters operationally, but this docs-only follow-up deployed cleanly: `flyctl deploy --remote-only --app augurrisk` completed successfully on 2026-04-07 UTC and the live routes verified immediately afterward. The main product question is no longer whether the current narrow `approve` refinement is live; it is whether live usage evidence justifies adding an explicit public spender-trust response field (`A-003`) or whether the current reason codes plus logs are enough. External registry copy was intentionally left alone for this deploy because the product positioning did not change. The only remaining local leftovers are unrelated autoresearch files (`auto/README.md`, `src/risk_api/auto_bench.py`, `tests/test_auto_bench.py`) plus scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+- Traffic read on 2026-04-09: pulled the live durable SQLite analytics store from Fly machine `287d341f3e0ed8` (`/data/analytics.sqlite3` plus WAL state) and analyzed the last 10 local days (`2026-03-31` through `2026-04-09` Central). Main judgment: the product direction is still correct, but conversion is weak. The traffic validates the existing agent-first admission-control wedge rather than suggesting a pivot. Key counts in that 10-day window:
+  - `4,363` total requests
+  - `132` `/analyze` requests
+  - `110` `422` `/analyze` responses
+  - `17` unpaid `402` `/analyze` attempts
+  - `2` paid `/analyze` requests
+  - `1` paid action-aware `approve` request, which is most likely the known smoke path
+  Strongest recurring actors were machine evaluators and ecosystem probers checking `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms.txt`, and then `/analyze`, not retail users. The March 29 false-positive fix clearly helped: paid Base WETH checks moved from `score=25` / `level=low` before `dee071e` to `score=0` / `level=safe` on `2026-04-04` and `2026-04-06`. The April 3 method-contract fix is also visible in successful `OPTIONS /analyze` probes from `ScoutScore-FidelityCheck/1.0`. Product implication: no strategy change, but next work should prioritize first-call conversion on `/analyze` and analytics segmentation for evaluator traffic versus real demand before widening the action-aware API.
 
 ## What Changed
+- Started the conversion-focused follow-up on 2026-04-09:
+  - tightened the canonical first successful paid-call path around Base WETH (`GET /analyze?address=0x4200000000000000000000000000000000000006`) across homepage copy, `llms.txt`, `llms-full.txt`, `skill.md`, `/how-payment-works`, `/.well-known/x402`, and OpenAPI examples
+  - added first-class analytics `traffic_class` labels and `/stats.traffic_classes` counts for:
+    - `known_health_check`
+    - `known_directory_evaluator_bot`
+    - `malformed_probe`
+    - `real_unpaid_conversion_attempt`
+    - `paid_request`
+    - `other_traffic`
+  - `/health` is now request-logged as `funnel_stage=health_check` / `traffic_class=known_health_check`, so total analytics volume will include health checks but the traffic-class breakdown separates them from conversion signals
+  - local verification passed: `python -m pytest -q` -> `400 passed`
+- Analyzed live production traffic on 2026-04-09 using the Fly volume-backed SQLite store:
+  - source of truth:
+    - copied `/data/analytics.sqlite3` from Fly machine `287d341f3e0ed8`
+    - also pulled the SQLite `-wal` / `-shm` files so the latest rows were included
+    - confirmed live `/stats` was ahead of the older local snapshot and matched the live durable store shape (`storage_backend=sqlite`, `storage_durable=true`)
+  - 10-day window analyzed:
+    - `2026-03-31` through `2026-04-09` local time (`America/Chicago`)
+  - key findings:
+    - product direction remains aligned with the repo's current positioning: agent-first deterministic admission control, not a retail destination screener
+    - evaluator and crawler traffic dominate the machine-facing surfaces; repeated fetches of `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms.txt`, `skill.md`, and the intent pages look like ecosystem evaluation rather than end-user demand
+    - `/analyze` conversion is still weak:
+      - `132` total `/analyze` requests in the window
+      - `110` `422` responses
+      - `17` unpaid `402` attempts
+      - `2` paid requests
+    - most recent `/analyze` failures are mixed probe traffic and brittle integrations, not one clean buyer cohort:
+      - `python-httpx/0.28.1` alone produced `52` invalid-address `422`s
+      - most `422`s were `missing_address`
+      - malformed examples like `0x4200000000000000000000000000000000000006/openapi.json` show URL-construction bugs or crawler misuse
+      - repeated `node`, `python-httpx`, `Go-http-client`, `Satring-Scraper`, `ScoutScore-*`, `X402-HealthCheck`, and `Thinkbot` traffic means raw request counts overstate real product demand
+    - the strongest current hidden batch / product-use signal is infrastructure evaluation:
+      - repeated paid and unpaid checks of canonical Base contracts, especially Base WETH
+      - recurring evaluator names like `ScoutScore-FidelityCheck/1.0`, `ScoutScore-HealthCheck/1.0`, `x402audit/1.0`, and `AgentScore-Enrichment/1.0`
+      - practical read: Augur is being tested as a machine trust primitive inside agent systems, routers, or listings, which is consistent with the existing product wedge
+  - commit / product read:
+    - `dee071e` (`Fix false positives and align admission-control metadata`) appears validated by live demand evidence:
+      - paid Base WETH responses before the fix were still `score=25` / `level=low`
+      - paid Base WETH responses after the fix were `score=0` / `level=safe`
+    - `9e1d59f` (`Fix analyze method contract behavior`) also appears validated:
+      - successful `OPTIONS /analyze` rows from `ScoutScore-FidelityCheck/1.0` now appear before unpaid probes, which is the intended compatibility path
+    - `93ba6f0` / `1af2be0` action-aware `approve` work is live and observable, but still not externally validated by demand:
+      - only `1` paid action-aware `approve` request is visible in the analyzed window
+      - it used Base WETH plus spender `0x1111111111111111111111111111111111111111`
+      - `action_decision=warn`
+      - `action_spender_trust=unchecked`
+      - current read: this is most likely the production smoke, not broad market usage
+  - recommended next move:
+    - no pivot
+    - make the first successful `/analyze` call path even more explicit on every machine-facing surface
+    - segment evaluator / health-check / crawler traffic from true conversion in analytics before using request counts as traction evidence
+    - keep action-aware scope narrow until repeated non-smoke paid usage appears
+- Added and deployed a concrete first-party action-aware `approve` example on 2026-04-06 / 2026-04-07 UTC:
+  - intent:
+    - make the current narrow action-aware product shape legible without widening the API
+    - show exactly how top-level contract policy and action-level policy can differ on `approve`
+    - keep the change on first-party surfaces instead of churning external registry copy again
+  - updated local surfaces:
+    - homepage (`/`)
+    - `skill.md`
+    - `llms.txt`
+    - `llms-full.txt`
+  - message shape:
+    - exact `GET /analyze?...&action=approve&spender=...&chain=base` request example
+    - example JSON with `action_context` and `action_evaluation`
+    - explicit note that V1 currently supports only `approve` on Base
+    - explicit note that spender trust remains `unchecked` when no allowlist is configured
+  - external/discovery follow-up:
+    - intentionally not yet applied to x402.jobs / MoltMart / Work402 / ERC-8004 / x402.org because this is supporting evidence for the current product message, not a new positioning change
+  - local verification passed:
+    - `python -m pytest tests/test_app.py -k "llms_txt or llms_full_txt or skill_md or landing_documents_action_aware_approve_example or landing_links_llms_txt" -q` -> `15 passed`
+    - `python -m pytest tests/test_app.py -q` -> `168 passed`
+  - deployment status:
+    - deployed from a clean detached worktree so unrelated local `auto_bench` changes were not shipped
+  - live verification after deploy:
+    - `flyctl status --app augurrisk` -> machine version `104`, state `started`, `1` passing health check
+    - `https://augurrisk.com/health` returned `{"status":"ok"}`
+    - homepage now contains `Action-Aware Example: Approve`
+    - live `skill.md`, `llms.txt`, and `llms-full.txt` now all contain the concrete `approve` example and `action_evaluation` output
+- Deployed the narrow `approve` refinement set on 2026-04-06:
+  - commit: `1af2be0` (`Refine action-aware approve policy`)
+  - `git push origin master` succeeded
+  - `flyctl deploy --remote-only --app augurrisk` timed out during health polling again, but the new image still landed and the app recovered to healthy on machine version `103`
+  - live verification after deploy:
+    - `flyctl status --app augurrisk` -> machine version `103`, state `started`, `1` passing health check
+    - `https://augurrisk.com/health` returned `{"status":"ok"}`
+    - `https://augurrisk.com/openapi.json` now includes `action_approve_spender_allowlisted` and `action_approve_spender_not_allowlisted`
+  - real paid production smoke on the live action-aware request shape succeeded:
+    - endpoint: `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base`
+    - observed flow: `402 -> signed PAYMENT-SIGNATURE -> 200`
+    - live result:
+      - `decision`: `allow`
+      - `action_evaluation.decision`: `warn`
+      - `action_evaluation.recommended_policy.reason_codes`: `["action_approve_requested"]`
+      - `score`: `0`
+      - `level`: `safe`
+  - live observability proof:
+    - `/stats` durable recent-entry view now shows the paid `approve` request with:
+      - `action_spender_trust: unchecked`
+      - `action_decision: warn`
+      - `funnel_stage: paid_request`
 - Added action-aware request observability locally on 2026-04-06:
   - `/analyze` request logging now records action-aware `approve` context more explicitly when present
   - new structured request-log fields:
@@ -32,7 +145,7 @@
     - `python -m pytest tests/test_config.py tests/test_logging.py tests/test_action_policy.py tests/test_app.py -q` -> `196 passed`
     - `python -m pytest -q` -> `395 passed`
   - deployment status:
-    - local only, not yet deployed to `augurrisk.com`
+    - deployed in `1af2be0`
 - Refined the action-aware `approve` layer locally on 2026-04-06 with an opt-in spender allowlist path:
   - new config env: `APPROVE_SPENDER_ALLOWLIST`
     - comma-separated Base spender addresses
@@ -50,7 +163,7 @@
     - `python -m pytest tests/test_config.py tests/test_action_policy.py tests/test_app.py -q` -> `181 passed`
     - `python -m pytest -q` -> `393 passed`
   - deployment status:
-    - local only, not yet deployed to `augurrisk.com`
+    - deployed in `1af2be0`
 - Implemented a narrow action-aware admission-control V1 locally on 2026-04-06:
   - `GET` and `POST /analyze` now accept optional action context fields:
     - `action`
@@ -725,9 +838,11 @@
    - proxy `no_code` vs `fetch_failed` semantics
    - one or two `reentrancy` edge cases
 2. Run `python auto/loop.py` and only change implementation if those new cases fail reproducibly.
-3. Escalate the Coinbase/CDP public discovery-feed gap with the current evidence set:
+3. Re-check the Coinbase/CDP public discovery feed with the refreshed evidence set:
    - real paid production smoke succeeded on 2026-04-03
+   - real paid production smoke also succeeded on 2026-04-06 on the live action-aware `approve` request shape
    - public feed recheck on 2026-04-03 local time still returned `NOT_FOUND` over the first `5` pages / `500` items
+   - if it is still absent after the newer smoke evidence, treat that as the support-escalation packet
 4. Keep `x402list.fun` classified as stale external state unless the directory itself updates.
 5. If you want stronger evidence before support escalation, do a broader but rate-limited feed scan beyond the first `500` items.
 7. Work through the 2026-03-11 outreach queue in `docs/outreach.md`, with OpenClaw after the tighter Base/x402 targets.
@@ -743,11 +858,15 @@
    - `/how-payment-works` visits
    - unpaid `402` attempts
    - paid requests
-12. If CDP support is not contacted yet, use the 2026-04-03 paid-smoke success plus the current `NOT_FOUND` public-feed scan as the escalation packet.
+12. If CDP support is not contacted yet, use the 2026-04-03 plus 2026-04-06 paid-smoke successes together with the current `NOT_FOUND` public-feed scan as the escalation packet.
 13. Only build more proof/demo surfaces if distribution shows confusion or weak conversion.
 14. If more public-page polish happens, keep checking that `/skill.md`, OpenAPI, and the paid `/analyze` path remain the dominant integration cues above the fold.
 15. Use real paid-call observations, not only `/stats`, to decide whether the current `allow / warn / manual_review / block` mapping matches actual evaluator behavior.
-16. In the next session, start a fresh hidden holdout discovery batch:
+16. The next highest-value move is distribution, not more product surface:
+   - use the live first-party `approve` example in outreach and demos
+   - watch whether it produces qualified action-aware `402` attempts, paid calls, or direct user questions
+   - only reopen `A-003` or a second action if that usage evidence justifies it
+17. In the next session, start a fresh hidden holdout discovery batch:
    - use `python auto/loop.py` as the default runner
    - run one batch at a time; do not queue multiple hidden discovery batches before you know what the previous one changed
    - add the next batch of real hidden holdouts under `auto/corpus/*.local.json` or `auto/candidates/*.local.json`
@@ -756,11 +875,11 @@
    - next target families should now move past that set unless a new real failure points back there
    - prioritize unseen detector/policy edge cases over widening the tracked public corpus immediately
    - only promote a new case into `auto/corpus/public_cases.json` if it is durable and representative
-17. Automation follow-up:
+18. Automation follow-up:
    - keep serial hidden-batch runs manual for now while the fixes are still shaping the research workflow
    - later, build a guarded local orchestrator that can run `N` serial batches end-to-end: hidden batch -> validation -> commit -> push -> deploy -> live verify -> next batch
    - first version should stay constrained to narrow selector/policy research surfaces and fail closed on ambiguous results
-18. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
+19. In the next session, tune `C:\Users\justi\dev\vault-synth` retrieval quality:
    - compare fused `search + vsearch` against plain `qmd query` on questions that should hit `outputs/`
    - decide whether the lexical branch should stay acronym-first, use a broader distilled keyword query, or use collection-aware hints
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
@@ -769,27 +888,33 @@
 1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
    - `https://augurrisk.com/health`
    - `https://augurrisk.com/openapi.json`
-   - live deployed baseline is `fef6a10`
-   - if the public domain ever times out again, check `flyctl status --app augurrisk` immediately; on 2026-03-30 the deploy itself succeeded but the machine needed a manual `flyctl machine start 287d341f3e0ed8 --app augurrisk` after Fly Machines API lease/rate-limit errors
-2. The paid-result problem and the wording/deploy work are already landed:
+   - live deployed state now includes the first-party `approve` example docs follow-up on machine version `104`
+   - if the next `flyctl deploy --remote-only` times out during health polling again, check `flyctl status --app augurrisk` and the live public routes immediately before assuming the deploy failed; on 2026-04-06 the deploy still landed and the machine recovered to healthy at version `103`, while the later docs-only follow-up deployed cleanly to version `104`
+2. The current narrow `approve` refinement is already landed on production:
+   - optional `APPROVE_SPENDER_ALLOWLIST` support is live
+   - action-aware request observability is live in `/stats` via `action_spender_trust` and `action_decision`
+   - a real paid action-aware `approve` smoke succeeded on 2026-04-06
+   - the first-party docs now also show one exact `approve` request/response example on `/`, `skill.md`, `llms.txt`, and `llms-full.txt`
+   - next product decision is whether live evidence justifies adding an explicit public spender-trust response field (`A-003`)
+3. The paid-result problem and the wording/deploy work are already landed:
    - Base WETH (`0x4200000000000000000000000000000000000006`) now returns `allow` locally
    - AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`) now returns `manual_review` locally
    - `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` now returns `allow` locally
    - internal live routes now reflect the admission-control wording
-3. Treat the March 26 OOM as secondary unless it repeats:
+4. Treat the March 26 OOM as secondary unless it repeats:
    - it caused one brief dropped request during crawler traffic on `/`
    - it did not overlap with the paid `/analyze` burst
    - if it happens again, consider a memory bump or more direct memory profiling
-4. The latest hidden discovery rerun is already green:
+5. The latest hidden discovery rerun is already green:
    - `python auto/loop.py` passed at `59/59` on 2026-03-30
    - `python -m pytest -q` passed at `363`
    - do not start a new hidden batch until you first add a new local candidate or holdout
-5. The endpoint method-contract follow-up is already landed locally:
+6. The endpoint method-contract follow-up is already landed locally:
    - `/analyze` now leaves `OPTIONS` and unsupported methods to Flask instead of masking them with `422`
    - POST `422` OpenAPI examples now explicitly cover conflicting query/body addresses plus malformed and non-object JSON bodies
    - `python -m pytest tests/test_app.py -q` passed at `151`
-   - next step is Coinbase/CDP support escalation or a broader rate-limited public-feed scan, then `x402list.fun`
-6. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
+   - next step is the refreshed Coinbase/CDP feed recheck or support escalation, then `x402list.fun`
+7. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
    - 8004scan
    - x402.jobs
    - MoltMart
@@ -797,12 +922,12 @@
    - x402.org/ecosystem
    - Coinbase public discovery feed
    - x402list.fun as an external stale-state check
-8. Runtime proof is now present from 2026-04-03:
-   - a real paid `/analyze` smoke succeeded from the Conway wallet to the live agent wallet
-   - Base WETH returned `allow` / `0` / `safe` with `0` findings
-   - use that success when reasoning about CDP/discovery visibility versus app-route health
-9. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
-10. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
+9. Runtime proof is now present from both 2026-04-03 and 2026-04-06:
+   - a real paid plain `/analyze` smoke succeeded from the Conway wallet to the live agent wallet
+   - a real paid action-aware `approve` smoke also succeeded on the live app
+   - use those successes when reasoning about CDP/discovery visibility versus app-route health
+10. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
+11. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
    - use `python auto/loop.py`
    - keep batches serial
    - add a new hidden holdout/candidate before changing detector logic again

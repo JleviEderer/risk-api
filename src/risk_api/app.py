@@ -25,6 +25,7 @@ from risk_api.analysis.action_policy import (
 from risk_api.analytics import (
     append_sqlite_entry,
     build_stats_payload,
+    classify_traffic_class,
     empty_stats_payload,
     init_sqlite_store,
     iter_jsonl_entries,
@@ -214,6 +215,9 @@ APPROVE_ACTION_ANALYSIS_EXAMPLE["action_evaluation"] = {
 
 SAFE_ANALYSIS_EXAMPLE_JSON = json.dumps(SAFE_ANALYSIS_EXAMPLE, indent=2)
 PROXY_ANALYSIS_EXAMPLE_JSON = json.dumps(PROXY_ANALYSIS_EXAMPLE, indent=2)
+APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON = json.dumps(
+    APPROVE_ACTION_ANALYSIS_EXAMPLE, indent=2
+)
 
 
 def _render_machine_doc(template: str, base_url: str) -> str:
@@ -221,6 +225,10 @@ def _render_machine_doc(template: str, base_url: str) -> str:
         template.replace("__BASE_URL__", base_url)
         .replace("__SAFE_ANALYSIS_EXAMPLE_JSON__", SAFE_ANALYSIS_EXAMPLE_JSON)
         .replace("__PROXY_ANALYSIS_EXAMPLE_JSON__", PROXY_ANALYSIS_EXAMPLE_JSON)
+        .replace(
+            "__APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__",
+            APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON,
+        )
     )
 
 
@@ -419,6 +427,7 @@ OPENAPI_SPEC: dict[str, object] = {
                             "type": "string",
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
+                        "example": SAFE_EXAMPLE_ADDRESS,
                         "description": BASE_ADDRESS_DESCRIPTION,
                     },
                     {
@@ -467,7 +476,7 @@ OPENAPI_SPEC: dict[str, object] = {
                                 "examples": {
                                     "safe_contract": {
                                         "summary": (
-                                            "Simple Base contract - no risk findings in this scan"
+                                            "Canonical first successful paid call - Base WETH"
                                         ),
                                         "value": SAFE_ANALYSIS_EXAMPLE,
                                     },
@@ -488,7 +497,13 @@ OPENAPI_SPEC: dict[str, object] = {
                         },
                     },
                     "402": {
-                        "description": "Payment required - send x402 payment and retry",
+                        "description": (
+                            "Payment required - first successful paid-call flow: "
+                            "send GET /analyze?address="
+                            f"{SAFE_EXAMPLE_ADDRESS}, receive x402 payment "
+                            "requirements, sign, and retry the same URL with "
+                            "PAYMENT-SIGNATURE."
+                        ),
                     },
                     "422": {
                         "description": "Invalid, missing, or non-contract Base mainnet address",
@@ -585,6 +600,7 @@ OPENAPI_SPEC: dict[str, object] = {
                             "type": "string",
                             "pattern": "^0x[0-9a-fA-F]{40}$",
                         },
+                        "example": SAFE_EXAMPLE_ADDRESS,
                         "description": BASE_ADDRESS_DESCRIPTION,
                     },
                     {
@@ -631,6 +647,21 @@ OPENAPI_SPEC: dict[str, object] = {
                                 "type": "object",
                                 "properties": _analyze_input_properties(),
                             },
+                            "examples": {
+                                "first_successful_paid_call": {
+                                    "summary": "Canonical first successful paid call body",
+                                    "value": {"address": SAFE_EXAMPLE_ADDRESS},
+                                },
+                                "approve_action": {
+                                    "summary": "Action-aware approve body",
+                                    "value": {
+                                        "address": SAFE_EXAMPLE_ADDRESS,
+                                        "action": AnalyzeAction.APPROVE.value,
+                                        "spender": APPROVE_EXAMPLE_SPENDER,
+                                        "chain": BASE_CHAIN_NAME,
+                                    },
+                                },
+                            },
                         }
                     },
                 },
@@ -642,6 +673,9 @@ OPENAPI_SPEC: dict[str, object] = {
                                 "schema": {"$ref": "#/components/schemas/AnalysisResult"},
                                 "examples": {
                                     "safe_contract": {
+                                        "summary": (
+                                            "Canonical first successful paid call - Base WETH"
+                                        ),
                                         "value": SAFE_ANALYSIS_EXAMPLE,
                                     },
                                     "approve_action": {
@@ -653,7 +687,12 @@ OPENAPI_SPEC: dict[str, object] = {
                         },
                     },
                     "402": {
-                        "description": "Payment required - send x402 payment and retry",
+                        "description": (
+                            "Payment required - first successful paid-call flow: "
+                            "send the canonical Base WETH address, receive x402 "
+                            "payment requirements, sign, and retry with "
+                            "PAYMENT-SIGNATURE."
+                        ),
                     },
                     "422": {
                         "description": "Invalid, missing, or non-contract Base mainnet address",
@@ -1728,8 +1767,8 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
 </section>
 
 <div class="section">
-<h2>Start Here If You Are An Agent</h2>
-<p class="section-copy">Start with the shortest docs, then call one paid endpoint when you need to check a contract. No API key, no signup, pay per request.</p>
+<h2>First Successful Paid Call</h2>
+<p class="section-copy">Use this exact Base WETH request as the canonical integration check. It is the fastest path from evaluator traffic to one successful paid machine call.</p>
 <div class="split-callouts">
   <div class="callout">
     <div class="kicker">Step 01</div>
@@ -1737,14 +1776,14 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
   </div>
   <div class="callout">
     <div class="kicker">Step 02</div>
-    <p>Call <code>/analyze</code> with a Base contract address, let your x402 client handle payment, and use the returned decision and policy recommendation before your workflow proceeds.</p>
+    <p>Call <code>/analyze?address=0x4200000000000000000000000000000000000006</code>, let your x402 client handle the <code>402</code> payment challenge, and retry the same URL with <code>PAYMENT-SIGNATURE</code>.</p>
   </div>
 </div>
 <pre>curl -s "__BASE_URL__/skill.md"
 
 curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
-<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Use Augur as a pre-transaction gate before your agent buys, routes funds, approves, pays, or interacts.</p>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Expected first success: HTTP <code>200</code> JSON with <code>decision: "allow"</code>, <code>level: "safe"</code>, and <code>score: 0</code>. If the address is missing or malformed, Augur returns <code>422</code> before payment.</p>
 </div>
 
 <div class="section">
@@ -1781,6 +1820,15 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
     <p>Screen a contract before an approval, listing, or other workflow treats it as acceptable.</p>
   </div>
 </div>
+</div>
+
+<div class="section">
+<h2>Action-Aware Example: Approve</h2>
+<p class="section-copy">V1 action-aware policy is intentionally narrow. It currently supports <code>action=approve</code> on Base and adds an action-level recommendation without replacing the base contract decision.</p>
+<pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&amp;action=approve&amp;spender=0x1111111111111111111111111111111111111111&amp;chain=base" \\
+  -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
+<p style="margin-top:8px">In this path, the contract can stay top-level <code>allow</code> while the action-level result becomes <code>warn</code>. That lets a calling wallet or agent stay more cautious about the approval than about the contract in the abstract.</p>
+<p style="margin-top:8px;color:var(--muted);font-size:.82rem">Current limit: action-aware V1 is only for <code>approve</code>. If no spender allowlist is configured, live requests log spender trust as <code>unchecked</code> and still return the narrower action-level policy.</p>
 </div>
 
 <div class="section">
@@ -2062,13 +2110,15 @@ ul{margin:8px 0 0 18px}
 </div>
 
 <div class="section">
-<h2>Quick examples</h2>
+<h2>First successful paid call</h2>
+<p>Use the Base WETH request below as the canonical integration check. It should produce HTTP <code>200</code> JSON with <code>decision: "allow"</code>, <code>level: "safe"</code>, and <code>score: 0</code> after your x402 client retries with payment.</p>
 <pre># First request
 GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 
 # Retry after signing payment
 GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;</pre>
+<p>If the request is missing <code>address</code>, appends another path after the address, or uses a malformed address, Augur returns <code>422</code> before payment.</p>
 <p>Integration references:</p>
 <ul>
   <li><a href="__BASE_URL__/.well-known/x402">Live x402 discovery document</a></li>
@@ -2157,6 +2207,7 @@ INTENT_PAGES: dict[str, dict[str, object]] = {
 
 PUBLIC_REQUEST_STAGE_BY_PATH: dict[str, str] = {
     "/": "landing_view",
+    "/health": "health_check",
     "/mcp": "mcp_guide_view",
     "/how-payment-works": "how_payment_view",
     "/skill.md": "skill_doc_fetch",
@@ -2357,11 +2408,43 @@ GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 Payment: Include a `PAYMENT-SIGNATURE` header with an x402 payment proof ($0.10 USDC on Base). \
 Any x402-compatible HTTP client handles this automatically.
 
+## First Successful Paid Call
+
+Use this exact Base WETH request as the canonical integration check:
+
+```http
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
+PAYMENT-SIGNATURE: <x402-payment-proof>
+```
+
+Expected first success: HTTP `200` JSON with `decision: "allow"`, `level: "safe"`, and `score: 0`.
+If the request is missing `address`, appends another path after the address, or uses a malformed address, Augur returns `422` before payment.
+
+## Action-Aware Example: Approve
+
+Augur also accepts a narrow action-aware context for `approve` on Base:
+
+```
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
+```
+
+This keeps the top-level contract `decision` intact and adds `action_context` plus `action_evaluation`.
+That means a clean contract can still return top-level `allow` while the approval-specific result returns action-level `warn`.
+
 ## Example Response
 
 ```json
 __SAFE_ANALYSIS_EXAMPLE_JSON__
 ```
+
+## Action-Aware Example Response
+
+```json
+__APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__
+```
+
+Current limit: action-aware V1 only supports `action=approve` on Base. \
+If no spender allowlist is configured, spender trust is treated as `unchecked`.
 
 ## Risk Levels
 
@@ -2407,7 +2490,7 @@ Use Augur when you need a fast deterministic first-pass contract gate on a Base 
 ## Fastest Path
 
 1. Read this file or `__BASE_URL__/openapi.json`
-2. Call `GET __BASE_URL__/analyze?address={base_contract_address}`
+2. For the first successful paid call, use `GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006`
 3. If you receive `402`, let your x402 client pay `$0.10` USDC on Base and retry with `PAYMENT-SIGNATURE`
 4. Read `decision`, `recommended_policy`, `findings`, `score`, `level`, `category_scores`, and optional `implementation`
 
@@ -2421,11 +2504,36 @@ Content-Type: application/json
 {"address":"0x4200000000000000000000000000000000000006"}
 ```
 
+## Action-Aware V1
+
+Augur also supports a narrow action-aware request shape for approval checks on Base:
+
+```http
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
+```
+
+Use this when your agent is about to approve a spender and you want a narrower action-level policy without replacing the base contract result.
+The response adds `action_context` and `action_evaluation`.
+
 ## Output Shape
 
 ```json
 __SAFE_ANALYSIS_EXAMPLE_JSON__
 ```
+
+## Action-Aware Example
+
+```json
+__APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__
+```
+
+The important distinction is:
+
+- top-level `decision` still describes the contract by default
+- `action_evaluation.decision` describes the specific `approve` action
+- a clean contract can stay top-level `allow` while the `approve` action returns `warn`
+
+Current limit: action-aware V1 currently supports only `approve` on Base, and `spender` is required for that action.
 
 Risk levels:
 
@@ -2491,11 +2599,26 @@ POST __BASE_URL__/analyze  (body: {"address": "{base_contract_address}"})
 **Payment:** $0.10 USDC on Base via x402. Send a request, receive 402 with payment \
 details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 
+## First Successful Paid Call
+
+Use this exact request as the canonical integration check:
+
+```http
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
+PAYMENT-SIGNATURE: <x402-payment-proof>
+```
+
+Expected first success: HTTP `200` JSON with `decision: "allow"`, `level: "safe"`, and `score: 0`.
+If the request is missing `address`, appends another path after the address, or uses a malformed address, Augur returns `422` before payment.
+
 ## Request Parameters
 
 | Parameter | Type   | Required | Description |
 |-----------|--------|----------|-------------|
 | address   | string | Yes      | Base mainnet contract address, 0x-prefixed, 40 hex chars |
+| action    | string | No       | Optional action-aware context. V1 currently supports only `approve` |
+| spender   | string | No       | Required when `action=approve`; Base spender address |
+| chain     | string | No       | Optional action-aware chain context. V1 currently supports only `base` |
 
 ## Example: Safe Contract
 
@@ -2521,6 +2644,28 @@ details, sign USDC authorization, retry with `PAYMENT-SIGNATURE` header.
 ```json
 __PROXY_ANALYSIS_EXAMPLE_JSON__
 ```
+
+## Example: Action-Aware Approve Request
+
+```http
+GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
+```
+
+This keeps the top-level contract decision and adds a second, narrower action-level judgment for the approval itself.
+
+## Example: Action-Aware Approve Response
+
+```json
+__APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__
+```
+
+In this example:
+
+- the contract-level `decision` is still `allow`
+- the action-level `action_evaluation.decision` is `warn`
+- the reason code `action_approve_requested` explains why the approval path is more cautious than the contract's default policy
+
+Current limit: action-aware V1 supports only `approve` on Base. If no spender allowlist is configured, the live service treats spender trust as `unchecked`.
 
 ## Response Schema
 
@@ -2939,6 +3084,7 @@ def _setup_request_logging(app: Flask) -> None:
             except Exception:
                 pass
 
+        entry["traffic_class"] = classify_traffic_class(entry)
         request_logger.info(json.dumps(entry, separators=(",", ":")))
 
         db_path = app.config.get("ANALYTICS_DB_PATH", "")
@@ -3459,6 +3605,10 @@ def create_app(
                 "deployer reputation (explorer-backed). Returns a default decision, "
                 "policy recommendation, supporting findings, and a 0-100 composite score.\n\n"
                 "## Usage\n\n"
+                "First successful paid call:\n"
+                f"GET /analyze?address={SAFE_EXAMPLE_ADDRESS}\n"
+                "PAYMENT-SIGNATURE: <x402-payment-proof>\n"
+                "Expected 200 JSON includes decision=allow, level=safe, score=0.\n\n"
                 "GET /analyze?address={base_contract_address}\n"
                 "POST /analyze with JSON body: {\"address\": \"0x...\"}\n\n"
                 "## Output\n\n"
