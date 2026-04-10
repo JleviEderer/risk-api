@@ -1,19 +1,19 @@
 # Handover
 
 ## Snapshot
-- Date: 2026-04-09
+- Date: 2026-04-10
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `c97098c` (`Add traffic quality dashboard and WETH proof`)
-- Deployed app baseline: `e552f78` (`Improve first paid call path and traffic segmentation`)
-- Status: deployed production is green on `e552f78`. The live app is healthy, Fly is on machine version `106` with `1` passing health check, and the public first-party surfaces now include both the concrete action-aware `approve` example and the canonical first successful paid-call Base WETH path across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, and OpenAPI examples. Live `/stats` now exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
+- Repo app-code baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; later commits may be handover-only)
+- Deployed app baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; app code from `c97098c`)
+- Status: deployed production is green on `0ab058c`. The live app is healthy, Fly is on machine version `110` with `1` passing health check, and the public first-party surfaces now include the dashboard Traffic Quality Classes panel, the `/reports/base-weth-before-after` proof artifact, the concrete action-aware `approve` example, the canonical first successful paid-call Base WETH path, and the `Call before pay / approve / interact` positioning copy across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, OpenAPI examples, and the sitemap. Live `/stats` exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
   - top-level `decision`: `allow`
   - action-level `decision`: `warn`
   - action-level reason codes: `action_approve_requested`
   Live `/stats` now also shows the new request-log observability fields for that paid `approve` request:
   - `action_spender_trust: unchecked`
   - `action_decision: warn`
-  The deploy quirk still matters operationally: the 2026-04-09 `flyctl deploy --remote-only --app augurrisk` run from clean detached worktree `C:\Users\justi\AppData\Local\Temp\risk-api-deploy-e552f78` succeeded, but printed a non-fatal lease-clear warning after the replacement machine reached a good state. Live verification immediately afterward returned `/health` `200`, OpenAPI `3.0.3` with the first-call 402 description, `llms.txt` containing both first-call and action-aware sections, and `/stats` with `storage_backend=sqlite`, `storage_durable=true`, and populated `traffic_classes`. The main product question is now whether the clearer first-call path reduces malformed `/analyze` probes and whether real unpaid conversion attempts turn into repeated paid calls before widening the action-aware API. External registry copy was intentionally left alone because the product positioning did not change. The only remaining local leftovers are unrelated autoresearch files (`auto/README.md`, `src/risk_api/auto_bench.py`, `tests/test_auto_bench.py`) plus scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+  The deploy quirk still matters operationally, but the 2026-04-10 `flyctl deploy --remote-only --app augurrisk` run from clean detached worktree `C:\Users\justi\AppData\Local\Temp\risk-api-deploy-0ab058c` completed cleanly and cleared its lease. Live verification immediately afterward returned `/health` `200`, `/dashboard` containing `Traffic Quality Classes`, `/reports/base-weth-before-after` containing both before/after scores, homepage and `llms.txt` containing `Call before pay. Call before approve. Call before interact.`, sitemap containing the new proof route, and `/stats` with populated `traffic_classes`. The main product question is now whether the clearer first-call path plus proof artifact reduces malformed `/analyze` probes and whether real unpaid conversion attempts turn into repeated paid calls before widening the action-aware API. External registry copy was intentionally left alone because the product positioning did not change. The only remaining local leftovers are unrelated autoresearch files (`auto/README.md`, `src/risk_api/auto_bench.py`, `tests/test_auto_bench.py`) plus scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
 - Traffic read on 2026-04-09: pulled the live durable SQLite analytics store from Fly machine `287d341f3e0ed8` (`/data/analytics.sqlite3` plus WAL state) and analyzed the last 10 local days (`2026-03-31` through `2026-04-09` Central). Main judgment: the product direction is still correct, but conversion is weak. The traffic validates the existing agent-first admission-control wedge rather than suggesting a pivot. Key counts in that 10-day window:
   - `4,363` total requests
   - `132` `/analyze` requests
@@ -24,7 +24,7 @@
   Strongest recurring actors were machine evaluators and ecosystem probers checking `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms.txt`, and then `/analyze`, not retail users. The March 29 false-positive fix clearly helped: paid Base WETH checks moved from `score=25` / `level=low` before `dee071e` to `score=0` / `level=safe` on `2026-04-04` and `2026-04-06`. The April 3 method-contract fix is also visible in successful `OPTIONS /analyze` probes from `ScoutScore-FidelityCheck/1.0`. Product implication: no strategy change, but next work should prioritize first-call conversion on `/analyze` and analytics segmentation for evaluator traffic versus real demand before widening the action-aware API.
 
 ## What Changed
-- Continued the conversion execution plan locally on 2026-04-10:
+- Continued and deployed the conversion execution plan on 2026-04-10:
   - added a `/dashboard` Traffic Quality Classes section that renders `traffic_classes` for:
     - real unpaid conversion attempts
     - paid requests
@@ -39,7 +39,12 @@
   - added the proof link to the homepage Proof of Work section and sitemap through the existing `REPORT_PAGES` registry path
   - added the positioning copy `Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.` to first-party public/machine docs
   - local verification passed: `python -m pytest -q` -> `401 passed`
-  - deployment status: not yet deployed in this section; deployed production remains `e552f78` until this local follow-up ships
+  - deployment verification passed:
+    - pushed `c97098c` and `0ab058c` to `origin/master`
+    - deployed from clean detached worktree `C:\Users\justi\AppData\Local\Temp\risk-api-deploy-0ab058c`
+    - `flyctl status --app augurrisk` -> machine version `110`, state `started`, `1` passing health check
+    - `https://augurrisk.com/health` -> `200 {"status":"ok"}`
+    - live `/dashboard`, `/reports/base-weth-before-after`, homepage, `llms.txt`, sitemap, and `/stats.traffic_classes` verified
 - Started and deployed the conversion-focused follow-up on 2026-04-09:
   - tightened the canonical first successful paid-call path around Base WETH (`GET /analyze?address=0x4200000000000000000000000000000000000006`) across homepage copy, `llms.txt`, `llms-full.txt`, `skill.md`, `/how-payment-works`, `/.well-known/x402`, and OpenAPI examples
   - added first-class analytics `traffic_class` labels and `/stats.traffic_classes` counts for:
