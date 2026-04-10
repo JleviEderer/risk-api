@@ -4,7 +4,7 @@
 - Date: 2026-04-09
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo code baseline: `3938fe5`
+- Repo code baseline: `c97098c` (`Add traffic quality dashboard and WETH proof`)
 - Deployed app baseline: `e552f78` (`Improve first paid call path and traffic segmentation`)
 - Status: deployed production is green on `e552f78`. The live app is healthy, Fly is on machine version `106` with `1` passing health check, and the public first-party surfaces now include both the concrete action-aware `approve` example and the canonical first successful paid-call Base WETH path across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, and OpenAPI examples. Live `/stats` now exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
   - top-level `decision`: `allow`
