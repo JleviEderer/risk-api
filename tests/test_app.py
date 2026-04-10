@@ -1003,6 +1003,9 @@ def test_dashboard_returns_html(client):
     assert resp.content_type.startswith("text/html")
     assert b"risk-api" in resp.data
     assert b"<canvas" in resp.data
+    assert b"Traffic Quality Classes" in resp.data
+    assert b"real_unpaid_conversion_attempt" in resp.data
+    assert b"malformed_probe" in resp.data
 
 
 def test_dashboard_not_behind_paywall(client_with_x402):
@@ -1361,6 +1364,8 @@ def test_landing_returns_html(client):
     assert resp.content_type.startswith("text/html")
     assert b"Augur" in resp.data
     assert b"Screen a Base contract before your agent touches it." in resp.data
+    assert b"Call before pay. Call before approve. Call before interact." in resp.data
+    assert b"deterministic preflight for Base contract actions" in resp.data
     assert b"not a full audit or guarantee" in resp.data
 
 
@@ -1406,6 +1411,7 @@ def test_landing_links_intent_pages(client):
 def test_landing_links_proof_report(client):
     resp = client.get("/")
     assert b"/reports/base-bluechip-bytecode-snapshot" in resp.data
+    assert b"/reports/base-weth-before-after" in resp.data
 
 
 def test_landing_uses_public_url(app):
@@ -1503,6 +1509,21 @@ def test_proof_report_page(client):
     assert b'&quot;decision&quot;: &quot;block&quot;' in resp.data
 
 
+def test_weth_before_after_proof_report_page(client):
+    resp = client.get("/reports/base-weth-before-after")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    assert b"Base WETH Before/After Fix" in resp.data
+    assert b"Exact request: GET /analyze?address=0x4200000000000000000000000000000000000006" in resp.data
+    assert b"Before: Base WETH false positive" in resp.data
+    assert b"After: Base WETH clean result" in resp.data
+    assert b'&quot;score&quot;: 25' in resp.data
+    assert b'&quot;score&quot;: 0' in resp.data
+    assert b'&quot;level&quot;: &quot;safe&quot;' in resp.data
+    assert b'&quot;decision&quot;: &quot;allow&quot;' in resp.data
+    assert b"This before/after artifact uses the same Base WETH request" in resp.data
+
+
 def test_proof_report_snapshots_match_current_policy_semantics():
     for report in REPORT_PAGES.values():
         for contract in report["contracts"]:
@@ -1527,10 +1548,17 @@ def test_proof_report_uses_public_url(app):
         assert b"https://augurrisk.com/" in resp.data
         assert b"https://augurrisk.com/how-payment-works" in resp.data
         assert b"https://augurrisk.com/openapi.json" in resp.data
+        resp = c.get("/reports/base-weth-before-after")
+        assert b"https://augurrisk.com/" in resp.data
+        assert b"https://augurrisk.com/how-payment-works" in resp.data
+        assert b"https://augurrisk.com/openapi.json" in resp.data
 
 
 def test_proof_report_not_behind_paywall(client_with_x402):
     resp = client_with_x402.get("/reports/base-bluechip-bytecode-snapshot")
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/html")
+    resp = client_with_x402.get("/reports/base-weth-before-after")
     assert resp.status_code == 200
     assert resp.content_type.startswith("text/html")
 
@@ -1679,6 +1707,7 @@ def test_sitemap_lists_public_endpoints(client):
     assert "/proxy-risk-api" in text
     assert "/deployer-reputation-api" in text
     assert "/reports/base-bluechip-bytecode-snapshot" in text
+    assert "/reports/base-weth-before-after" in text
     assert "/openapi.json" in text
     assert "/agent-metadata.json" in text
     assert "/.well-known/agent-card.json" in text
@@ -1789,6 +1818,7 @@ def test_llms_txt_documents_first_successful_paid_call(client):
     )
     assert 'decision: "allow"' in text
     assert "returns `422` before payment" in text
+    assert "Call before pay. Call before approve. Call before interact." in text
 
 
 def test_llms_txt_uses_public_url(app):
@@ -1873,6 +1903,7 @@ def test_skill_md_returns_markdown(client):
     assert "action=approve" in text
     assert "first successful paid call" in text
     assert "0x4200000000000000000000000000000000000006" in text
+    assert "deterministic preflight for Base contract actions" in text
 
 
 def test_skill_md_uses_public_url(app):

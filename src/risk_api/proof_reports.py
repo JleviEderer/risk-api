@@ -341,7 +341,105 @@ REPORT_PAGES: dict[str, dict[str, object]] = {
                 ),
             },
         ],
-    }
+    },
+    "/reports/base-weth-before-after": {
+        "title": "Base WETH Before/After Fix",
+        "meta_description": (
+            "Proof artifact showing the exact Augur request and output before "
+            "and after the Base WETH false-positive fix."
+        ),
+        "eyebrow": "Quality Proof",
+        "snapshot_date": "2026-04-09",
+        "scope": (
+            "This before/after artifact uses the same Base WETH request on both "
+            "sides of the March 29 false-positive fix: "
+            "GET /analyze?address=0x4200000000000000000000000000000000000006."
+        ),
+        "summary": (
+            "Base WETH is the canonical first successful paid-call example for "
+            "Augur. This report shows why the recent detector-quality work matters: "
+            "the same request moved from a conservative honeypot false positive to "
+            "a clean safe result."
+        ),
+        "methodology": [
+            "Exact request: GET /analyze?address=0x4200000000000000000000000000000000000006.",
+            "Before snapshot: observed before the March 29 false-positive fix, when standard dispatcher/default-REVERT patterns could surface as a honeypot warning.",
+            "After snapshot: observed after the fix, including paid production checks on 2026-04-04 and 2026-04-06 returning score=0, level=safe, decision=allow.",
+            "Both JSON blocks are shaped like the live /analyze response contract and are static evidence, not recomputed on page load.",
+        ],
+        "takeaways": [
+            "The product became less noisy on a canonical Base contract without widening the API.",
+            "This is the kind of quality proof evaluators need before trusting Augur as a repeat machine-to-machine preflight.",
+            "The first-call example now points at a request that should return a clean allow result rather than a false-positive warning.",
+        ],
+        "contracts": [
+            {
+                "name": "Before: Base WETH false positive",
+                "snapshot": {
+                    "address": "0x4200000000000000000000000000000000000006",
+                    "score": 25,
+                    "level": "low",
+                    "decision": "block",
+                    "recommended_policy": {
+                        "action": "block",
+                        "summary": (
+                            "Block automatic interaction by default. Only proceed "
+                            "with an explicit override after deeper review."
+                        ),
+                        "reason_codes": ["honeypot_signal"],
+                    },
+                    "findings": [
+                        {
+                            "detector": "honeypot",
+                            "severity": "high",
+                            "title": "Potential honeypot: conditional REVERT in transfer path",
+                            "description": (
+                                "Contract has transfer functions with conditional REVERT "
+                                "patterns that could selectively block token transfers "
+                                "for certain addresses."
+                            ),
+                            "points": 25,
+                            "offset": 361,
+                        }
+                    ],
+                    "category_scores": {"honeypot": 25},
+                    "bytecode_size": 2041,
+                    "implementation": None,
+                },
+                "interpretation": (
+                    "This was the wrong operational result for the canonical Base WETH "
+                    "first-call path. The detector was too broad around common control-flow "
+                    "patterns, so the policy layer blocked an otherwise standard wrapped asset."
+                ),
+            },
+            {
+                "name": "After: Base WETH clean result",
+                "snapshot": {
+                    "address": "0x4200000000000000000000000000000000000006",
+                    "score": 0,
+                    "level": "safe",
+                    "decision": "allow",
+                    "recommended_policy": {
+                        "action": "allow",
+                        "summary": (
+                            "Allow by default for first-pass automation. Continue "
+                            "only if this matches your broader strategy and trust model."
+                        ),
+                        "reason_codes": [],
+                    },
+                    "findings": [],
+                    "category_scores": {},
+                    "bytecode_size": 4632,
+                    "implementation": None,
+                },
+                "interpretation": (
+                    "After the fix, the same request returns the intended first-call "
+                    "shape: score 0, level safe, and decision allow. That makes Base "
+                    "WETH a better onboarding and evaluator smoke-test target."
+                ),
+            },
+        ],
+    },
 }
 
 
@@ -363,6 +461,13 @@ def render_report_page(base_url: str, path: str) -> str:
     eyebrow = str(report["eyebrow"])
     snapshot_date = str(report["snapshot_date"])
     summary = str(report["summary"])
+    scope = str(
+        report.get(
+            "scope",
+            f"This snapshot was generated on {snapshot_date} for three notable "
+            "Base contracts: WETH, USDC, and cbBTC.",
+        )
+    )
     methodology = "\n".join(
         f"<li>{escape(str(item))}</li>" for item in report["methodology"]
     )
@@ -495,7 +600,7 @@ pre{{background:#0f1117;border:1px solid #2d3148;border-radius:6px;padding:14px;
 
 <div class="section">
   <h2>Scope</h2>
-  <p>This snapshot was generated on <strong>{escape(snapshot_date)}</strong> for three notable Base contracts: WETH, USDC, and cbBTC.</p>
+  <p>{escape(scope)}</p>
   <ul>
     {methodology}
   </ul>

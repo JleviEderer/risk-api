@@ -90,7 +90,7 @@
 
 ## Validation
 1. **[2026-04-09] Separate evaluator traffic from real demand in Fly analytics**
-   Do instead: use the request `traffic_class` field and `/stats.traffic_classes` first; treat `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms*.txt`, health checks, and repeated Base WETH `402` or paid probes as machine-evaluator traffic unless a real integration trail proves otherwise; judge traction from repeated non-smoke paid calls and successful first-call conversion, not raw high-intent counts.
+   Do instead: use `/dashboard` Traffic Quality Classes plus the request `traffic_class` field and `/stats.traffic_classes` first; treat `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms*.txt`, health checks, and repeated Base WETH `402` or paid probes as machine-evaluator traffic unless a real integration trail proves otherwise; judge traction from repeated non-smoke paid calls and successful first-call conversion, not raw high-intent counts.
 2. **[2026-04-06] Observe narrow action-aware behavior before widening the API**
    Do instead: log `approve` spender trust and action-level decision first, ship that narrow instrumentation with the current allowlist refinement, and only add extra public response fields if live usage shows the reason codes are not enough.
 3. **[2026-04-06] After an action-aware deploy, verify `/stats` as well as the route**

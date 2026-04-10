@@ -1136,6 +1136,20 @@ h1 span{color:var(--blue)}
 }
 .mini .big{font-size:1.6rem;font-weight:700;letter-spacing:-.03em}
 .mini .muted{margin-top:6px;color:var(--muted);font-size:.82rem;line-height:1.45}
+.traffic-class-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.traffic-class{
+  background:rgba(9,18,31,.72);
+  border:1px solid rgba(34,53,84,.8);
+  border-radius:16px;
+  padding:14px;
+}
+.traffic-class .name{font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.traffic-class .count{font-size:1.55rem;font-weight:700;margin-top:8px;letter-spacing:-.03em}
+.traffic-class .share{margin-top:4px;color:#9fb0c8;font-size:.8rem}
+.traffic-class.good .count{color:var(--green)}
+.traffic-class.warn .count{color:var(--amber)}
+.traffic-class.noise .count{color:var(--purple)}
+.traffic-class.health .count{color:var(--blue)}
 .progress-cluster{display:grid;gap:10px}
 .progress-row{display:grid;gap:6px}
 .progress-label{display:flex;justify-content:space-between;gap:12px;font-size:.84rem;color:#d6e1f2}
@@ -1188,11 +1202,12 @@ tr:hover td{background:rgba(17,29,47,.45)}
   .layout{grid-template-columns:1fr}
   .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
   .chart-grid{grid-template-columns:1fr}
+  .traffic-class-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:720px){
   .shell{padding:18px 14px 28px}
   .hero,.section,.card{border-radius:18px}
-  .cards,.mini-grid{grid-template-columns:1fr}
+  .cards,.mini-grid,.traffic-class-grid{grid-template-columns:1fr}
   h1{font-size:1.7rem}
 }
 </style>
@@ -1312,6 +1327,12 @@ tr:hover td{background:rgba(17,29,47,.45)}
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="section">
+        <h2>Traffic Quality Classes</h2>
+        <div class="intro">First-class labels for separating health checks, evaluator bots, malformed probes, real unpaid conversion attempts, and paid requests.</div>
+        <div class="traffic-class-grid" id="traffic-classes"></div>
       </section>
 
       <section class="section">
@@ -1481,14 +1502,58 @@ function renderStageCounts(stageCounts){
     return topItemRow(stageLabel(pair[0]),pair[1]);
   }).join('');
 }
+function classLabel(key){
+  var labels={
+    known_health_check:'Health checks',
+    known_directory_evaluator_bot:'Evaluator bots',
+    malformed_probe:'Malformed probes',
+    real_unpaid_conversion_attempt:'Real unpaid attempts',
+    paid_request:'Paid requests',
+    other_traffic:'Other traffic'
+  };
+  return labels[key]||key;
+}
+function classTone(key){
+  if(key==='paid_request'||key==='real_unpaid_conversion_attempt')return 'good';
+  if(key==='malformed_probe')return 'warn';
+  if(key==='known_health_check')return 'health';
+  if(key==='known_directory_evaluator_bot')return 'noise';
+  return '';
+}
+function renderTrafficClasses(classes,total){
+  var el=document.getElementById('traffic-classes');
+  var keys=[
+    'real_unpaid_conversion_attempt',
+    'paid_request',
+    'malformed_probe',
+    'known_directory_evaluator_bot',
+    'known_health_check',
+    'other_traffic'
+  ];
+  if(!classes){
+    el.innerHTML='<div class="empty">Traffic class data is not available yet.</div>';
+    return;
+  }
+  el.innerHTML=keys.map(function(key){
+    var count=classes[key]||0;
+    return '<div class="traffic-class '+classTone(key)+'">'
+      +'<div class="name">'+classLabel(key)+'</div>'
+      +'<div class="count">'+fmtNumber(count)+'</div>'
+      +'<div class="share">'+pct(count,total)+' of tracked traffic</div>'
+      +'</div>';
+  }).join('');
+}
 function renderInsights(data){
   var funnel=data.funnel||{};
+  var classes=data.traffic_classes||{};
   var total=data.total_requests||0;
   var landing=funnel.landing_views||0;
   var intent=funnel.intent_page_views||0;
   var docs=funnel.machine_doc_fetches||0;
   var attempts=funnel.valid_unpaid_402_attempts||0;
   var paid=funnel.paid_requests||0;
+  var malformed=classes.malformed_probe||0;
+  var evaluators=classes.known_directory_evaluator_bot||0;
   var items=[];
 
   if(intent>0){
@@ -1507,6 +1572,12 @@ function renderInsights(data){
     items.push('<div class="insight"><strong>Machine discovery currently outweighs human demand.</strong><span>'+fmtNumber(docs)+' machine-doc fetches versus '+fmtNumber(landing)+' landing views suggests crawlers and agent registries are still a large share of traffic.</span></div>');
   }else{
     items.push('<div class="insight"><strong>Homepage awareness is carrying the current traffic mix.</strong><span>'+fmtNumber(landing)+' landing views account for '+pct(landing,total)+' of tracked traffic on this instance.</span></div>');
+  }
+
+  if(malformed>attempts){
+    items.push('<div class="insight"><strong>Malformed probes still dominate first-use friction.</strong><span>'+fmtNumber(malformed)+' malformed probes versus '+fmtNumber(attempts)+' real unpaid conversion attempts. Keep the canonical first paid call impossible to miss.</span></div>');
+  }else if(attempts>0){
+    items.push('<div class="insight"><strong>Unpaid conversion attempts are visible.</strong><span>'+fmtNumber(attempts)+' real unpaid attempts are now separated from '+fmtNumber(evaluators)+' evaluator or directory-bot events.</span></div>');
   }
 
   document.getElementById('insights').innerHTML=items.join('');
@@ -1596,6 +1667,7 @@ function refresh(){
     document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString();
     renderTrafficChart(d);
     renderFunnelBars(d);
+    renderTrafficClasses(d.traffic_classes||{},total);
     renderInsights(d);
     renderList('top-paths',d.top_paths,'path','No paths logged yet.');
     renderList('top-hosts',d.top_hosts,'host','No hosts logged yet.');
@@ -1751,6 +1823,7 @@ footer{margin-top:28px;padding-top:16px;border-top:1px solid rgba(63,95,134,.22)
   <h1>Screen a Base contract before your agent touches it.</h1>
   <p class="subtitle">Deterministic Base contract admission control for agents. Decide whether a Base contract interaction should proceed before your agent buys, routes funds, approves, pays, or interacts.</p>
   <span class="badge">$0.10/call via x402 &middot; No API key needed</span>
+  <p class="hero-note">Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.</p>
   <p class="hero-note">Fastest path for integration: start with <a href="__BASE_URL__/skill.md">/skill.md</a> if you want the shortest agent-oriented workflow, use <a href="__BASE_URL__/openapi.json">/openapi.json</a> for a formal schema, or install the local wrapper from <a href="__BASE_URL__/mcp">/mcp</a>.</p>
   <div class="hero-stats">
     <div class="hero-stat"><strong>8</strong><span>Detectors</span></div>
@@ -1863,6 +1936,7 @@ Pay with any x402-compatible client. Returns JSON with decision, recommended_pol
 <p class="section-copy">See exact Augur output on notable Base contracts before you wire the API into an agent policy.</p>
 <div class="links">
   <a href="__BASE_URL__/reports/base-bluechip-bytecode-snapshot">Base Blue-Chip Bytecode Snapshot <div class="path">/reports/base-bluechip-bytecode-snapshot</div></a>
+  <a href="__BASE_URL__/reports/base-weth-before-after">Base WETH Before/After Fix <div class="path">/reports/base-weth-before-after</div></a>
 </div>
 </div>
 
@@ -2396,7 +2470,8 @@ LLMS_TXT = """\
 
 Augur fetches on-chain bytecode for a Base mainnet smart contract (EIP-155:8453) \
 and runs 8 deterministic detectors to produce a default decision, policy recommendation, supporting findings, and a composite score from 0 (safe) to 100 (critical).
-Use Augur before your agent buys, routes funds, approves, pays, or interacts.
+Use Augur before your agent buys, routes funds, approves, pays, or interacts. \
+Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.
 A `safe` result means no major bytecode-level risk signals were detected in this scan, not that the contract is audited or guaranteed safe.
 
 ## How to Call
@@ -2486,6 +2561,7 @@ payment:
 # Augur
 
 Use Augur when you need a fast deterministic first-pass contract gate on a Base mainnet contract. Use it before your agent buys, routes funds, approves, pays, or interacts.
+Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.
 
 ## Fastest Path
 
@@ -2585,6 +2661,7 @@ LLMS_FULL_TXT = """\
 
 Augur is a paid HTTP API for deterministic pre-transaction contract admission control on Base (EIP-155:8453). \
 Use Augur before your agent buys, routes funds, approves, pays, or interacts. \
+Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions. \
 It uses deterministic bytecode pattern matching (no LLM) for fast, reliable results. \
 It is a fast bytecode gate, not a full security audit, simulator, runtime monitor, or guarantee. \
 Payment is via the x402 HTTP payment protocol - no API key, no signup, no subscription.

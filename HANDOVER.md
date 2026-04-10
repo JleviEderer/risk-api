@@ -24,6 +24,22 @@
   Strongest recurring actors were machine evaluators and ecosystem probers checking `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms.txt`, and then `/analyze`, not retail users. The March 29 false-positive fix clearly helped: paid Base WETH checks moved from `score=25` / `level=low` before `dee071e` to `score=0` / `level=safe` on `2026-04-04` and `2026-04-06`. The April 3 method-contract fix is also visible in successful `OPTIONS /analyze` probes from `ScoutScore-FidelityCheck/1.0`. Product implication: no strategy change, but next work should prioritize first-call conversion on `/analyze` and analytics segmentation for evaluator traffic versus real demand before widening the action-aware API.
 
 ## What Changed
+- Continued the conversion execution plan locally on 2026-04-10:
+  - added a `/dashboard` Traffic Quality Classes section that renders `traffic_classes` for:
+    - real unpaid conversion attempts
+    - paid requests
+    - malformed probes
+    - known directory/evaluator bots
+    - known health checks
+    - other traffic
+  - added a new registry-backed proof page at `/reports/base-weth-before-after` showing:
+    - exact Base WETH request
+    - before output: `score=25`, `level=low`, `decision=block`, `reason_codes=["honeypot_signal"]`
+    - after output: `score=0`, `level=safe`, `decision=allow`, `reason_codes=[]`
+  - added the proof link to the homepage Proof of Work section and sitemap through the existing `REPORT_PAGES` registry path
+  - added the positioning copy `Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.` to first-party public/machine docs
+  - local verification passed: `python -m pytest -q` -> `401 passed`
+  - deployment status: not yet deployed in this section; deployed production remains `e552f78` until this local follow-up ships
 - Started and deployed the conversion-focused follow-up on 2026-04-09:
   - tightened the canonical first successful paid-call path around Base WETH (`GET /analyze?address=0x4200000000000000000000000000000000000006`) across homepage copy, `llms.txt`, `llms-full.txt`, `skill.md`, `/how-payment-works`, `/.well-known/x402`, and OpenAPI examples
   - added first-class analytics `traffic_class` labels and `/stats.traffic_classes` counts for:
