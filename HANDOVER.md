@@ -4,7 +4,8 @@
 - Date: 2026-04-10
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo app-code baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; later commits may be handover-only)
+- Repo baseline: `d6e11f8` (`Update handover after dashboard proof deploy`; handover-only)
+- Repo app-code baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; app code from `c97098c`)
 - Deployed app baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; app code from `c97098c`)
 - Status: deployed production is green on `0ab058c`. The live app is healthy, Fly is on machine version `110` with `1` passing health check, and the public first-party surfaces now include the dashboard Traffic Quality Classes panel, the `/reports/base-weth-before-after` proof artifact, the concrete action-aware `approve` example, the canonical first successful paid-call Base WETH path, and the `Call before pay / approve / interact` positioning copy across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, OpenAPI examples, and the sitemap. Live `/stats` exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
   - top-level `decision`: `allow`

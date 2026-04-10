@@ -2,7 +2,7 @@
 
 ## Repo Workflow
 1. **[2026-03-10] Public proof pages are registry-driven**
-   Do instead: add new proof reports in `src/risk_api/proof_reports.py` and let `REPORT_PAGES` drive routing, sitemap inclusion, and request logging.
+   Do instead: add new proof reports in `src/risk_api/proof_reports.py` and let `REPORT_PAGES` drive routing, sitemap inclusion, and request logging; reuse `/reports/base-weth-before-after` as the current Base WETH false-positive before/after proof artifact instead of recreating it elsewhere.
 2. **[2026-03-10] Keep proof-report assets explicit**
    Do instead: use report-specific OG images for proof pages when promoting them; the generic `/avatar.png` reads like stock security art in social previews.
 3. **[2026-03-16] Treat `pause()` as suspicious admin control, not silent allow**
