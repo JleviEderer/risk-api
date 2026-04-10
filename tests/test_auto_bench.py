@@ -47,6 +47,58 @@ def test_candidate_failure_metrics_count_reproducible_blind_spots(tmp_path):
     assert summary["blind_spots"] == ["raw_delegatecall_allow_regression"]
 
 
+def test_analysis_case_supports_mocked_rpc_and_explorer(tmp_path):
+    analysis_path = tmp_path / "analysis.local.json"
+    analysis_path.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "analysis-deployer-not-found",
+                    "name": "Analysis case can drive mocked explorer-backed reputation",
+                    "kind": "analysis",
+                    "source": "holdout",
+                    "tags": ["policy", "deployer_reputation"],
+                    "input": {
+                        "address": "0x" + "ab" * 20,
+                        "rpc_url": "https://rpc.example",
+                        "rpc": [
+                            {
+                                "result": "0x6080604052" + ("00" * 200),
+                            }
+                        ],
+                        "explorer": [
+                            {
+                                "json": {
+                                    "status": "0",
+                                    "message": "No data found",
+                                    "result": [],
+                                }
+                            }
+                        ],
+                    },
+                    "expected": {
+                        "score": 3,
+                        "level": "safe",
+                        "decision": "warn",
+                        "reason_codes_include": ["deployer_reputation_signal"],
+                        "findings_include": ["deployer_reputation"],
+                        "category_scores_include": {
+                            "deployer_reputation": 3,
+                        },
+                        "proxy_resolution_status": "not_proxy",
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = run_bench([analysis_path], include_app_contract_checks=False)
+
+    assert summary["failed_checks"] == 0
+    assert summary["passed_checks"] == 1
+
+
 def test_app_contract_checks_fail_on_stale_proof_report_policy(monkeypatch):
     stale_reports = {
         **auto_bench.REPORT_PAGES,

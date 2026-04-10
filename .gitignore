@@ -26,3 +26,8 @@ docs/autonomous-agent-operations-field-guide.local.md
 auto/**/*.local.json
 auto/runs/
 auto/notes.local.md
+.claude/
+.codex/live_db/
+.codex/research.local/
+.codex/tmp/
+.playwright-mcp/

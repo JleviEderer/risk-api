@@ -61,6 +61,16 @@ Use this for:
 - reason code regressions
 - action-layer regressions that cannot be expressed with a single bytecode blob
 
+### `analysis`
+
+Runs a fully mocked `analyze_contract()` pass, including RPC and explorer calls.
+
+Use this for:
+
+- deployer-reputation behavior that depends on explorer responses
+- proxy `resolved` vs `no_code` vs `fetch_failed` runtime behavior
+- mixed engine outcomes that need real fetch plus policy integration
+
 ### `serialization`
 
 Normalizes a snapshot through the live serializer and checks the wire shape.

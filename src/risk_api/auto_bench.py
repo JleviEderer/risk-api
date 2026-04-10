@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -199,6 +200,8 @@ def _evaluate_case(case: Mapping[str, Any]) -> CheckResult:
         actual = _evaluate_bytecode_case(case)
     elif kind == "policy":
         actual = _evaluate_policy_case(case)
+    elif kind == "analysis":
+        actual = _evaluate_analysis_case(case)
     elif kind == "serialization":
         actual = _evaluate_serialization_case(case)
     else:
@@ -266,6 +269,74 @@ def _evaluate_policy_case(case: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _evaluate_analysis_case(case: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        import responses
+    except ImportError as exc:
+        raise RuntimeError(
+            "analysis cases require the optional dev dependency 'responses'"
+        ) from exc
+
+    from unittest.mock import patch
+
+    from risk_api.analysis.engine import analyze_contract, clear_analysis_cache
+    from risk_api.analysis.reputation import BLOCKSCOUT_API, clear_reputation_cache
+    from risk_api.chain.rpc import clear_cache as clear_rpc_cache
+
+    inputs = _require_mapping(case, "input")
+    address = str(inputs["address"])
+    rpc_url = str(inputs.get("rpc_url", "https://mainnet.base.org"))
+    basescan_api_key = str(inputs.get("basescan_api_key", ""))
+    rpc_specs = _require_list(inputs, "rpc")
+    explorer_specs = _optional_list(inputs, "explorer")
+    mock_now = inputs.get("mock_now")
+
+    clear_rpc_cache()
+    clear_analysis_cache()
+    clear_reputation_cache()
+
+    try:
+        with responses.RequestsMock(assert_all_requests_are_fired=True) as mocked:
+            for spec in rpc_specs:
+                _register_mock_response(
+                    mocked,
+                    responses.POST,
+                    rpc_url,
+                    spec,
+                    wrap_as_json_rpc=True,
+                )
+            for spec in explorer_specs:
+                _register_mock_response(
+                    mocked,
+                    responses.GET,
+                    BLOCKSCOUT_API,
+                    spec,
+                    wrap_as_json_rpc=False,
+                )
+
+            time_ctx = (
+                patch("risk_api.analysis.reputation.time.time", return_value=int(mock_now))
+                if mock_now is not None
+                else nullcontext()
+            )
+            with time_ctx:
+                result = analyze_contract(address, rpc_url, basescan_api_key)
+    finally:
+        clear_rpc_cache()
+        clear_analysis_cache()
+        clear_reputation_cache()
+
+    return {
+        "score": result.score,
+        "level": result.level.value,
+        "decision": result.decision.value,
+        "reason_codes": list(result.recommended_policy.reason_codes),
+        "findings": [finding.detector for finding in result.findings],
+        "category_scores": dict(result.category_scores),
+        "proxy_resolution_status": result.proxy_resolution_status.value,
+    }
+
+
 def _evaluate_serialization_case(case: Mapping[str, Any]) -> dict[str, Any]:
     snapshot = _require_mapping(case, "snapshot")
     wire = normalize_analysis_snapshot(snapshot)
@@ -286,7 +357,7 @@ def _compare_expected(actual: Mapping[str, Any], expected: Any) -> list[str]:
         return [f"Expected contract must be an object, got: {type(expected).__name__}"]
 
     mismatches: list[str] = []
-    for key in ("score", "level", "decision"):
+    for key in ("score", "level", "decision", "proxy_resolution_status"):
         if key in expected and actual.get(key) != expected[key]:
             mismatches.append(
                 f"{key}: expected {expected[key]!r}, got {actual.get(key)!r}"
@@ -539,6 +610,59 @@ def _require_mapping(case: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"Case {case.get('id', '<unknown>')} must include object {key!r}")
     return value
+
+
+def _require_list(case: Mapping[str, Any], key: str) -> list[Any]:
+    value = case.get(key)
+    if not isinstance(value, list):
+        raise ValueError(f"Case {case.get('id', '<unknown>')} must include array {key!r}")
+    return value
+
+
+def _optional_list(case: Mapping[str, Any], key: str) -> list[Any]:
+    value = case.get(key, [])
+    if not isinstance(value, list):
+        raise ValueError(f"Case {case.get('id', '<unknown>')} field {key!r} must be an array")
+    return value
+
+
+def _register_mock_response(
+    mocked: Any,
+    method: str,
+    url: str,
+    raw_spec: Any,
+    *,
+    wrap_as_json_rpc: bool,
+) -> None:
+    if not isinstance(raw_spec, Mapping):
+        raise ValueError(f"Mock response must be an object, got {type(raw_spec).__name__}")
+
+    status = int(raw_spec.get("status", 200))
+    if "connection_error" in raw_spec:
+        mocked.add(method, url, body=ConnectionError(str(raw_spec["connection_error"])))
+        return
+
+    if "json" in raw_spec:
+        payload = raw_spec["json"]
+    elif wrap_as_json_rpc and "result" in raw_spec:
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": raw_spec["result"],
+        }
+    elif wrap_as_json_rpc and "error" in raw_spec:
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": raw_spec["error"],
+        }
+    else:
+        raise ValueError(
+            "Mock response must include one of 'json', 'result', 'error', or "
+            "'connection_error'"
+        )
+
+    mocked.add(method, url, json=payload, status=status)
 
 
 if __name__ == "__main__":

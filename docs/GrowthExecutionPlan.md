@@ -86,34 +86,36 @@ Active tasks:
 
 - [x] `A-002` Add opt-in spender allowlist refinement for `approve`
   Output: optional `APPROVE_SPENDER_ALLOWLIST` config path that lets clean contracts preserve `allow` for trusted spenders and escalates non-allowlisted spenders to `manual_review`.
-  Done means: local code and tests are complete.
-  Status: complete locally on 2026-04-06; not yet deployed.
+  Done means: code, tests, and live behavior are in production.
+  Status: deployed in production on 2026-04-06 in `1af2be0`.
 
 - [ ] `A-003` Add explicit machine-readable spender trust output
   Output: a small response field for action-aware `approve` that exposes spender trust state directly, rather than forcing clients to infer it only from reason codes.
-  Why now: this sharpens the API contract without broadening scope.
+  Why now: this sharpens the API contract without broadening scope, but only if live usage shows the current shape is ambiguous.
   Depends on: `A-002`.
   Done means: the response shape, OpenAPI, and tests all expose the trust state clearly.
+  Status: intentionally deferred until real usage shows the current reason codes plus logs are not enough.
 
 - [x] `A-004` Add action-aware observability for `approve`
   Output: request/event logging that shows whether `approve` used no allowlist, an allowlisted spender, or a non-allowlisted spender.
   Why now: this gives production evidence about whether the new policy is useful before adding more actions.
   Depends on: `A-002`.
   Done means: logs or analytics can answer how action-aware `approve` is actually being used.
-  Status: complete locally on 2026-04-06; not yet deployed.
+  Status: deployed in production on 2026-04-06 in `1af2be0`.
 
-- [ ] `A-005` Deploy the next narrow `approve` refinement
+- [x] `A-005` Deploy the next narrow `approve` refinement
   Output: commit, push, deploy, and verify the next `approve` slice.
   Why now: keep the product loop moving without piling up undeployed semantic changes.
-  Depends on: choose one of `A-003` or `A-004`, not both plus more.
+  Depends on: choose one narrow refinement and ship it cleanly.
   Done means:
   - app deploy is live
   - `https://augurrisk.com/health` is healthy
   - live `openapi.json` matches the new contract
   - one real paid production smoke covers the action-aware request shape
+  Status: complete. The narrow `approve` refinement shipped in `1af2be0`, and the first-party docs-only follow-up deployed separately on machine version `104`.
 
 Rule for this workstream:
-- do one more narrow refinement, then deploy
+- keep `approve` as the only action until real callers show a need for a second one
 
 ### 2. Conversion And First-Use Clarity
 
@@ -122,17 +124,25 @@ Goal:
 
 Active tasks:
 
-- [ ] `C-001` Review whether the homepage and machine docs now describe action-aware `approve` clearly enough
+- [x] `C-001` Review whether the homepage and machine docs now describe action-aware `approve` clearly enough
   Output: small wording pass only if the current public copy undersells or confuses the action-aware layer.
   Why now: the product has moved closer to the action point, so the public explanation may lag.
   Depends on: `A-005`.
   Done means: public docs explain the narrow `approve` layer without over-claiming destination validation.
+  Status: complete on first-party surfaces. Homepage, `skill.md`, `llms.txt`, and `llms-full.txt` now all show the concrete `approve` example and action-level output.
 
-- [ ] `C-002` Keep the paid-call quickstarts aligned with the live contract
+- [x] `C-002` Keep the paid-call quickstarts aligned with the live contract
   Output: Python, JavaScript, MCP, and machine-doc examples stay accurate as the action-aware layer evolves.
   Why now: drift here creates trust loss before the first payment.
   Depends on: any action-aware contract change that ships.
   Done means: examples and docs match the live API shape.
+  Status: complete for the current first-party docs surfaces. External registry copy intentionally unchanged.
+
+- [ ] `C-003` Watch whether the new first-party `approve` example improves first-use clarity
+  Output: one small evidence read from `/stats`, paid calls, and any direct user feedback after the docs change.
+  Why now: the docs addition is only useful if it helps a real evaluator understand when top-level `decision` and action-level `action_evaluation` differ.
+  Depends on: deployed first-party example.
+  Done means: we can say whether the example reduced confusion, increased action-aware probes, or had no visible effect.
 
 ### 3. Registry And Discovery Hygiene
 
@@ -144,7 +154,7 @@ Active tasks:
 - [ ] `R-001` Re-check Coinbase public discovery feed after the next production deploy
   Output: one fresh feed check after a real paid smoke on the current live app.
   Why now: the app is healthy and the remaining gap still looks external.
-  Depends on: `A-005`.
+  Depends on: current production staying healthy after the docs-only follow-up.
   Done means: we either see Augur in the feed or have a cleaner escalation packet.
 
 - [ ] `R-002` Keep `x402list.fun` classified as external stale state unless the directory itself changes
@@ -164,10 +174,10 @@ Goal:
 Active tasks:
 
 - [ ] `D-001` Execute one targeted distribution push
-  Output: one relevant post or reply plus one supporting follow-up, taken from the queue in `docs/outreach.md`.
-  Why now: distribution still needs a real measured follow-through, not more planning.
+  Output: one relevant post or reply plus one supporting follow-up, taken from the queue in `docs/outreach.md`, using the live `approve` example rather than abstract product copy.
+  Why now: first-party surfaces now show one exact action-aware example, which is enough to test demand without inventing more product.
   Depends on: existing proof and machine-readable surfaces are already good enough.
-  Done means: the post is live and we can watch traffic/referral impact.
+  Done means: the post is live and we can watch whether action-aware traffic or qualified referral traffic changes.
 
 - [ ] `D-002` Add basic source attribution where feasible
   Output: better visibility into docs, registries, and outreach as traffic sources.
@@ -185,16 +195,16 @@ Active tasks:
 
 Do now:
 
-1. `A-005` Deploy the next narrow `approve` refinement
-2. real paid production smoke on the action-aware request shape
-3. `R-001` Re-check Coinbase public discovery feed
+1. `D-001` Execute one targeted distribution push using the live `approve` example
+2. `C-003` Watch whether the new first-party example changes action-aware traffic or confusion
+3. `R-001` Re-check Coinbase public discovery feed with the current evidence set
 
 Do next:
 
-1. `D-001` Execute one targeted distribution push
-2. `D-002` Improve source attribution
-3. `D-003` Run a lightweight AI-answer visibility check
-4. consider `A-003` only if the current logs show a real need for explicit spender-trust output
+1. `D-002` Improve source attribution
+2. `D-003` Run a lightweight AI-answer visibility check
+3. consider `A-003` only if the current logs show a real need for explicit spender-trust output
+4. only consider a second action if a real caller asks for one
 
 Do later:
 
@@ -212,6 +222,7 @@ These are no longer the active bottleneck, but they matter as completed prerequi
 - [x] first proof-of-work report
 - [x] initial registry alignment pass
 - [x] action-aware `approve` V1 in production
+- [x] first-party action-aware `approve` example live on `/`, `skill.md`, `llms.txt`, and `llms-full.txt`
 
 ## Not In Scope Right Now
 
