@@ -5,9 +5,9 @@
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch before this pass: `master` at `20a2835`, ahead of `origin/master` by 1 with uncommitted production `/stats` analytics fixes.
 - Scope for this pass: hygiene and tracking only. No product API response changes were made.
-- Live app: `augurrisk` on Fly is healthy. `flyctl status --app augurrisk` shows machine `48e64d2fd31728`, version `118`, `started`, with `1` passing check.
+- Live app: `augurrisk` on Fly is healthy. `flyctl status --app augurrisk` shows machine `48e64d2fd31728`, `started`, with `1` passing check. The exact Fly machine version advances on each deploy, including docs-only deploys.
 - Live `/health`: `ok`.
-- Live `/stats`: healthy and using durable SQLite (`storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`). Latest discovery-pass check on 2026-07-06 returned `total_requests=339900`, `paid_requests=35`, after the paid CDP/Bazaar indexing smoke.
+- Live `/stats`: healthy and using durable SQLite (`storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`). Discovery-pass checks on 2026-07-06 showed `paid_requests=35` after the paid CDP/Bazaar indexing smoke.
 - Current local stats fix: `/stats` aggregates directly in SQLite, reads `raw_json` only for recent rows, stores `traffic_class` in its own column, and uses SQL fallback classification for older rows. This matches the deployed Fly machine version `115` behavior.
 - Validation on 2026-07-06:
   - `python -m py_compile src\risk_api\analytics.py src\risk_api\app.py`

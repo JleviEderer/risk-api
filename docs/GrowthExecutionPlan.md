@@ -77,7 +77,7 @@ Current rule:
 
 - [x] `H-001` Verify live health and bounded `/stats`
   Output: live `/health`, `/stats`, and Fly machine state checked on 2026-07-06.
-  Evidence: Fly app `augurrisk`, machine `48e64d2fd31728`, version `118`, `1` passing check; `/health` returned `ok`; `/stats` returned `storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`, `total_requests=339900`, `paid_requests=35`, and populated `traffic_classes` after the discovery-pass paid smoke.
+  Evidence: Fly app `augurrisk`, machine `48e64d2fd31728`, `1` passing check; `/health` returned `ok`; `/stats` returned `storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`, `paid_requests=35`, and populated `traffic_classes` after the discovery-pass paid smoke. The exact Fly machine version and total request count are volatile after each deploy/request.
 
 - [x] `H-002` Commit and push the deployed `/stats` SQLite analytics fix
   Output: persist the already-deployed version `115` behavior in git so a future clean deploy does not reintroduce the dashboard timeout.
