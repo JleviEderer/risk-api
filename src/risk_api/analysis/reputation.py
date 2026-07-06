@@ -12,8 +12,10 @@ import functools
 import logging
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, cast
 
 import requests
 
@@ -142,7 +144,7 @@ def _throttle_blockscout_requests() -> None:
         _last_request_started_at = now
 
 
-def _blockscout_get(params: dict[str, object], api_key: str) -> dict[str, object] | None:
+def _blockscout_get(params: Mapping[str, str], api_key: str) -> dict[str, Any] | None:
     request_params = dict(params)
     if api_key:
         request_params["apikey"] = api_key
@@ -163,7 +165,7 @@ def _blockscout_get(params: dict[str, object], api_key: str) -> dict[str, object
                     response=resp,
                 )
             resp.raise_for_status()
-            data = resp.json()
+            data = cast(dict[str, Any], resp.json())
         except (requests.RequestException, ValueError) as e:
             logger.debug("Blockscout request failed: %s", e)
             if attempt + 1 >= MAX_REQUEST_ATTEMPTS:
@@ -265,7 +267,13 @@ def get_first_tx_timestamp(
         return None
 
     try:
-        return int(data["result"][0]["timeStamp"])
+        result = data["result"]
+        if not isinstance(result, list) or not result:
+            return None
+        entry = result[0]
+        if not isinstance(entry, dict):
+            return None
+        return int(entry["timeStamp"])
     except (KeyError, TypeError, ValueError):
         return None
 

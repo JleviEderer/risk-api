@@ -8,7 +8,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
@@ -2338,11 +2338,13 @@ def _render_intent_page(base_url: str, path: str) -> str:
     meta_description = str(page["meta_description"])
     summary = str(page["summary"])
     eyebrow = str(page["eyebrow"])
+    problem_point_values = cast(list[object], page["problem_points"])
+    check_point_values = cast(list[object], page["check_points"])
     problem_points = "\n".join(
-        f"<li>{item}</li>" for item in page["problem_points"]
+        f"<li>{item}</li>" for item in problem_point_values
     )
     check_points = "\n".join(
-        f"<li>{item}</li>" for item in page["check_points"]
+        f"<li>{item}</li>" for item in check_point_values
     )
     related_links = "\n".join(
         (

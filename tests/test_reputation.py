@@ -1,6 +1,7 @@
 """Tests for deployer wallet reputation detector."""
 
 import time
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -35,7 +36,8 @@ def _clear_caches_and_disable_sleep(monkeypatch):
 
 
 def _last_call_params() -> dict[str, list[str]]:
-    return parse_qs(urlparse(responses.calls[-1].request.url).query)
+    request_url = cast(str, responses.calls[-1].request.url)
+    return parse_qs(urlparse(request_url).query)
 
 
 # --- get_contract_creator ---

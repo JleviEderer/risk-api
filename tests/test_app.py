@@ -1,4 +1,5 @@
 import json
+from typing import Any, cast
 
 import pytest
 import responses
@@ -1526,8 +1527,8 @@ def test_weth_before_after_proof_report_page(client):
 
 def test_proof_report_snapshots_match_current_policy_semantics():
     for report in REPORT_PAGES.values():
-        for contract in report["contracts"]:
-            snapshot = contract["snapshot"]
+        for contract in cast(list[dict[str, Any]], report["contracts"]):
+            snapshot = cast(dict[str, Any], contract["snapshot"])
             result = analysis_result_from_snapshot(snapshot)
             expected_policy = derive_policy(
                 score=result.score,
@@ -1959,7 +1960,8 @@ def test_openapi_get_200_has_examples(client):
 def test_openapi_proxy_example_matches_mocked_route_output(client):
     eip1967 = "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
     proxy_bytecode = "0x7f" + eip1967 + "f4" + "00" * 200
-    impl_addr_hex = PROXY_ANALYSIS_EXAMPLE["implementation"]["address"][2:]
+    implementation = cast(dict[str, Any], PROXY_ANALYSIS_EXAMPLE["implementation"])
+    impl_addr_hex = str(implementation["address"])[2:]
     impl_addr_padded = "0x" + "0" * 24 + impl_addr_hex
     impl_bytecode = "0x" + "ff" + "00" * 200
 

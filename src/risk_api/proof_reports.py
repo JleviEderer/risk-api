@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from html import escape
+from typing import Any, cast
 
 from risk_api.api_contract import normalize_analysis_snapshot
 
@@ -469,23 +470,28 @@ def render_report_page(base_url: str, path: str) -> str:
         )
     )
     methodology = "\n".join(
-        f"<li>{escape(str(item))}</li>" for item in report["methodology"]
+        f"<li>{escape(str(item))}</li>"
+        for item in cast(list[object], report["methodology"])
     )
     takeaways = "\n".join(
-        f"<li>{escape(str(item))}</li>" for item in report["takeaways"]
+        f"<li>{escape(str(item))}</li>"
+        for item in cast(list[object], report["takeaways"])
     )
 
     contract_sections: list[str] = []
-    for contract in report["contracts"]:
+    for contract in cast(list[dict[str, Any]], report["contracts"]):
         contract_name = str(contract["name"])
-        snapshot = normalize_analysis_snapshot(dict(contract["snapshot"]))
+        snapshot = cast(
+            dict[str, Any],
+            normalize_analysis_snapshot(dict(contract["snapshot"])),
+        )
         address = str(snapshot["address"])
         score = int(snapshot["score"])
         level = str(snapshot["level"])
         bytecode_size = int(snapshot["bytecode_size"])
         implementation = snapshot.get("implementation")
         interpretation = str(contract["interpretation"])
-        findings = snapshot["findings"]
+        findings = cast(list[dict[str, Any]], snapshot["findings"])
         finding_items = "\n".join(
             (
                 f"<li><strong>{escape(str(finding['title']))}</strong> "
@@ -496,7 +502,7 @@ def render_report_page(base_url: str, path: str) -> str:
             for finding in findings
         )
         implementation_html = ""
-        if implementation:
+        if isinstance(implementation, dict):
             implementation_html = (
                 "<p class=\"muted\" style=\"margin-top:8px\">"
                 f"Resolved implementation: <code>{escape(str(implementation['address']))}</code>"

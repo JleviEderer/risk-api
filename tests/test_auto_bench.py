@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from risk_api import auto_bench
 from risk_api.auto_bench import run_bench
@@ -100,15 +101,19 @@ def test_analysis_case_supports_mocked_rpc_and_explorer(tmp_path):
 
 
 def test_app_contract_checks_fail_on_stale_proof_report_policy(monkeypatch):
+    base_report = auto_bench.REPORT_PAGES["/reports/base-bluechip-bytecode-snapshot"]
+    base_contracts = cast(list[dict[str, Any]], base_report["contracts"])
+    first_contract = base_contracts[0]
+    first_snapshot = cast(dict[str, Any], first_contract["snapshot"])
     stale_reports = {
         **auto_bench.REPORT_PAGES,
         "/reports/base-bluechip-bytecode-snapshot": {
-            **auto_bench.REPORT_PAGES["/reports/base-bluechip-bytecode-snapshot"],
+            **base_report,
             "contracts": [
                 {
-                    **auto_bench.REPORT_PAGES["/reports/base-bluechip-bytecode-snapshot"]["contracts"][0],
+                    **first_contract,
                     "snapshot": {
-                        **auto_bench.REPORT_PAGES["/reports/base-bluechip-bytecode-snapshot"]["contracts"][0]["snapshot"],
+                        **first_snapshot,
                         "decision": "warn",
                         "recommended_policy": {
                             "action": "warn",
@@ -120,7 +125,7 @@ def test_app_contract_checks_fail_on_stale_proof_report_policy(monkeypatch):
                         },
                     },
                 },
-                *auto_bench.REPORT_PAGES["/reports/base-bluechip-bytecode-snapshot"]["contracts"][1:],
+                *base_contracts[1:],
             ],
         },
     }

@@ -7,7 +7,7 @@ from contextlib import nullcontext
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, cast
 
 from risk_api.analysis.disassembler import disassemble
 from risk_api.analysis.patterns import Finding, Severity, run_all_detectors
@@ -504,7 +504,7 @@ def _proof_report_mismatches(client: Any) -> list[str]:
 def _proof_report_policy_mismatches() -> list[str]:
     mismatches: list[str] = []
     for path, report in REPORT_PAGES.items():
-        for contract in report.get("contracts", []):
+        for contract in cast(list[Mapping[str, object]], report.get("contracts", [])):
             contract_name = str(contract.get("name", "<unknown>"))
             snapshot = _require_mapping(contract, "snapshot")
             result = analysis_result_from_snapshot(snapshot)
