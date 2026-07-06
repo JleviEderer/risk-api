@@ -5,9 +5,9 @@
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch before this pass: `master` at `20a2835`, ahead of `origin/master` by 1 with uncommitted production `/stats` analytics fixes.
 - Scope for this pass: hygiene and tracking only. No product API response changes were made.
-- Live app: `augurrisk` on Fly is healthy. `flyctl status --app augurrisk` shows machine `48e64d2fd31728`, version `115`, `started`, with `1` passing check.
+- Live app: `augurrisk` on Fly is healthy. `flyctl status --app augurrisk` shows machine `48e64d2fd31728`, version `118`, `started`, with `1` passing check.
 - Live `/health`: `ok`.
-- Live `/stats`: healthy and using durable SQLite (`storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`). Latest check on 2026-07-06 returned `total_requests=339399`, `paid_requests=34`, and populated `traffic_classes`.
+- Live `/stats`: healthy and using durable SQLite (`storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`). Latest discovery-pass check on 2026-07-06 returned `total_requests=339900`, `paid_requests=35`, after the paid CDP/Bazaar indexing smoke.
 - Current local stats fix: `/stats` aggregates directly in SQLite, reads `raw_json` only for recent rows, stores `traffic_class` in its own column, and uses SQL fallback classification for older rows. This matches the deployed Fly machine version `115` behavior.
 - Validation on 2026-07-06:
   - `python -m py_compile src\risk_api\analytics.py src\risk_api\app.py`
@@ -15,13 +15,14 @@
   - `python -m pytest tests\test_app.py tests\test_logging.py -q` -> `188 passed`
   - `python -m pytest -q` -> `403 passed`
 - Fly token hygiene: app token `codex-deploy-2026-06-04` was still active and was revoked with `flyctl tokens revoke` on 2026-07-06. Remaining active app tokens need a follow-up owner/purpose review before revocation.
-- CDP/Bazaar discovery: `scripts/check_cdp_discovery.py` scanned `20,000` resources on 2026-07-06 and did not find `https://augurrisk.com/analyze`; the only Augur-related match remains stale `https://risk-api.life.conway.tech/analyze`. The old Conway health URL timed out from this machine.
-- x402.jobs discovery: `https://www.x402.jobs/search?q=augur` returned `404`; `python scripts\register_x402jobs.py --list` succeeded but returned no Augur resource for the available API key. Re-listing or dashboard repair is now a tracked discovery task.
+- CDP/Bazaar discovery: `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after the 2026-07-06 validation and paid settlement and did not find `https://augurrisk.com/analyze`; the only Augur-related match remains stale `https://risk-api.life.conway.tech/analyze`. The old Conway health URL timed out from this machine.
+- x402.jobs discovery: repaired on 2026-07-06. `python scripts\register_x402jobs.py --list --search Augur` shows resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, listing `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price.
 - Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
 - Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
+- Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar did not repair immediately: the canonical endpoint passed CDP `/x402/validate`, a real paid WETH settlement succeeded, and Blockscout shows tx `0x38d86ab18f54029a8e453c50a0bb3adcfb37a05dfc165dc32305f666427f218d`, but CDP merchant/search still returns only stale `https://risk-api.life.conway.tech/analyze`. Escalation packet: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
 - Next exact tasks:
-  1. Repair CDP/Bazaar indexing so Bazaar returns the canonical `augurrisk.com/analyze` resource instead of the dead Conway URL.
-  2. Recreate or update the x402.jobs listing for Augur with `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
+  1. Re-check CDP/Bazaar after the 2026-07-06 paid settlement indexing window.
+  2. If CDP still shows only Conway, send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to Coinbase/CDP or x402 support.
   3. Implement bounded full paid-response logging.
   4. Build paid-contract regression fixtures from real paid contracts.
   5. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
@@ -948,14 +949,14 @@
 
 ## Tomorrow Start Here
 1. Start with discovery repair, not product changes:
-   - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource and did not find `https://augurrisk.com/analyze` after a 20,000-resource scan on 2026-07-06
-   - x402.jobs did not list Augur under the available API key on 2026-07-06
+   - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource even after the canonical endpoint passed CDP validate and a fresh paid settlement succeeded on 2026-07-06
+   - x402.jobs is repaired as `https://x402.jobs/resources/augurrisk-com/augur-2`
    - use `docs/GrowthExecutionPlan.md` and `docs/REGISTRATIONS.md` as the current checklist/source of truth
 2. Confirm live health before any follow-up:
    - health check: `https://augurrisk.com/health`
    - contract check: `https://augurrisk.com/openapi.json`
    - stats check: `https://augurrisk.com/stats`
-   - live app behavior is already deployed on Fly machine version `115`; the bounded `/stats` fix should now be committed on `origin/master`
+   - live app behavior is already deployed on Fly; the bounded `/stats` fix is committed on `origin/master`
    - if the next `flyctl deploy --remote-only` times out during health polling, check `flyctl status --app augurrisk` and the live public routes before assuming the deploy failed
 3. If the goal is API quality, do not make product response changes before observability:
    - first implement bounded full paid-response logging

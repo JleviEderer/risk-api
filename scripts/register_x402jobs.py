@@ -84,6 +84,37 @@ RESOURCE = {
 }
 
 
+def _resource_listing_url(resource: dict[str, object]) -> str:
+    explicit_url = resource.get("x402jobs_url")
+    if explicit_url:
+        return str(explicit_url)
+
+    display_path = resource.get("display_path")
+    if display_path:
+        return f"https://x402.jobs/resources/{display_path}"
+
+    server_slug = resource.get("server_slug")
+    slug = resource.get("slug")
+    if server_slug and slug:
+        return f"https://x402.jobs/resources/{server_slug}/{slug}"
+
+    return "?"
+
+
+def _resource_price_usdc(resource: dict[str, object]) -> str:
+    explicit_price = resource.get("price_usdc")
+    if explicit_price:
+        return str(explicit_price)
+
+    amount = resource.get("max_amount_required")
+    if amount is None:
+        return "?"
+    try:
+        return f"{int(str(amount)) / 1_000_000:.2f}"
+    except ValueError:
+        return str(amount)
+
+
 def get_api_key(args: argparse.Namespace) -> str:
     key = args.key or os.environ.get("X402_JOBS_API_KEY", "")
     if not key:
@@ -112,8 +143,8 @@ def cmd_create(args: argparse.Namespace) -> None:
         print("\nSUCCESS! Resource created on x402.jobs")
         resource = data.get("resource", data)
         print(f"  UUID: {resource.get('id', '?')}")
-        print(f"  Listing: https://x402.jobs/resources/{resource.get('display_path', '?')}")
-        print(f"  Price: ${resource.get('price_usdc', '?')}")
+        print(f"  Listing: {_resource_listing_url(resource)}")
+        print(f"  Price: ${_resource_price_usdc(resource)}")
         print(f"  Active: {resource.get('is_active', '?')}")
     else:
         print(f"\nERROR: {resp.status_code}")
@@ -125,8 +156,10 @@ def cmd_list(args: argparse.Namespace) -> None:
     api_key = get_api_key(args)
     print("Listing your resources on x402.jobs...\n")
 
+    params = {"search": args.search} if args.search else None
     resp = httpx.get(
         f"{API_BASE}/resources",
+        params=params,
         headers={"x-api-key": api_key},
         timeout=30,
     )
@@ -148,10 +181,14 @@ def cmd_list(args: argparse.Namespace) -> None:
         url = r.get("resourceUrl", r.get("resource_url", "?"))
         active = r.get("is_active", "?")
         slug = r.get("display_path", r.get("slug", "?"))
+        listing_url = _resource_listing_url(r)
+        price = _resource_price_usdc(r)
         print(f"  UUID: {rid}")
         print(f"  Name: {name}")
         print(f"  URL:  {url}")
         print(f"  Slug: {slug}")
+        print(f"  Listing: {listing_url}")
+        print(f"  Price: ${price}")
         print(f"  Active: {active}")
         print()
 
@@ -202,7 +239,7 @@ def cmd_update(args: argparse.Namespace) -> None:
         print("\nSUCCESS! Resource updated on x402.jobs")
         resource = data.get("resource", data)
         print(f"  UUID: {resource.get('id', uuid)}")
-        print(f"  Listing: https://x402.jobs/resources/{resource.get('display_path', '?')}")
+        print(f"  Listing: {_resource_listing_url(resource)}")
     else:
         print(f"\nERROR: {resp.status_code}")
         print(f"Response: {resp.text}")
@@ -214,6 +251,10 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Manage Augur on x402.jobs")
     parser.add_argument("--key", help="x402.jobs API key (or set X402_JOBS_API_KEY in .env)")
+    parser.add_argument(
+        "--search",
+        help="Filter --list results with the x402.jobs search parameter, e.g. Augur",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--list", action="store_true", help="List your resources (shows UUIDs)")
     group.add_argument("--update", metavar="UUID", help="Update existing resource by UUID")

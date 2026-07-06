@@ -77,7 +77,7 @@ Current rule:
 
 - [x] `H-001` Verify live health and bounded `/stats`
   Output: live `/health`, `/stats`, and Fly machine state checked on 2026-07-06.
-  Evidence: Fly app `augurrisk`, machine `48e64d2fd31728`, version `115`, `1` passing check; `/health` returned `ok`; `/stats` returned `storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`, `total_requests=339399`, `paid_requests=34`, and populated `traffic_classes`.
+  Evidence: Fly app `augurrisk`, machine `48e64d2fd31728`, version `118`, `1` passing check; `/health` returned `ok`; `/stats` returned `storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`, `total_requests=339900`, `paid_requests=35`, and populated `traffic_classes` after the discovery-pass paid smoke.
 
 - [x] `H-002` Commit and push the deployed `/stats` SQLite analytics fix
   Output: persist the already-deployed version `115` behavior in git so a future clean deploy does not reintroduce the dashboard timeout.
@@ -97,17 +97,20 @@ Current rule:
 
 - [ ] `D-001` Repair Coinbase Bazaar / CDP discovery indexing
   Output: make `https://augurrisk.com/analyze` discoverable in CDP Bazaar search.
-  Evidence from 2026-07-06: `scripts/check_cdp_discovery.py` scanned `20,000` resources and did not find `augurrisk.com/analyze`; the only Augur-related match was the stale `https://risk-api.life.conway.tech/analyze` resource. The old Conway domain timed out from this machine.
+  Evidence from 2026-07-06: `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after validation and paid settlement and did not find `augurrisk.com/analyze`; the only Augur-related match was the stale `https://risk-api.life.conway.tech/analyze` resource. The old Conway domain timed out from this machine.
+  Current status: canonical endpoint passed CDP `/x402/validate`, and one fresh paid WETH settlement succeeded on 2026-07-06. CDP merchant/search still return only the stale Conway resource. Escalation packet: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
   Done means: CDP discovery returns the canonical `augurrisk.com` resource for Augur-related searches or there is a support/escalation packet with the stale-resource evidence.
 
-- [ ] `D-002` Re-list or repair x402.jobs
+- [x] `D-002` Re-list or repair x402.jobs
   Output: restore an Augur x402.jobs listing pointing at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
   Evidence from 2026-07-06: `https://www.x402.jobs/search?q=augur` returned `404`; `python scripts/register_x402jobs.py --list` succeeded with the available API key but returned no Augur resource.
+  Status: repaired on 2026-07-06. Resource ID `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, listing `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, `max_amount_required=100000` (`$0.10` USDC).
   Done means: `scripts/register_x402jobs.py --list` shows Augur or the dashboard shows the current listing with the canonical URL.
 
-- [ ] `D-003` Refresh `docs/REGISTRATIONS.md` after discovery repair
+- [x] `D-003` Refresh `docs/REGISTRATIONS.md` after discovery repair
   Output: update registry status after CDP/Bazaar and x402.jobs are actually fixed or proven external.
   Depends on: `D-001` and `D-002`.
+  Status: refreshed on 2026-07-06 with x402.jobs repair and CDP/Bazaar escalation evidence.
 
 ### 3. API-Output Clarity
 
@@ -157,9 +160,9 @@ Current rule:
 
 Do now:
 
-1. Finish `H-002`: commit and push the bounded `/stats` fix plus this tracking update after tests pass.
-2. Run `D-001`: repair CDP/Bazaar indexing or prepare the stale Conway escalation packet.
-3. Run `D-002`: recreate or update the x402.jobs listing with the canonical Augur URL.
+1. Re-check CDP/Bazaar after the 2026-07-06 paid settlement has had time to index.
+2. If CDP still returns only Conway after the indexing window, send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to Coinbase/CDP or x402 support.
+3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
 
@@ -169,8 +172,8 @@ Do next:
 
 Do later:
 
-1. Decide `P-001` pricing test after discovery is no longer obviously broken.
-2. Execute `O-001` distribution after the main directories point at working URLs.
+1. Decide `P-001` pricing test by 2026-07-20 even if CDP/Bazaar is still waiting on external support.
+2. Execute `O-001` distribution after x402.jobs is stable and CDP/Bazaar is either fixed or actively escalated.
 3. Consider A-003-plus/batch ergonomics only after logging and regressions are in place.
 
 ## Completed Baseline
