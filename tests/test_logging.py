@@ -449,6 +449,61 @@ def test_stats_empty_when_only_durable_analytics_is_configured(client_analytics)
     assert data["funnel"]["landing_views"] == 0
 
 
+def test_sqlite_analytics_persists_traffic_class(app_with_analytics_db):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    entry = {
+        "ts": "2026-04-10T12:00:00Z",
+        "path": "/analyze",
+        "status": 422,
+        "paid": False,
+        "duration_ms": 12,
+        "user_agent": "pytest-agent",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-traffic-class-test",
+        "funnel_stage": "invalid_address",
+    }
+
+    assert append_sqlite_entry(db_path, entry) is True
+
+    with sqlite3.connect(db_path) as conn:
+        traffic_class = conn.execute(
+            "SELECT traffic_class FROM request_events"
+        ).fetchone()[0]
+
+    assert traffic_class == "malformed_probe"
+
+
+def test_sqlite_stats_classifies_rows_without_stored_traffic_class(
+    client_analytics, app_with_analytics_db
+):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    entry = {
+        "ts": "2026-04-10T12:00:00Z",
+        "path": "/health",
+        "status": 200,
+        "paid": False,
+        "duration_ms": 8,
+        "user_agent": "Better Stack",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-old-traffic-class-test",
+        "funnel_stage": "health_check",
+    }
+    assert append_sqlite_entry(db_path, entry) is True
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE request_events SET traffic_class = NULL")
+
+    data = client_analytics.get("/stats").get_json()
+
+    assert data["total_requests"] == 1
+    assert data["traffic_classes"]["known_health_check"] == 1
+    assert data["recent"][0]["traffic_class"] == "known_health_check"
+
+
 def test_sqlite_analytics_ignores_duplicate_entries(app_with_analytics_db):
     db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
     entry = {

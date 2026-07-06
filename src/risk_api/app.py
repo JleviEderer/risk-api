@@ -24,12 +24,12 @@ from risk_api.analysis.action_policy import (
 )
 from risk_api.analytics import (
     append_sqlite_entry,
+    build_sqlite_stats_payload,
     build_stats_payload,
     classify_traffic_class,
     empty_stats_payload,
     init_sqlite_store,
     iter_jsonl_entries,
-    iter_sqlite_entries,
 )
 from risk_api.analysis.engine import NoBytecodeError, analyze_contract
 from risk_api.analysis.policy import PolicyReasonCode
@@ -3522,8 +3522,8 @@ def create_app(
         log_path = app.config.get("REQUEST_LOG_PATH", "")
         if analytics_db_path:
             return jsonify(
-                build_stats_payload(
-                    iter_sqlite_entries(str(analytics_db_path)),
+                build_sqlite_stats_payload(
+                    str(analytics_db_path),
                     intent_page_stages=INTENT_PAGE_STAGES,
                     machine_doc_stages=MACHINE_DOC_STAGES,
                     storage_backend="sqlite",

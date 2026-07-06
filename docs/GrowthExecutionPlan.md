@@ -1,6 +1,6 @@
 # Augur Growth Execution Plan
 
-> Last updated: 2026-04-06
+> Last updated: 2026-07-06
 
 This document is the active operating tracker for product, distribution, and conversion work.
 
@@ -66,150 +66,111 @@ Current leading indicators:
 5. Use `docs/outreach.md` for post history, not this file.
 6. Keep this file focused on active execution only.
 
-## Active Workstreams
-
-### 1. Action-Aware Product Execution
-
-Goal:
-- make Augur more useful at the moment of action without broadening scope
+## July 2026 Execution Checklist
 
 Current rule:
-- `approve` is the only supported action for now
-- action-aware output must stay additive on top of the contract-level policy
-- top-level `decision` remains the contract-level result
+- hygiene, discovery repair, tracking, and evidence capture come before product API changes
+- do not change the paid response contract until logging and regression evidence are in place
+- keep the main product direction as `Base contract admission control for agents`
 
-Active tasks:
+### 1. Hygiene
 
-- [x] `A-001` Ship narrow action-aware `approve` support
-  Output: optional `action`, `spender`, and `chain` inputs plus additive `action_context` and `action_evaluation` in the response.
-  Done means: code, tests, and live OpenAPI are in production.
+- [x] `H-001` Verify live health and bounded `/stats`
+  Output: live `/health`, `/stats`, and Fly machine state checked on 2026-07-06.
+  Evidence: Fly app `augurrisk`, machine `48e64d2fd31728`, version `115`, `1` passing check; `/health` returned `ok`; `/stats` returned `storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`, `total_requests=339399`, `paid_requests=34`, and populated `traffic_classes`.
 
-- [x] `A-002` Add opt-in spender allowlist refinement for `approve`
-  Output: optional `APPROVE_SPENDER_ALLOWLIST` config path that lets clean contracts preserve `allow` for trusted spenders and escalates non-allowlisted spenders to `manual_review`.
-  Done means: code, tests, and live behavior are in production.
-  Status: deployed in production on 2026-04-06 in `1af2be0`.
+- [x] `H-002` Commit and push the deployed `/stats` SQLite analytics fix
+  Output: persist the already-deployed version `115` behavior in git so a future clean deploy does not reintroduce the dashboard timeout.
+  Done means: full tests pass, live behavior matches the local fix, commit is on `origin/master`, and no product API behavior changes are included.
+  Status: completed in the 2026-07-06 hygiene pass after full test suite validation.
 
-- [ ] `A-003` Add explicit machine-readable spender trust output
-  Output: a small response field for action-aware `approve` that exposes spender trust state directly, rather than forcing clients to infer it only from reason codes.
-  Why now: this sharpens the API contract without broadening scope, but only if live usage shows the current shape is ambiguous.
-  Depends on: `A-002`.
-  Done means: the response shape, OpenAPI, and tests all expose the trust state clearly.
-  Status: intentionally deferred until real usage shows the current reason codes plus logs are not enough.
+- [x] `H-003` Revoke the exposed Fly app token from the June deploy session
+  Output: token `codex-deploy-2026-06-04` was found active and revoked on 2026-07-06 using `flyctl tokens revoke`.
+  Remaining note: Fly CLI can list app limited-access tokens, but account-wide personal access-token review may still require the Fly dashboard.
 
-- [x] `A-004` Add action-aware observability for `approve`
-  Output: request/event logging that shows whether `approve` used no allowlist, an allowlisted spender, or a non-allowlisted spender.
-  Why now: this gives production evidence about whether the new policy is useful before adding more actions.
-  Depends on: `A-002`.
-  Done means: logs or analytics can answer how action-aware `approve` is actually being used.
-  Status: deployed in production on 2026-04-06 in `1af2be0`.
+- [ ] `H-004` Review remaining long-lived Fly deploy tokens
+  Output: decide whether the two generic `flyctl deploy token` entries and `augurrisk` token are still needed.
+  Why now: they are not proven exposed, so do not revoke during a narrow hygiene pass without confirming their current use.
+  Done means: unused long-lived tokens are revoked or renamed with owner/purpose.
 
-- [x] `A-005` Deploy the next narrow `approve` refinement
-  Output: commit, push, deploy, and verify the next `approve` slice.
-  Why now: keep the product loop moving without piling up undeployed semantic changes.
-  Depends on: choose one narrow refinement and ship it cleanly.
-  Done means:
-  - app deploy is live
-  - `https://augurrisk.com/health` is healthy
-  - live `openapi.json` matches the new contract
-  - one real paid production smoke covers the action-aware request shape
-  Status: complete. The narrow `approve` refinement shipped in `1af2be0`, and the first-party docs-only follow-up deployed separately on machine version `104`.
+### 2. Discovery
 
-Rule for this workstream:
-- keep `approve` as the only action until real callers show a need for a second one
+- [ ] `D-001` Repair Coinbase Bazaar / CDP discovery indexing
+  Output: make `https://augurrisk.com/analyze` discoverable in CDP Bazaar search.
+  Evidence from 2026-07-06: `scripts/check_cdp_discovery.py` scanned `20,000` resources and did not find `augurrisk.com/analyze`; the only Augur-related match was the stale `https://risk-api.life.conway.tech/analyze` resource. The old Conway domain timed out from this machine.
+  Done means: CDP discovery returns the canonical `augurrisk.com` resource for Augur-related searches or there is a support/escalation packet with the stale-resource evidence.
 
-### 2. Conversion And First-Use Clarity
+- [ ] `D-002` Re-list or repair x402.jobs
+  Output: restore an Augur x402.jobs listing pointing at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
+  Evidence from 2026-07-06: `https://www.x402.jobs/search?q=augur` returned `404`; `python scripts/register_x402jobs.py --list` succeeded with the available API key but returned no Augur resource.
+  Done means: `scripts/register_x402jobs.py --list` shows Augur or the dashboard shows the current listing with the canonical URL.
 
-Goal:
-- make it easier for a new evaluator to reach a justified first paid call
+- [ ] `D-003` Refresh `docs/REGISTRATIONS.md` after discovery repair
+  Output: update registry status after CDP/Bazaar and x402.jobs are actually fixed or proven external.
+  Depends on: `D-001` and `D-002`.
 
-Active tasks:
+### 3. API-Output Clarity
 
-- [x] `C-001` Review whether the homepage and machine docs now describe action-aware `approve` clearly enough
-  Output: small wording pass only if the current public copy undersells or confuses the action-aware layer.
-  Why now: the product has moved closer to the action point, so the public explanation may lag.
-  Depends on: `A-005`.
-  Done means: public docs explain the narrow `approve` layer without over-claiming destination validation.
-  Status: complete on first-party surfaces. Homepage, `skill.md`, `llms.txt`, and `llms-full.txt` now all show the concrete `approve` example and action-level output.
+- [ ] `A-003` Make the machine-branching field unambiguous
+  Output: ensure agents can branch on one primary decision field without being misled by `level=safe` plus action-level `warn`.
+  Why now: real paid callers exist, so response ambiguity is commercial risk.
+  Constraint: no product API changes in the July hygiene pass; design this only after logging and regression cases are locked.
+  Done means: response shape, OpenAPI, examples, and tests make the primary branch field explicit.
 
-- [x] `C-002` Keep the paid-call quickstarts aligned with the live contract
-  Output: Python, JavaScript, MCP, and machine-doc examples stay accurate as the action-aware layer evolves.
-  Why now: drift here creates trust loss before the first payment.
-  Depends on: any action-aware contract change that ships.
-  Done means: examples and docs match the live API shape.
-  Status: complete for the current first-party docs surfaces. External registry copy intentionally unchanged.
+### 4. Logging
 
-- [ ] `C-003` Watch whether the new first-party `approve` example improves first-use clarity
-  Output: one small evidence read from `/stats`, paid calls, and any direct user feedback after the docs change.
-  Why now: the docs addition is only useful if it helps a real evaluator understand when top-level `decision` and action-level `action_evaluation` differ.
-  Depends on: deployed first-party example.
-  Done means: we can say whether the example reduced confusion, increased action-aware probes, or had no visible effect.
+- [ ] `L-001` Log full paid analysis responses safely
+  Output: persist the paid response body or a bounded redacted response snapshot for paid `/analyze` rows.
+  Why now: current durable analytics records timing, UA, referer, analyzed address, action/spender, score, level, and paid status, but not the full findings or policy output.
+  Done means: paid-call forensics can reconstruct what Augur told the caller without storing payer wallet, transaction hash, or source IP.
 
-### 3. Registry And Discovery Hygiene
+- [ ] `L-002` Add payer attribution plan without over-logging
+  Output: decide whether to store facilitator record IDs, payment transaction hashes, or a correlation key.
+  Done means: payer attribution can be audited without adding unnecessary personal data or brittle scraper dependence.
 
-Goal:
-- keep public discovery aligned while treating external indexing issues correctly
+### 5. Paid-Contract Regressions
 
-Active tasks:
+- [ ] `Q-001` Build a golden regression suite from real paid contracts
+  Output: fixtures and expected outcomes for contracts that real paid callers screened.
+  Initial set: Base WETH `0x4200000000000000000000000000000000000006`, Mintpad `0xfb51fce18e0d8509487a05774f99db81c981a7fe`, RUG PULL `0x3Af31D3879044f0544F09247b59a98F80520C4F32`, Pudgy Penguin `0x722d787dffeacbc5fe64b32b2acbc0415662931b`, and the recurring Beefy/AERO-style paid cases from the July analytics pull.
+  Depends on: `L-001` for future exact-response capture.
+  Done means: future detector or policy edits fail tests if they regress real paid use cases without an intentional fixture update.
 
-- [ ] `R-001` Re-check Coinbase public discovery feed after the next production deploy
-  Output: one fresh feed check after a real paid smoke on the current live app.
-  Why now: the app is healthy and the remaining gap still looks external.
-  Depends on: current production staying healthy after the docs-only follow-up.
-  Done means: we either see Augur in the feed or have a cleaner escalation packet.
+### 6. Pricing
 
-- [ ] `R-002` Keep `x402list.fun` classified as external stale state unless the directory itself changes
-  Output: no repo-side churn disguised as progress.
-  Why now: this has repeatedly looked external rather than app-side.
-  Depends on: none.
-  Done means: we stop revisiting this unless there is actual external movement.
+- [ ] `P-001` Decide whether to test a lower x402 price
+  Output: keep `$0.10`, or run a dated `$0.02-$0.03` price test with clear success criteria.
+  Why now: the category has cheaper x402 scanners and the funnel shows many valid unpaid `402` attempts versus `34` paid calls.
+  Done means: the price decision is documented with the test window, target paid calls/week, and rollback rule.
 
-Note:
-- execution details and verification steps live in `docs/REGISTRATIONS.md`
+### 7. Distribution
 
-### 4. Distribution And Outreach
+- [ ] `O-001` Execute one focused distribution push after discovery hygiene
+  Output: one concrete Base/x402 community post or reply using the live WETH proof and admission-control framing.
+  Depends on: fix or document CDP/Bazaar and x402.jobs first, so the outreach sends agents to working discovery surfaces.
 
-Goal:
-- get qualified builder traffic from the right channels
-
-Active tasks:
-
-- [ ] `D-001` Execute one targeted distribution push
-  Output: one relevant post or reply plus one supporting follow-up, taken from the queue in `docs/outreach.md`, using the live `approve` example rather than abstract product copy.
-  Why now: first-party surfaces now show one exact action-aware example, which is enough to test demand without inventing more product.
-  Depends on: existing proof and machine-readable surfaces are already good enough.
-  Done means: the post is live and we can watch whether action-aware traffic or qualified referral traffic changes.
-
-- [ ] `D-002` Add basic source attribution where feasible
-  Output: better visibility into docs, registries, and outreach as traffic sources.
-  Why now: we should not keep doing discoverability work that cannot be judged.
-  Depends on: none.
-  Done means: major acquisition surfaces can be compared with simple evidence.
-
-- [ ] `D-003` Track AI-answer visibility separately from registry work
-  Output: a lightweight recurring check for whether Augur is retrieved or cited in answer engines.
-  Why now: retrieval remains a real problem, and it is not the same problem as listing hygiene.
-  Depends on: `D-002` ideally, but can start manually before then.
-  Done means: answer-engine visibility is reviewed as its own workstream.
+- [ ] `O-002` Add basic source attribution for outreach and registry traffic
+  Output: a simple way to distinguish marketplace, docs, and outreach-driven traffic without relying on raw request counts.
 
 ## Immediate Queue
 
 Do now:
 
-1. `D-001` Execute one targeted distribution push using the live `approve` example
-2. `C-003` Watch whether the new first-party example changes action-aware traffic or confusion
-3. `R-001` Re-check Coinbase public discovery feed with the current evidence set
+1. Finish `H-002`: commit and push the bounded `/stats` fix plus this tracking update after tests pass.
+2. Run `D-001`: repair CDP/Bazaar indexing or prepare the stale Conway escalation packet.
+3. Run `D-002`: recreate or update the x402.jobs listing with the canonical Augur URL.
 
 Do next:
 
-1. `D-002` Improve source attribution
-2. `D-003` Run a lightweight AI-answer visibility check
-3. consider `A-003` only if the current logs show a real need for explicit spender-trust output
-4. only consider a second action if a real caller asks for one
+1. Implement `L-001` full paid-response logging.
+2. Build `Q-001` paid-contract regression cases.
+3. Design `A-003` decision-primary output clarity without widening the product.
 
 Do later:
 
-1. only consider a second action after live evidence shows the `approve` layer is useful and stable
-2. only broaden beyond `approve` if the next action is equally narrow and defensible
+1. Decide `P-001` pricing test after discovery is no longer obviously broken.
+2. Execute `O-001` distribution after the main directories point at working URLs.
+3. Consider A-003-plus/batch ergonomics only after logging and regressions are in place.
 
 ## Completed Baseline
 

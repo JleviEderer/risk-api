@@ -89,23 +89,23 @@
    Do instead: treat repeated `Base-only deterministic prefilter` framing and zero unprompted mentions as a category/distribution signal before deciding on a product pivot into simulation.
 
 ## Validation
-1. **[2026-04-09] Separate evaluator traffic from real demand in Fly analytics**
+1. **[2026-06-04] Keep public `/stats` bounded over durable SQLite**
+   Do instead: aggregate dashboard totals with SQLite queries and read `raw_json` only for recent rows; store `traffic_class` as a column and keep SQL fallback classification for older rows so a grown `/data/analytics.sqlite3` cannot make `/stats` time out and break `/dashboard`; do not bulk-backfill old analytics rows inside a public request on the 512 MB Fly VM.
+2. **[2026-04-09] Separate evaluator traffic from real demand in Fly analytics**
    Do instead: use `/dashboard` Traffic Quality Classes plus the request `traffic_class` field and `/stats.traffic_classes` first; treat `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms*.txt`, health checks, and repeated Base WETH `402` or paid probes as machine-evaluator traffic unless a real integration trail proves otherwise; judge traction from repeated non-smoke paid calls and successful first-call conversion, not raw high-intent counts.
-2. **[2026-04-06] Observe narrow action-aware behavior before widening the API**
+3. **[2026-04-06] Observe narrow action-aware behavior before widening the API**
    Do instead: log `approve` spender trust and action-level decision first, ship that narrow instrumentation with the current allowlist refinement, and only add extra public response fields if live usage shows the reason codes are not enough.
-3. **[2026-04-06] After an action-aware deploy, verify `/stats` as well as the route**
+4. **[2026-04-06] After an action-aware deploy, verify `/stats` as well as the route**
    Do instead: after a paid action-aware smoke, check the durable recent entry in `/stats` for `action`, `action_spender_trust`, and `action_decision` so you confirm both the public response and the production observability path before deciding on further API changes.
-4. **[2026-04-03] Do not let `/analyze` hooks override Flask's method contract**
+5. **[2026-04-03] Do not let `/analyze` hooks override Flask's method contract**
    Do instead: keep address validation and x402 gating limited to the real `/analyze` request methods (`GET`, `POST`, `HEAD`) so `OPTIONS` stays ungated and unsupported methods return Flask's native `405` instead of misleading `422`/`402` responses.
-5. **[2026-03-29] A healthy live app can still be metadata-stale**
+6. **[2026-03-29] A healthy live app can still be metadata-stale**
    Do instead: before touching third-party listings, fetch `https://augurrisk.com/`, `openapi.json`, `skill.md`, `llms*.txt`, `/.well-known/agent-card.json`, `agent-metadata.json`, and `/.well-known/x402` and confirm the actual live wording matches the repo change you plan to propagate.
-6. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
+7. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
    Do instead: if `flyctl deploy --remote-only` times out during health polling, immediately check `flyctl status --app augurrisk` plus the live public routes; if the machine image/version advanced and the public app is healthy, treat the deploy as landed even if Fly's polling call failed.
-7. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
+8. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
    Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
-8. **[2026-03-10] CDP feed absence after successful settlement is not automatically a repo bug**
-   Do instead: after confirming live CDP settlement plus Bazaar extension metadata, treat continued absence from the public discovery feed as indexing lag, feed behavior, or support-escalation territory before rewriting metadata again.
-9. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+9. **[2026-07-06] A healthy Augur app can still be dead-linked in CDP/Bazaar**
+   Do instead: check CDP/Bazaar discovery directly with `scripts/check_cdp_discovery.py` and the old Conway URL before treating discovery as fixed; on 2026-07-06, live `augurrisk.com` was healthy but CDP still only surfaced `https://risk-api.life.conway.tech/analyze`, so repair or escalate the directory entry before doing outreach.
+10. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
    Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard. Keep `/stats` fail-soft on malformed JSONL rows rather than letting one bad log line break the public ops view.
-10. **[2026-03-16] Public examples must round-trip through the live serializer**
-   Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.

@@ -164,6 +164,244 @@ def _top_items(counter: Counter[str], key_name: str) -> list[dict[str, Any]]:
     return [{key_name: item, "count": count} for item, count in counter.most_common(10)]
 
 
+def _sql_placeholders(items: tuple[str, ...] | list[str] | set[str]) -> str:
+    return ", ".join("?" for _ in items)
+
+
+def _sqlite_traffic_class_expression() -> tuple[str, list[str]]:
+    health_checks = " OR ".join(
+        "lower(user_agent) LIKE ?" for _ in KNOWN_HEALTH_CHECK_UA_SNIPPETS
+    )
+    evaluators = " OR ".join(
+        "lower(user_agent) LIKE ?" for _ in KNOWN_EVALUATOR_UA_SNIPPETS
+    )
+    machine_stages = _sql_placeholders(MACHINE_DISCOVERY_STAGES)
+    machine_paths = _sql_placeholders(MACHINE_DISCOVERY_PATHS)
+    malformed_stages = _sql_placeholders(MALFORMED_ANALYZE_STAGES)
+    traffic_classes = _sql_placeholders(TRAFFIC_CLASS_KEYS)
+
+    expression = f"""
+        CASE
+            WHEN traffic_class IN ({traffic_classes}) THEN traffic_class
+            WHEN paid = 1 THEN 'paid_request'
+            WHEN path = '/health' OR ({health_checks}) THEN 'known_health_check'
+            WHEN path = '/analyze'
+                AND (status = 422 OR funnel_stage IN ({malformed_stages}))
+                THEN 'malformed_probe'
+            WHEN funnel_stage IN ({machine_stages})
+                OR path IN ({machine_paths})
+                OR ({evaluators})
+                THEN 'known_directory_evaluator_bot'
+            WHEN path = '/analyze' AND status = 402
+                THEN 'real_unpaid_conversion_attempt'
+            ELSE 'other_traffic'
+        END
+    """
+    params = [
+        *TRAFFIC_CLASS_KEYS,
+        *(f"%{snippet}%" for snippet in KNOWN_HEALTH_CHECK_UA_SNIPPETS),
+        *MALFORMED_ANALYZE_STAGES,
+        *MACHINE_DISCOVERY_STAGES,
+        *MACHINE_DISCOVERY_PATHS,
+        *(f"%{snippet}%" for snippet in KNOWN_EVALUATOR_UA_SNIPPETS),
+    ]
+    return expression, params
+
+
+def _top_sqlite_items(
+    conn: sqlite3.Connection, column: str, key_name: str
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        f"""
+        SELECT {column}, COUNT(*) AS count
+        FROM request_events
+        WHERE {column} IS NOT NULL AND {column} != ''
+        GROUP BY {column}
+        ORDER BY count DESC
+        LIMIT 10
+        """
+    ).fetchall()
+    return [{key_name: str(item), "count": int(count)} for item, count in rows]
+
+
+def build_sqlite_stats_payload(
+    db_path: str,
+    *,
+    intent_page_stages: set[str],
+    machine_doc_stages: set[str],
+    storage_backend: str = "sqlite",
+    storage_path: str = "",
+    storage_durable: bool = True,
+) -> dict[str, Any]:
+    """Aggregate analytics directly in SQLite for the dashboard/stats response."""
+    payload = empty_stats_payload()
+    payload["storage_backend"] = storage_backend
+    payload["storage_path"] = storage_path
+    payload["storage_durable"] = storage_durable
+    if not db_path or not os.path.exists(db_path):
+        return payload
+
+    with _connect_sqlite(db_path) as conn:
+        _ensure_sqlite_schema(conn)
+        total_row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(paid), 0) AS paid,
+                COALESCE(ROUND(AVG(duration_ms)), 0) AS avg_duration_ms
+            FROM request_events
+            """
+        ).fetchone()
+        if total_row is not None:
+            payload["total_requests"] = int(total_row[0] or 0)
+            payload["paid_requests"] = int(total_row[1] or 0)
+            payload["avg_duration_ms"] = int(total_row[2] or 0)
+
+        stage_counts = {
+            str(stage): int(count)
+            for stage, count in conn.execute(
+                """
+                SELECT funnel_stage, COUNT(*) AS count
+                FROM request_events
+                WHERE funnel_stage IS NOT NULL AND funnel_stage != ''
+                GROUP BY funnel_stage
+                """
+            )
+        }
+        payload["stage_counts"] = stage_counts
+
+        funnel = {key: 0 for key in FUNNEL_KEYS}
+        funnel["landing_views"] = stage_counts.get("landing_view", 0)
+        funnel["how_payment_views"] = stage_counts.get("how_payment_view", 0)
+        funnel["intent_page_views"] = sum(
+            stage_counts.get(stage, 0) for stage in intent_page_stages
+        )
+        funnel["intent_honeypot_views"] = stage_counts.get("intent_honeypot_view", 0)
+        funnel["intent_proxy_views"] = stage_counts.get("intent_proxy_view", 0)
+        funnel["intent_deployer_views"] = stage_counts.get(
+            "intent_deployer_view", 0
+        )
+        funnel["machine_doc_fetches"] = sum(
+            stage_counts.get(stage, 0) for stage in machine_doc_stages
+        )
+        funnel["valid_unpaid_402_attempts"] = stage_counts.get("unpaid_402", 0)
+        funnel["invalid_address_requests"] = stage_counts.get("invalid_address", 0)
+        funnel["no_bytecode_requests"] = stage_counts.get("no_bytecode", 0)
+        funnel["paid_requests"] = stage_counts.get("paid_request", 0)
+        payload["funnel"] = funnel
+
+        traffic_classes = {key: 0 for key in TRAFFIC_CLASS_KEYS}
+        traffic_expr, traffic_params = _sqlite_traffic_class_expression()
+        for traffic_class, count in conn.execute(
+            f"""
+            SELECT traffic_class_value, COUNT(*) AS count
+            FROM (
+                SELECT {traffic_expr} AS traffic_class_value
+                FROM request_events
+            )
+            GROUP BY traffic_class_value
+            """,
+            traffic_params,
+        ):
+            if traffic_class in traffic_classes:
+                traffic_classes[str(traffic_class)] = int(count)
+        payload["traffic_classes"] = traffic_classes
+
+        payload["top_paths"] = _top_sqlite_items(conn, "path", "path")
+        payload["top_hosts"] = _top_sqlite_items(conn, "host", "host")
+        payload["top_referers"] = _top_sqlite_items(conn, "referer", "referer")
+
+        hourly_rows = conn.execute(
+            """
+            SELECT
+                substr(ts, 1, 13) AS hour_prefix,
+                COUNT(*) AS count,
+                COALESCE(SUM(paid), 0) AS paid,
+                COALESCE(ROUND(AVG(duration_ms)), 0) AS avg_duration_ms,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'landing_view' THEN 1 ELSE 0 END), 0) AS landing_views,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'how_payment_view' THEN 1 ELSE 0 END), 0) AS how_payment_views,
+                COALESCE(SUM(CASE WHEN funnel_stage IN ({intent_stages}) THEN 1 ELSE 0 END), 0) AS intent_page_views,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'intent_honeypot_view' THEN 1 ELSE 0 END), 0) AS intent_honeypot_views,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'intent_proxy_view' THEN 1 ELSE 0 END), 0) AS intent_proxy_views,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'intent_deployer_view' THEN 1 ELSE 0 END), 0) AS intent_deployer_views,
+                COALESCE(SUM(CASE WHEN funnel_stage IN ({machine_stages}) THEN 1 ELSE 0 END), 0) AS machine_doc_fetches,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'unpaid_402' THEN 1 ELSE 0 END), 0) AS valid_unpaid_402_attempts,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'invalid_address' THEN 1 ELSE 0 END), 0) AS invalid_address_requests,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'no_bytecode' THEN 1 ELSE 0 END), 0) AS no_bytecode_requests,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'paid_request' THEN 1 ELSE 0 END), 0) AS paid_requests
+            FROM request_events
+            WHERE ts IS NOT NULL AND length(ts) >= 13
+            GROUP BY hour_prefix
+            ORDER BY hour_prefix ASC
+            """.format(
+                intent_stages=_sql_placeholders(intent_page_stages),
+                machine_stages=_sql_placeholders(machine_doc_stages),
+            ),
+            [*intent_page_stages, *machine_doc_stages],
+        ).fetchall()
+        payload["hourly"] = [
+            {
+                "hour": f"{hour_prefix}:00:00Z",
+                "count": int(count),
+                "paid": int(paid),
+                "landing_views": int(landing_views),
+                "how_payment_views": int(how_payment_views),
+                "intent_page_views": int(intent_page_views),
+                "intent_honeypot_views": int(intent_honeypot_views),
+                "intent_proxy_views": int(intent_proxy_views),
+                "intent_deployer_views": int(intent_deployer_views),
+                "machine_doc_fetches": int(machine_doc_fetches),
+                "valid_unpaid_402_attempts": int(valid_unpaid_402_attempts),
+                "invalid_address_requests": int(invalid_address_requests),
+                "no_bytecode_requests": int(no_bytecode_requests),
+                "paid_requests": int(paid_requests),
+                "avg_duration_ms": int(avg_duration_ms),
+            }
+            for (
+                hour_prefix,
+                count,
+                paid,
+                avg_duration_ms,
+                landing_views,
+                how_payment_views,
+                intent_page_views,
+                intent_honeypot_views,
+                intent_proxy_views,
+                intent_deployer_views,
+                machine_doc_fetches,
+                valid_unpaid_402_attempts,
+                invalid_address_requests,
+                no_bytecode_requests,
+                paid_requests,
+            ) in hourly_rows
+        ]
+
+        recent_rows = conn.execute(
+            """
+            SELECT raw_json
+            FROM request_events
+            ORDER BY id DESC
+            LIMIT 20
+            """
+        ).fetchall()
+        recent: list[dict[str, Any]] = []
+        for (raw_json,) in reversed(recent_rows):
+            try:
+                entry = json.loads(raw_json)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            traffic_class = classify_traffic_class(entry)
+            if entry.get("traffic_class") != traffic_class:
+                entry = dict(entry)
+                entry["traffic_class"] = traffic_class
+            recent.append(entry)
+        payload["recent"] = recent
+
+    return payload
+
+
 def build_stats_payload(
     entries: Iterable[dict[str, Any]],
     *,
@@ -399,37 +637,51 @@ def _ensure_sqlite_schema(conn: sqlite3.Connection) -> None:
         str(row[1])
         for row in conn.execute("PRAGMA table_info(request_events)")
     }
+    indexes = {
+        str(row[1])
+        for row in conn.execute("PRAGMA index_list(request_events)")
+    }
+    needs_fingerprint_dedupe = "idx_request_events_fingerprint" not in indexes
     if "fingerprint" not in columns:
         conn.execute("ALTER TABLE request_events ADD COLUMN fingerprint TEXT")
+        columns.add("fingerprint")
+        needs_fingerprint_dedupe = True
+    if "traffic_class" not in columns:
+        conn.execute("ALTER TABLE request_events ADD COLUMN traffic_class TEXT")
+        columns.add("traffic_class")
 
-    rows = conn.execute(
-        "SELECT id, raw_json FROM request_events WHERE fingerprint IS NULL OR fingerprint = ''"
-    ).fetchall()
-    for row_id, raw_json in rows:
-        try:
-            parsed = json.loads(raw_json)
-        except json.JSONDecodeError:
-            fingerprint = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
-        else:
-            if isinstance(parsed, dict):
-                fingerprint = _entry_fingerprint(parsed)
-            else:
-                fingerprint = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
-        conn.execute(
-            "UPDATE request_events SET fingerprint = ? WHERE id = ?",
-            (fingerprint, row_id),
-        )
-
-    conn.execute(
-        """
-        DELETE FROM request_events
-        WHERE id NOT IN (
-            SELECT MIN(id)
+    if needs_fingerprint_dedupe:
+        rows = conn.execute(
+            """
+            SELECT id, raw_json
             FROM request_events
-            GROUP BY fingerprint
+            WHERE fingerprint IS NULL OR fingerprint = ''
+            """
+        ).fetchall()
+        for row_id, raw_json in rows:
+            try:
+                parsed = json.loads(raw_json)
+            except json.JSONDecodeError:
+                fingerprint = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
+            else:
+                if isinstance(parsed, dict):
+                    fingerprint = _entry_fingerprint(parsed)
+                else:
+                    fingerprint = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
+            conn.execute(
+                "UPDATE request_events SET fingerprint = ? WHERE id = ?",
+                (fingerprint, row_id),
+            )
+        conn.execute(
+            """
+            DELETE FROM request_events
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM request_events
+                GROUP BY fingerprint
+            )
+            """
         )
-        """
-    )
     conn.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_request_events_fingerprint
@@ -444,8 +696,22 @@ def _ensure_sqlite_schema(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         """
+        CREATE INDEX IF NOT EXISTS idx_request_events_traffic_class
+        ON request_events(traffic_class)
+        """
+    )
+    conn.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_request_events_funnel_stage
         ON request_events(funnel_stage)
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS request_events_schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
         """
     )
 
@@ -467,6 +733,7 @@ def append_sqlite_entry(db_path: str, entry: dict[str, Any]) -> bool:
 
     payload = json.dumps(entry, separators=(",", ":"))
     fingerprint = _entry_fingerprint(entry)
+    traffic_class = classify_traffic_class(entry)
     with _connect_sqlite(db_path) as conn:
         _ensure_sqlite_schema(conn)
         cursor = conn.execute(
@@ -474,8 +741,8 @@ def append_sqlite_entry(db_path: str, entry: dict[str, Any]) -> bool:
             INSERT OR IGNORE INTO request_events (
                 ts, path, status, paid, duration_ms, user_agent, method, host,
                 referer, request_id, funnel_stage, address, error_type, score,
-                level, raw_json, fingerprint
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                level, raw_json, fingerprint, traffic_class
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(entry.get("ts", "")),
@@ -495,6 +762,7 @@ def append_sqlite_entry(db_path: str, entry: dict[str, Any]) -> bool:
                 str(entry.get("level", "")) or None,
                 payload,
                 fingerprint,
+                traffic_class,
             ),
         )
         return cursor.rowcount == 1

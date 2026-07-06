@@ -7,6 +7,9 @@ Use this when moving `/stats` and `/dashboard` off ephemeral per-machine JSONL l
 - Repo support exists:
   - `ANALYTICS_DB_PATH` enables SQLite event persistence
   - `/stats` prefers SQLite when that env var is set
+  - `/stats` should aggregate through bounded SQLite queries and read `raw_json` only for the recent-request table
+  - `traffic_class` is persisted as a SQLite column, with SQL fallback classification for older rows where the column is empty
+  - do not bulk-backfill historical analytics rows inside the public `/stats` request on the current 512 MB Fly VM
   - `REQUEST_LOG_PATH` remains available as the legacy JSONL fallback
 - Production cutover was completed on 2026-03-09:
   - Fly volume `augur_analytics` exists in `iad`

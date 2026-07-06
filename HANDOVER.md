@@ -1,20 +1,51 @@
 # Handover
 
+## July 6, 2026 Hygiene Snapshot
+
+- Repo root: `C:\Users\justi\dev\risk-api`
+- Branch before this pass: `master` at `20a2835`, ahead of `origin/master` by 1 with uncommitted production `/stats` analytics fixes.
+- Scope for this pass: hygiene and tracking only. No product API response changes were made.
+- Live app: `augurrisk` on Fly is healthy. `flyctl status --app augurrisk` shows machine `48e64d2fd31728`, version `115`, `started`, with `1` passing check.
+- Live `/health`: `ok`.
+- Live `/stats`: healthy and using durable SQLite (`storage_backend=sqlite`, `storage_durable=true`, `storage_path=/data/analytics.sqlite3`). Latest check on 2026-07-06 returned `total_requests=339399`, `paid_requests=34`, and populated `traffic_classes`.
+- Current local stats fix: `/stats` aggregates directly in SQLite, reads `raw_json` only for recent rows, stores `traffic_class` in its own column, and uses SQL fallback classification for older rows. This matches the deployed Fly machine version `115` behavior.
+- Validation on 2026-07-06:
+  - `python -m py_compile src\risk_api\analytics.py src\risk_api\app.py`
+  - `python -m pytest tests\test_logging.py -q` -> `17 passed`
+  - `python -m pytest tests\test_app.py tests\test_logging.py -q` -> `188 passed`
+  - `python -m pytest -q` -> `403 passed`
+- Fly token hygiene: app token `codex-deploy-2026-06-04` was still active and was revoked with `flyctl tokens revoke` on 2026-07-06. Remaining active app tokens need a follow-up owner/purpose review before revocation.
+- CDP/Bazaar discovery: `scripts/check_cdp_discovery.py` scanned `20,000` resources on 2026-07-06 and did not find `https://augurrisk.com/analyze`; the only Augur-related match remains stale `https://risk-api.life.conway.tech/analyze`. The old Conway health URL timed out from this machine.
+- x402.jobs discovery: `https://www.x402.jobs/search?q=augur` returned `404`; `python scripts\register_x402jobs.py --list` succeeded but returned no Augur resource for the available API key. Re-listing or dashboard repair is now a tracked discovery task.
+- Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
+- Next exact tasks:
+  1. Repair CDP/Bazaar indexing so Bazaar returns the canonical `augurrisk.com/analyze` resource instead of the dead Conway URL.
+  2. Recreate or update the x402.jobs listing for Augur with `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
+  3. Implement bounded full paid-response logging.
+  4. Build paid-contract regression fixtures from real paid contracts.
+  5. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
+
 ## Snapshot
-- Date: 2026-04-10
+- Date: 2026-06-04
 - Repo root: `C:\Users\justi\dev\risk-api`
 - Branch: `master`
-- Repo baseline: `d6e11f8` (`Update handover after dashboard proof deploy`; handover-only)
+- Repo baseline: `20a2835` (`Update autoresearch harness and planning docs`; docs/tooling only, no deploy needed)
 - Repo app-code baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; app code from `c97098c`)
-- Deployed app baseline: `0ab058c` (`Update handover for dashboard proof follow-up`; app code from `c97098c`)
-- Status: deployed production is green on `0ab058c`. The live app is healthy, Fly is on machine version `110` with `1` passing health check, and the public first-party surfaces now include the dashboard Traffic Quality Classes panel, the `/reports/base-weth-before-after` proof artifact, the concrete action-aware `approve` example, the canonical first successful paid-call Base WETH path, and the `Call before pay / approve / interact` positioning copy across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, OpenAPI examples, and the sitemap. Live `/stats` exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
+- Deployed app baseline: app behavior from `c97098c` / `0ab058c`; latest live health read on 2026-04-10 saw Fly machine version `112`
+- Status: deployed production is green. The live app is healthy, and the public first-party surfaces now include the dashboard Traffic Quality Classes panel, the `/reports/base-weth-before-after` proof artifact, the concrete action-aware `approve` example, the canonical first successful paid-call Base WETH path, and the `Call before pay / approve / interact` positioning copy across `/`, `/skill.md`, `/llms.txt`, `/llms-full.txt`, `/how-payment-works`, `/.well-known/x402`, OpenAPI examples, and the sitemap. Live `/stats` exposes `traffic_classes` for health checks, evaluator bots, malformed probes, unpaid conversion attempts, paid requests, and other traffic. A real paid production smoke on 2026-04-06 succeeded on the live action-aware `approve` request shape (`402 -> PAYMENT-SIGNATURE -> 200`) against Base WETH with:
   - top-level `decision`: `allow`
   - action-level `decision`: `warn`
   - action-level reason codes: `action_approve_requested`
   Live `/stats` now also shows the new request-log observability fields for that paid `approve` request:
   - `action_spender_trust: unchecked`
   - `action_decision: warn`
-  The deploy quirk still matters operationally, but the 2026-04-10 `flyctl deploy --remote-only --app augurrisk` run from clean detached worktree `C:\Users\justi\AppData\Local\Temp\risk-api-deploy-0ab058c` completed cleanly and cleared its lease. Live verification immediately afterward returned `/health` `200`, `/dashboard` containing `Traffic Quality Classes`, `/reports/base-weth-before-after` containing both before/after scores, homepage and `llms.txt` containing `Call before pay. Call before approve. Call before interact.`, sitemap containing the new proof route, and `/stats` with populated `traffic_classes`. The main product question is now whether the clearer first-call path plus proof artifact reduces malformed `/analyze` probes and whether real unpaid conversion attempts turn into repeated paid calls before widening the action-aware API. External registry copy was intentionally left alone because the product positioning did not change. The only remaining local leftovers are unrelated autoresearch files (`auto/README.md`, `src/risk_api/auto_bench.py`, `tests/test_auto_bench.py`) plus scratch dirs/files such as `.claude/`, `.codex/live_db/`, `.codex/research.local/`, `.codex/tmp/`, and `.playwright-mcp/`.
+  The deploy quirk still matters operationally, but the 2026-04-10 `flyctl deploy --remote-only --app augurrisk` run from clean detached worktree `C:\Users\justi\AppData\Local\Temp\risk-api-deploy-0ab058c` completed cleanly and cleared its lease. Live verification immediately afterward returned `/health` `200`, `/dashboard` containing `Traffic Quality Classes`, `/reports/base-weth-before-after` containing both before/after scores, homepage and `llms.txt` containing `Call before pay. Call before approve. Call before interact.`, sitemap containing the new proof route, and `/stats` with populated `traffic_classes`. The main product question is now whether the clearer first-call path plus proof artifact reduces malformed `/analyze` probes and whether real unpaid conversion attempts turn into repeated paid calls before widening the action-aware API. External registry copy was intentionally left alone because the product positioning did not change. The 2026-04-10 follow-up commit `20a2835` only updates the autoresearch harness, planning docs, and local scratch `.gitignore` entries; it does not need a production deploy.
+- 2026-06-04 dashboard return session: live `/health` returned `200` and live `/dashboard` returned the HTML shell, but live `/stats` timed out and then returned `503 Service Unavailable`, which explained why the dashboard UI appeared broken after loading. Fixed and deployed to Fly machine version `115`. `/stats` now uses direct SQLite aggregate queries and reads `raw_json` only for the 20 recent rows instead of iterating every request event in Python on each dashboard refresh. SQLite analytics now stores `traffic_class` in its own column while preserving SQL fallback classification for older rows without that column populated. A one-time in-request `traffic_class` backfill attempt was deployed briefly as version `114`, but the production DB update was too heavy for the 512 MB / 30s Gunicorn runtime and produced `502` plus worker timeout/OOM evidence in Fly logs, so it was removed and replaced by the non-mutating SQL fallback path in version `115`. Validation passed locally with `python -m py_compile src\risk_api\analytics.py src\risk_api\app.py`, `python -m pytest tests/test_logging.py -q` (`17 passed`), `python -m pytest tests/test_app.py tests/test_logging.py -q` (`188 passed`), and `python -m pytest -q` (`403 passed`) before the first deploy; the final corrective version was rechecked with `python -m py_compile src\risk_api\analytics.py src\risk_api\app.py`, `python -m pytest tests/test_logging.py -q` (`17 passed`), and `python -m pytest tests/test_app.py tests/test_logging.py -q` (`188 passed`). Live verification after version `115`: `flyctl status --app augurrisk` showed machine `48e64d2fd31728`, version `115`, `started`, `1` passing check; `/health` returned `200`; `/dashboard` returned `200` with `Traffic Quality Classes`; `/stats` returned `200`, `storage_backend=sqlite`, `storage_durable=true`, `total_requests=220480`, `paid_requests=22`, populated `traffic_classes`, and `recent=20`. First final `/stats` timing was about `11.5s`; repeat timing was about `2.8s`. Revoke the pasted Fly token after this session because it was exposed in chat.
+- Current session audit on 2026-04-10: no active product implementation item remains from the conversion/action-aware plan after excluding distribution/registry tasks and traffic-waiting tasks. Live post-proof/dashboard measurement was too fresh to judge: since the April 10 proof/dashboard deploy there were `0` `/analyze` calls in the pulled analytics snapshot; since the April 9 traffic-class deploy there were `16` `/analyze` calls and all were malformed `422` probes, mostly `dexter-api/x402-schema-fetcher`, `Dexter-Verifier/1.0`, and `node`. There were no new unpaid `402`, paid `/analyze`, or action-aware `approve` calls in that post-traffic-class window.
+- Detector quality audit on 2026-04-10: another source read and local validation confirmed the known limits rather than a new blocker. Honeypot detection is intentionally narrow around blacklist-style transfer controls, reentrancy is a shallow `CALL` then nearby `SSTORE` heuristic, and `deployer_reputation` remains the weakest operational detector because explorer errors produce no finding. This is future research backlog, not an urgent fix. Current validation passed:
+  - `python auto/loop.py` -> `59/59` checks passed, `0` blind spots, `0` holdout disagreements, `0` policy regressions, `0` serializer/doc drifts
+  - `python -m pytest tests/test_patterns.py tests/test_policy.py tests/test_engine.py tests/test_scoring.py tests/test_action_policy.py tests/test_reputation.py tests/test_auto_bench.py -q` -> `112 passed`
+  If detector work is reopened, start by adding new holdout/candidate cases first for richer honeypot transfer-path behavior, reentrancy false-positive/false-negative boundaries, and deployer-reputation partial-failure behavior. Do not jump straight into implementation.
 - Traffic read on 2026-04-09: pulled the live durable SQLite analytics store from Fly machine `287d341f3e0ed8` (`/data/analytics.sqlite3` plus WAL state) and analyzed the last 10 local days (`2026-03-31` through `2026-04-09` Central). Main judgment: the product direction is still correct, but conversion is weak. The traffic validates the existing agent-first admission-control wedge rather than suggesting a pivot. Key counts in that 10-day window:
   - `4,363` total requests
   - `132` `/analyze` requests
@@ -915,50 +946,47 @@
    - if `vault-synth` becomes a regular tool, add its own local `.env` or move `OPENAI_API_KEY` to a user-level secret store instead of relying on the `risk-api` fallback
 
 ## Tomorrow Start Here
-1. Confirm the deployed app is still healthy and the repo still matches the current code baseline:
-   - `https://augurrisk.com/health`
-   - `https://augurrisk.com/openapi.json`
-   - live deployed state now includes the first-party `approve` example docs follow-up on machine version `104`
-   - if the next `flyctl deploy --remote-only` times out during health polling again, check `flyctl status --app augurrisk` and the live public routes immediately before assuming the deploy failed; on 2026-04-06 the deploy still landed and the machine recovered to healthy at version `103`, while the later docs-only follow-up deployed cleanly to version `104`
-2. The current narrow `approve` refinement is already landed on production:
-   - optional `APPROVE_SPENDER_ALLOWLIST` support is live
-   - action-aware request observability is live in `/stats` via `action_spender_trust` and `action_decision`
-   - a real paid action-aware `approve` smoke succeeded on 2026-04-06
-   - the first-party docs now also show one exact `approve` request/response example on `/`, `skill.md`, `llms.txt`, and `llms-full.txt`
-   - next product decision is whether live evidence justifies adding an explicit public spender-trust response field (`A-003`)
-3. The paid-result problem and the wording/deploy work are already landed:
-   - Base WETH (`0x4200000000000000000000000000000000000006`) now returns `allow` locally
-   - AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`) now returns `manual_review` locally
-   - `0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984` now returns `allow` locally
-   - internal live routes now reflect the admission-control wording
-4. Treat the March 26 OOM as secondary unless it repeats:
+1. Start with discovery repair, not product changes:
+   - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource and did not find `https://augurrisk.com/analyze` after a 20,000-resource scan on 2026-07-06
+   - x402.jobs did not list Augur under the available API key on 2026-07-06
+   - use `docs/GrowthExecutionPlan.md` and `docs/REGISTRATIONS.md` as the current checklist/source of truth
+2. Confirm live health before any follow-up:
+   - health check: `https://augurrisk.com/health`
+   - contract check: `https://augurrisk.com/openapi.json`
+   - stats check: `https://augurrisk.com/stats`
+   - live app behavior is already deployed on Fly machine version `115`; the bounded `/stats` fix should now be committed on `origin/master`
+   - if the next `flyctl deploy --remote-only` times out during health polling, check `flyctl status --app augurrisk` and the live public routes before assuming the deploy failed
+3. If the goal is API quality, do not make product response changes before observability:
+   - first implement bounded full paid-response logging
+   - then build regression fixtures from real paid contracts
+   - only then design the decision-primary output clarity change
+4. If the goal is the current conversion/action-aware plan, do not build broad product surface yet:
+   - the `/analyze` onboarding path is done
+   - traffic classes in analytics are done
+   - first-party wedge copy is done
+   - the WETH before/after proof page is done
+   - dashboard Traffic Quality Classes are done
+   - `approve` V1, spender allowlist refinement, and action-aware observability are done
+   - the next response-shape work is decision-primary clarity, not more action expansion
+5. For the next analytics read, use the Fly SQLite store, not just the public aggregate `/stats`:
+   - pull `/data/analytics.sqlite3`, `/data/analytics.sqlite3-wal`, and `/data/analytics.sqlite3-shm`
+   - compare before/after counts for `malformed_probe`, `real_unpaid_conversion_attempt`, `paid_request`, and action-aware `approve`
+   - preserve the paid-contract addresses as regression candidates
+6. If the goal is distribution, repair discovery first:
+   - fix or escalate CDP/Bazaar stale Conway indexing
+   - recreate or repair x402.jobs
+   - keep `x402list.fun` classified as external stale state unless the directory itself updates
+   - use `docs/outreach.md` for outreach execution status
+7. If the goal is detector quality, start with new holdout/candidate cases before implementation:
+   - current validation is green: `python auto/loop.py` -> `59/59`; targeted detector/policy/reputation/autobench tests -> `112 passed`
+   - known research frontiers are richer honeypot transfer-path logic, reentrancy semantics beyond `CALL` then nearby `SSTORE`, and deployer-reputation resilience under explorer partial failures
+   - add cases under ignored `auto/corpus/*.local.json` or `auto/candidates/*.local.json`, then run `python auto/loop.py`
+   - only change implementation if those new cases fail reproducibly
+8. Treat the March 26 OOM as secondary unless it repeats:
    - it caused one brief dropped request during crawler traffic on `/`
    - it did not overlap with the paid `/analyze` burst
    - if it happens again, consider a memory bump or more direct memory profiling
-5. The latest hidden discovery rerun is already green:
-   - `python auto/loop.py` passed at `59/59` on 2026-03-30
-   - `python -m pytest -q` passed at `363`
-   - do not start a new hidden batch until you first add a new local candidate or holdout
-6. The endpoint method-contract follow-up is already landed locally:
-   - `/analyze` now leaves `OPTIONS` and unsupported methods to Flask instead of masking them with `422`
-   - POST `422` OpenAPI examples now explicitly cover conflicting query/body addresses plus malformed and non-object JSON bodies
-   - `python -m pytest tests/test_app.py -q` passed at `151`
-   - next step is the refreshed Coinbase/CDP feed recheck or support escalation, then `x402list.fun`
-7. After that, audit the live third-party surfaces instead of assuming the repo updates propagated:
-   - 8004scan
-   - x402.jobs
-   - MoltMart
-   - Work402 if applicable
-   - x402.org/ecosystem
-   - Coinbase public discovery feed
-   - x402list.fun as an external stale-state check
-9. Runtime proof is now present from both 2026-04-03 and 2026-04-06:
+9. Runtime proof is already present from both 2026-04-03 and 2026-04-06:
    - a real paid plain `/analyze` smoke succeeded from the Conway wallet to the live agent wallet
    - a real paid action-aware `approve` smoke also succeeded on the live app
    - use those successes when reasoning about CDP/discovery visibility versus app-route health
-10. Keep the public copy generic (`explorer-backed`) unless there is a reason to advertise Blockscout specifically.
-11. For the next research step, start a fresh hidden discovery probe only after adding a new local candidate or holdout:
-   - use `python auto/loop.py`
-   - keep batches serial
-   - add a new hidden holdout/candidate before changing detector logic again
-   - target `deployer_reputation`, proxy `no_code`, and `reentrancy` before spending another batch on selector aliases
