@@ -217,6 +217,15 @@ def test_get_first_tx_timestamp_no_txs():
 
 
 @responses.activate
+def test_get_first_tx_timestamp_empty_ok_result():
+    responses.get(
+        BLOCKSCOUT_API,
+        json={"status": "1", "message": "OK", "result": []},
+    )
+    assert get_first_tx_timestamp(FAKE_DEPLOYER, API_KEY) is None
+
+
+@responses.activate
 def test_get_first_tx_timestamp_retryable_soft_error_returns_none_after_retry():
     responses.get(
         BLOCKSCOUT_API,

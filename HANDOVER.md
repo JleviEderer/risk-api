@@ -18,6 +18,7 @@
 - CDP/Bazaar discovery: `scripts/check_cdp_discovery.py` scanned `20,000` resources on 2026-07-06 and did not find `https://augurrisk.com/analyze`; the only Augur-related match remains stale `https://risk-api.life.conway.tech/analyze`. The old Conway health URL timed out from this machine.
 - x402.jobs discovery: `https://www.x402.jobs/search?q=augur` returned `404`; `python scripts\register_x402jobs.py --list` succeeded but returned no Augur resource for the available API key. Re-listing or dashboard repair is now a tracked discovery task.
 - Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
+- Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
 - Next exact tasks:
   1. Repair CDP/Bazaar indexing so Bazaar returns the canonical `augurrisk.com/analyze` resource instead of the dead Conway URL.
   2. Recreate or update the x402.jobs listing for Augur with `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.

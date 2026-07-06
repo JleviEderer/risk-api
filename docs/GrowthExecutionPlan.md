@@ -132,7 +132,7 @@ Current rule:
 
 - [ ] `Q-001` Build a golden regression suite from real paid contracts
   Output: fixtures and expected outcomes for contracts that real paid callers screened.
-  Initial set: Base WETH `0x4200000000000000000000000000000000000006`, Mintpad `0xfb51fce18e0d8509487a05774f99db81c981a7fe`, RUG PULL `0x3Af31D3879044f0544F09247b59a98F80520C4F32`, Pudgy Penguin `0x722d787dffeacbc5fe64b32b2acbc0415662931b`, and the recurring Beefy/AERO-style paid cases from the July analytics pull.
+  Initial set: Base WETH `0x4200000000000000000000000000000000000006`, Mintpad `0xfb51d2120c27bb56d91221042cb2dd2866a647fe`, RUG PULL `0x3Af31D295C09aCa8AE4524DAA6108F17F9e54F32`, Pudgy Penguin `0x722dF2b5552354950a7b55d8872a4e8f33eD1b07`, and the recurring Beefy/AERO-style paid cases from the July analytics pull.
   Depends on: `L-001` for future exact-response capture.
   Done means: future detector or policy edits fail tests if they regress real paid use cases without an intentional fixture update.
 
@@ -141,6 +141,7 @@ Current rule:
 - [ ] `P-001` Decide whether to test a lower x402 price
   Output: keep `$0.10`, or run a dated `$0.02-$0.03` price test with clear success criteria.
   Why now: the category has cheaper x402 scanners and the funnel shows many valid unpaid `402` attempts versus `34` paid calls.
+  Timing: decide by 2026-07-20 even if CDP/Bazaar repair is still waiting on Coinbase or other external support.
   Done means: the price decision is documented with the test window, target paid calls/week, and rollback rule.
 
 ### 7. Distribution

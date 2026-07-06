@@ -103,9 +103,9 @@
    Do instead: before touching third-party listings, fetch `https://augurrisk.com/`, `openapi.json`, `skill.md`, `llms*.txt`, `/.well-known/agent-card.json`, `agent-metadata.json`, and `/.well-known/x402` and confirm the actual live wording matches the repo change you plan to propagate.
 7. **[2026-03-30] A Fly deploy timeout can still leave the new image in place**
    Do instead: if `flyctl deploy --remote-only` times out during health polling, immediately check `flyctl status --app augurrisk` plus the live public routes; if the machine image/version advanced and the public app is healthy, treat the deploy as landed even if Fly's polling call failed.
-8. **[2026-03-26] Brief proxy-side drops do not always appear in the analytics DB**
-   Do instead: for downtime forensics, query `/data/analytics.sqlite3` for durable request outcomes and pair it with Fly proxy logs so OOM-era `connection closed before message completed` events are not mistaken for zero-impact traffic.
-9. **[2026-07-06] A healthy Augur app can still be dead-linked in CDP/Bazaar**
+8. **[2026-07-06] A healthy Augur app can still be dead-linked in CDP/Bazaar**
    Do instead: check CDP/Bazaar discovery directly with `scripts/check_cdp_discovery.py` and the old Conway URL before treating discovery as fixed; on 2026-07-06, live `augurrisk.com` was healthy but CDP still only surfaced `https://risk-api.life.conway.tech/analyze`, so repair or escalate the directory entry before doing outreach.
-10. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
+9. **[2026-03-16] Treat recent `402` rows and `curl/...` agents as probe-sensitive clues**
    Do instead: for real production traffic forensics, pull `/data/analytics.sqlite3` from the Fly volume and query it directly; use `/dashboard`, `/stats`, and Fly logs as quick hints only, assume the newest rows may be your own probes, and treat `curl/...` as intent signals rather than proof of a human at the keyboard. Keep `/stats` fail-soft on malformed JSONL rows rather than letting one bad log line break the public ops view.
+10. **[2026-03-16] Public examples must round-trip through the live serializer**
+   Do instead: for OpenAPI examples, machine docs, and proof-report JSON, normalize fixtures through the same serializer the `/analyze` route uses so `implementation` omission and nested proxy payloads cannot drift.
