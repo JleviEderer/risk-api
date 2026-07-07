@@ -17,15 +17,49 @@
 - Fly token hygiene: app token `codex-deploy-2026-06-04` was still active and was revoked with `flyctl tokens revoke` on 2026-07-06. Remaining active app tokens need a follow-up owner/purpose review before revocation.
 - CDP/Bazaar discovery: still stale after the 2026-07-07 recheck. `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources and did not find `https://augurrisk.com/analyze`; merchant discovery for payTo `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891` still returns only `https://risk-api.life.conway.tech/analyze`; CDP search finds Conway but not `augurrisk.com`. Escalation now requires user action through CDP support or Discord.
 - x402.jobs discovery: repaired on 2026-07-06. `python scripts\register_x402jobs.py --list --search Augur` shows resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, listing `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price.
+- Paid response logging: implemented on 2026-07-07 without changing the public `/analyze` response. Durable SQLite now has a companion `paid_response_snapshots` table keyed to `request_events`; it stores redacted, byte-bounded serialized response snapshots only for paid `/analyze` HTTP 200 rows. It does not add source IP, payer wallet, transaction hash, payment signature, or facilitator payload logging.
 - Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
 - Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
 - Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar remains stale after the 2026-07-07 recheck; the support-ready packet and copy-paste message are in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
 - Next exact tasks:
-  1. Submit the copy-paste message in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to CDP support at `https://support.cdp.coinbase.com/`.
-  2. If no ticket response, post the same message in the CDP/x402 Discord at `https://discord.gg/cdp`.
-  3. Implement bounded full paid-response logging.
-  4. Build paid-contract regression fixtures from real paid contracts.
-  5. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
+  1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
+  2. Build paid-contract regression fixtures from real paid contracts using `request_events` plus `paid_response_snapshots`.
+  3. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
+  4. Decide whether `L-002` needs stored facilitator IDs/tx hashes or whether off-chain Blockscout correlation is enough.
+  5. Decide the pricing test by 2026-07-20.
+
+Paid-response snapshot query:
+
+```powershell
+@'
+import json, sqlite3, sys
+db = sys.argv[1]
+con = sqlite3.connect(db)
+con.row_factory = sqlite3.Row
+for r in con.execute("""
+  SELECT e.ts, e.address, e.action, e.spender, e.score, e.level,
+         s.truncated, s.response_bytes, s.snapshot_json
+  FROM paid_response_snapshots s
+  JOIN request_events e ON e.id = s.request_event_id
+  ORDER BY e.ts DESC
+  LIMIT 25
+"""):
+    snap = json.loads(r["snapshot_json"])
+    print({
+        "ts": r["ts"],
+        "address": r["address"],
+        "action": r["action"],
+        "spender": r["spender"],
+        "score": r["score"],
+        "level": r["level"],
+        "truncated": bool(r["truncated"]),
+        "response_bytes": r["response_bytes"],
+        "decision": snap.get("decision"),
+        "action_decision": (snap.get("action_evaluation") or {}).get("decision"),
+        "findings": len(snap.get("findings", [])) if isinstance(snap.get("findings"), list) else None,
+    })
+'@ | python - ".codex\live_db\<stamp>\analytics.sqlite3"
+```
 
 ## Snapshot
 - Date: 2026-06-04
@@ -951,6 +985,7 @@
 1. Start with discovery repair, not product changes:
    - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource even after the canonical endpoint passed CDP validate, a fresh paid settlement succeeded on 2026-07-06, and CDP was rechecked on 2026-07-07
    - x402.jobs is repaired as `https://x402.jobs/resources/augurrisk-com/augur-2`
+   - paid-response snapshots are now in durable SQLite for new paid `/analyze` 200 rows only
    - use `docs/GrowthExecutionPlan.md` and `docs/REGISTRATIONS.md` as the current checklist/source of truth
 2. Confirm live health before any follow-up:
    - health check: `https://augurrisk.com/health`

@@ -3169,7 +3169,16 @@ def _setup_request_logging(app: Flask) -> None:
         db_path = app.config.get("ANALYTICS_DB_PATH", "")
         if isinstance(db_path, str) and db_path:
             try:
-                append_sqlite_entry(db_path, entry)
+                paid_response_snapshot = request.environ.get(
+                    "paid_response_snapshot"
+                )
+                append_sqlite_entry(
+                    db_path,
+                    entry,
+                    paid_response_snapshot=paid_response_snapshot
+                    if isinstance(paid_response_snapshot, Mapping)
+                    else None,
+                )
             except Exception:
                 logger.exception("failed to persist analytics entry")
         return response
@@ -3840,14 +3849,14 @@ def create_app(
             if isinstance(action_context, ActionContext)
             else None
         )
-        return jsonify(
-            serialize_analysis_result(
-                result,
-                action_context=action_context
-                if isinstance(action_context, ActionContext)
-                else None,
-                action_evaluation=action_evaluation,
-            )
+        response_data = serialize_analysis_result(
+            result,
+            action_context=action_context
+            if isinstance(action_context, ActionContext)
+            else None,
+            action_evaluation=action_evaluation,
         )
+        request.environ["paid_response_snapshot"] = response_data
+        return jsonify(response_data)
 
     return app

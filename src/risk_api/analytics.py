@@ -7,9 +7,24 @@ import json
 import os
 import sqlite3
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
+
+PAID_RESPONSE_SNAPSHOT_SCHEMA_VERSION = 1
+PAID_RESPONSE_SNAPSHOT_MAX_BYTES = 64 * 1024
+_PAID_RESPONSE_REDACTED = "[redacted]"
+_PAID_RESPONSE_SENSITIVE_KEY_PARTS = (
+    "payment",
+    "signature",
+    "payer",
+    "wallet",
+    "transaction",
+    "tx_hash",
+    "source_ip",
+    "remote_addr",
+    "ip_address",
+)
 
 FUNNEL_KEYS = (
     "landing_views",
@@ -608,6 +623,58 @@ def _entry_fingerprint(entry: dict[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _is_sensitive_paid_response_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return any(part in normalized for part in _PAID_RESPONSE_SENSITIVE_KEY_PARTS)
+
+
+def _redact_paid_response_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): (
+                _PAID_RESPONSE_REDACTED
+                if _is_sensitive_paid_response_key(str(key))
+                else _redact_paid_response_value(child)
+            )
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_paid_response_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_redact_paid_response_value(item) for item in value]
+    return value
+
+
+def _bounded_paid_response_json(
+    snapshot: Mapping[str, Any],
+    *,
+    max_bytes: int = PAID_RESPONSE_SNAPSHOT_MAX_BYTES,
+) -> tuple[str, int, bool]:
+    redacted = _redact_paid_response_value(snapshot)
+    payload = json.dumps(redacted, separators=(",", ":"), sort_keys=True)
+    original_size = len(payload.encode("utf-8"))
+    if original_size <= max_bytes:
+        return payload, original_size, False
+
+    preview_chars = max(0, max_bytes - 256)
+    bounded: dict[str, object] = {
+        "truncated": True,
+        "schema_version": PAID_RESPONSE_SNAPSHOT_SCHEMA_VERSION,
+        "original_size_bytes": original_size,
+        "max_bytes": max_bytes,
+        "preview": payload[:preview_chars],
+    }
+    bounded_payload = json.dumps(bounded, separators=(",", ":"), sort_keys=True)
+    while len(bounded_payload.encode("utf-8")) > max_bytes and preview_chars > 0:
+        preview_chars = max(0, preview_chars - 256)
+        bounded["preview"] = payload[:preview_chars]
+        bounded_payload = json.dumps(bounded, separators=(",", ":"), sort_keys=True)
+    if len(bounded_payload.encode("utf-8")) > max_bytes:
+        minimal = {"truncated": True, "schema_version": PAID_RESPONSE_SNAPSHOT_SCHEMA_VERSION}
+        bounded_payload = json.dumps(minimal, separators=(",", ":"), sort_keys=True)
+    return bounded_payload, original_size, True
+
+
 def _ensure_sqlite_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -714,6 +781,34 @@ def _ensure_sqlite_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS paid_response_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_event_id INTEGER NOT NULL UNIQUE,
+            request_fingerprint TEXT NOT NULL UNIQUE,
+            ts TEXT NOT NULL,
+            address TEXT,
+            schema_version INTEGER NOT NULL,
+            response_bytes INTEGER NOT NULL,
+            truncated INTEGER NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            FOREIGN KEY(request_event_id) REFERENCES request_events(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paid_response_snapshots_ts
+        ON paid_response_snapshots(ts)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paid_response_snapshots_address
+        ON paid_response_snapshots(address)
+        """
+    )
 
 
 def init_sqlite_store(db_path: str) -> None:
@@ -726,7 +821,21 @@ def init_sqlite_store(db_path: str) -> None:
         _ensure_sqlite_schema(conn)
 
 
-def append_sqlite_entry(db_path: str, entry: dict[str, Any]) -> bool:
+def _should_store_paid_response_snapshot(entry: dict[str, Any]) -> bool:
+    return (
+        bool(entry.get("paid"))
+        and entry.get("path") == "/analyze"
+        and int(entry.get("status", 0)) == 200
+    )
+
+
+def append_sqlite_entry(
+    db_path: str,
+    entry: dict[str, Any],
+    *,
+    paid_response_snapshot: Mapping[str, Any] | None = None,
+    paid_response_max_bytes: int = PAID_RESPONSE_SNAPSHOT_MAX_BYTES,
+) -> bool:
     """Persist an analytics entry into SQLite."""
     if not db_path:
         return False
@@ -765,6 +874,33 @@ def append_sqlite_entry(db_path: str, entry: dict[str, Any]) -> bool:
                 traffic_class,
             ),
         )
+        if (
+            cursor.rowcount == 1
+            and paid_response_snapshot is not None
+            and _should_store_paid_response_snapshot(entry)
+        ):
+            snapshot_json, response_bytes, truncated = _bounded_paid_response_json(
+                paid_response_snapshot,
+                max_bytes=paid_response_max_bytes,
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO paid_response_snapshots (
+                    request_event_id, request_fingerprint, ts, address,
+                    schema_version, response_bytes, truncated, snapshot_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    cursor.lastrowid,
+                    fingerprint,
+                    str(entry.get("ts", "")),
+                    str(entry.get("address", "")) or None,
+                    PAID_RESPONSE_SNAPSHOT_SCHEMA_VERSION,
+                    response_bytes,
+                    1 if truncated else 0,
+                    snapshot_json,
+                ),
+            )
         return cursor.rowcount == 1
 
 

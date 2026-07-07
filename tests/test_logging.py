@@ -7,8 +7,9 @@ from unittest.mock import patch
 
 import pytest
 import responses
+from flask import request
 
-from risk_api.analytics import append_sqlite_entry
+from risk_api.analytics import PAID_RESPONSE_SNAPSHOT_MAX_BYTES, append_sqlite_entry
 from risk_api.api_contract import analysis_result_from_snapshot
 from risk_api.app import create_app
 from risk_api.analysis.engine import clear_analysis_cache
@@ -437,6 +438,230 @@ def test_durable_analytics_db_persists_request_events(
     assert data["stage_counts"]["analyze_success"] == 1
     assert data["traffic_classes"]["other_traffic"] == 2
     assert data["recent"][-1]["path"] == "/analyze"
+
+
+def test_paid_analyze_response_snapshot_is_persisted(app_with_analytics_db):
+    addr = "0x" + "ab" * 20
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    @app_with_analytics_db.before_request
+    def _mark_paid_for_test() -> None:
+        if request.path == "/analyze":
+            request.environ["x402_payload"] = {"test": "paid"}
+
+    client = app_with_analytics_db.test_client()
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["decision"] == "allow"
+
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT e.paid, e.funnel_stage, s.address, s.truncated, s.snapshot_json
+            FROM request_events e
+            JOIN paid_response_snapshots s ON s.request_event_id = e.id
+            """
+        ).fetchone()
+
+    assert row is not None
+    paid, funnel_stage, stored_address, truncated, snapshot_json = row
+    assert paid == 1
+    assert funnel_stage == "paid_request"
+    assert stored_address == addr
+    assert truncated == 0
+    snapshot = json.loads(snapshot_json)
+    assert snapshot["address"] == addr
+    assert snapshot["score"] == 0
+    assert snapshot["recommended_policy"]["action"] == "allow"
+    assert "payment" not in snapshot
+
+
+def test_non_paid_analyze_response_does_not_create_snapshot(
+    client_analytics, app_with_analytics_db
+):
+    addr = "0x" + "ab" * 20
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client_analytics.get(f"/analyze?address={addr}")
+
+    assert resp.status_code == 200
+
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    with sqlite3.connect(db_path) as conn:
+        snapshot_count = conn.execute(
+            "SELECT COUNT(*) FROM paid_response_snapshots"
+        ).fetchone()[0]
+
+    assert snapshot_count == 0
+
+
+def test_sqlite_paid_response_snapshot_is_paid_only(app_with_analytics_db):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    entry = {
+        "ts": "2026-07-07T12:00:00Z",
+        "path": "/analyze",
+        "status": 200,
+        "paid": False,
+        "duration_ms": 12,
+        "user_agent": "pytest-agent",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-unpaid-snapshot-test",
+        "funnel_stage": "analyze_success",
+        "address": "0x" + "ab" * 20,
+    }
+
+    assert append_sqlite_entry(
+        db_path,
+        entry,
+        paid_response_snapshot={
+            "address": entry["address"],
+            "score": 0,
+            "level": "safe",
+        },
+    ) is True
+
+    with sqlite3.connect(db_path) as conn:
+        snapshot_count = conn.execute(
+            "SELECT COUNT(*) FROM paid_response_snapshots"
+        ).fetchone()[0]
+
+    assert snapshot_count == 0
+
+
+def test_sqlite_paid_response_snapshot_is_bounded_and_redacted(
+    app_with_analytics_db,
+):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    addr = "0x" + "ab" * 20
+    entry = {
+        "ts": "2026-07-07T12:00:00Z",
+        "path": "/analyze",
+        "status": 200,
+        "paid": True,
+        "duration_ms": 12,
+        "user_agent": "pytest-agent",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-paid-snapshot-bound-test",
+        "funnel_stage": "paid_request",
+        "address": addr,
+    }
+    max_bytes = 512
+    secret = "secret-payment-signature"
+
+    assert append_sqlite_entry(
+        db_path,
+        entry,
+        paid_response_snapshot={
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "payment_signature": secret,
+            "payer_wallet": "0x" + "12" * 20,
+            "findings": [{"description": "x" * PAID_RESPONSE_SNAPSHOT_MAX_BYTES}],
+        },
+        paid_response_max_bytes=max_bytes,
+    ) is True
+
+    with sqlite3.connect(db_path) as conn:
+        response_bytes, truncated, snapshot_json = conn.execute(
+            """
+            SELECT response_bytes, truncated, snapshot_json
+            FROM paid_response_snapshots
+            """
+        ).fetchone()
+
+    assert response_bytes > max_bytes
+    assert truncated == 1
+    assert len(snapshot_json.encode("utf-8")) <= max_bytes
+    assert secret not in snapshot_json
+    assert "secret" not in snapshot_json
+    snapshot = json.loads(snapshot_json)
+    assert snapshot["truncated"] is True
+    assert snapshot["original_size_bytes"] == response_bytes
+
+
+def test_sqlite_stats_remains_compatible_with_paid_response_snapshots(
+    client_analytics, app_with_analytics_db
+):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    addr = "0x" + "ab" * 20
+    entry = {
+        "ts": "2026-07-07T12:00:00Z",
+        "path": "/analyze",
+        "status": 200,
+        "paid": True,
+        "duration_ms": 12,
+        "user_agent": "pytest-agent",
+        "method": "GET",
+        "host": "augurrisk.com",
+        "referer": "",
+        "request_id": "req-paid-snapshot-stats-test",
+        "funnel_stage": "paid_request",
+        "address": addr,
+    }
+
+    assert append_sqlite_entry(
+        db_path,
+        entry,
+        paid_response_snapshot={
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+        },
+    ) is True
+
+    data = client_analytics.get("/stats").get_json()
+
+    assert data["total_requests"] == 1
+    assert data["paid_requests"] == 1
+    assert data["funnel"]["paid_requests"] == 1
+    assert data["traffic_classes"]["paid_request"] == 1
+    assert "paid_response_snapshot" not in data["recent"][0]
+    assert "snapshot_json" not in data["recent"][0]
 
 
 def test_stats_empty_when_only_durable_analytics_is_configured(client_analytics):

@@ -98,7 +98,7 @@ Current rule:
 - [ ] `D-001` Repair Coinbase Bazaar / CDP discovery indexing
   Output: make `https://augurrisk.com/analyze` discoverable in CDP Bazaar search.
   Evidence from 2026-07-06: `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after validation and paid settlement and did not find `augurrisk.com/analyze`; the only Augur-related match was the stale `https://risk-api.life.conway.tech/analyze` resource. The old Conway domain timed out from this machine.
-  Current status: rechecked on 2026-07-07 and still stale. Full CDP scan still returned `NOT_FOUND`; merchant discovery for payTo still returns only `https://risk-api.life.conway.tech/analyze`; search `urlSubstring=augurrisk.com` returns no resources; search `urlSubstring=risk-api.life.conway.tech` returns the stale resource. Escalation packet and copy-paste support message: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
+  Current status: rechecked on 2026-07-07 and still stale. Full CDP scan still returned `NOT_FOUND`; merchant discovery for payTo still returns only `https://risk-api.life.conway.tech/analyze`; search `urlSubstring=augurrisk.com` returns no resources; search `urlSubstring=risk-api.life.conway.tech` returns the stale resource. User submitted the CDP support case on 2026-07-07 using `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`; next recheck is 2026-07-09 or after support replies.
   Done means: CDP discovery returns the canonical `augurrisk.com` resource for Augur-related searches or a CDP support/Discord escalation has been submitted and tracked.
 
 - [x] `D-002` Re-list or repair x402.jobs
@@ -122,9 +122,42 @@ Current rule:
 
 ### 4. Logging
 
-- [ ] `L-001` Log full paid analysis responses safely
+- [x] `L-001` Log full paid analysis responses safely
   Output: persist the paid response body or a bounded redacted response snapshot for paid `/analyze` rows.
   Why now: current durable analytics records timing, UA, referer, analyzed address, action/spender, score, level, and paid status, but not the full findings or policy output.
+  Status: completed on 2026-07-07. Durable SQLite now creates `paid_response_snapshots` beside `request_events` and stores a redacted, byte-bounded copy of the serialized public `/analyze` response only for paid `/analyze` HTTP 200 rows. Snapshot rows are linked to `request_events.id` and `request_fingerprint`; `/stats` still aggregates only from `request_events`.
+  Privacy limits: the snapshot path does not add source IP, payer wallet, transaction hash, payment signature, or facilitator payload logging. Keys containing payment/signature/payer/wallet/transaction/IP-style terms are redacted, and oversized snapshots are stored as a bounded valid JSON preview with `truncated=1`.
+  Query:
+  ```powershell
+  @'
+  import json, sqlite3, sys
+  db = sys.argv[1]
+  con = sqlite3.connect(db)
+  con.row_factory = sqlite3.Row
+  for r in con.execute("""
+    SELECT e.ts, e.address, e.action, e.spender, e.score, e.level,
+           s.truncated, s.response_bytes, s.snapshot_json
+    FROM paid_response_snapshots s
+    JOIN request_events e ON e.id = s.request_event_id
+    ORDER BY e.ts DESC
+    LIMIT 25
+  """):
+      snap = json.loads(r["snapshot_json"])
+      print({
+          "ts": r["ts"],
+          "address": r["address"],
+          "action": r["action"],
+          "spender": r["spender"],
+          "score": r["score"],
+          "level": r["level"],
+          "truncated": bool(r["truncated"]),
+          "response_bytes": r["response_bytes"],
+          "decision": snap.get("decision"),
+          "action_decision": (snap.get("action_evaluation") or {}).get("decision"),
+          "findings": len(snap.get("findings", [])) if isinstance(snap.get("findings"), list) else None,
+      })
+  '@ | python - ".codex\live_db\<stamp>\analytics.sqlite3"
+  ```
   Done means: paid-call forensics can reconstruct what Augur told the caller without storing payer wallet, transaction hash, or source IP.
 
 - [ ] `L-002` Add payer attribution plan without over-logging
@@ -160,15 +193,15 @@ Current rule:
 
 Do now:
 
-1. Submit the copy-paste message in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to CDP support at `https://support.cdp.coinbase.com/`.
-2. If no ticket response, post the same message in the CDP/x402 Discord at `https://discord.gg/cdp`.
+1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
+2. Build `Q-001` paid-contract regression cases using durable analytics plus `paid_response_snapshots`.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
 
-1. Implement `L-001` full paid-response logging.
-2. Build `Q-001` paid-contract regression cases.
-3. Design `A-003` decision-primary output clarity without widening the product.
+1. Build `Q-001` paid-contract regression cases.
+2. Design `A-003` decision-primary output clarity without widening the product.
+3. Decide whether `L-002` needs facilitator IDs or transaction hashes, or whether off-chain correlation is enough.
 
 Do later:
 
