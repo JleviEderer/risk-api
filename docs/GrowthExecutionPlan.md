@@ -117,7 +117,8 @@ Current rule:
 - [ ] `A-003` Make the machine-branching field unambiguous
   Output: ensure agents can branch on one primary decision field without being misled by `level=safe` plus action-level `warn`.
   Why now: real paid callers exist, so response ambiguity is commercial risk.
-  Constraint: no product API changes in the July hygiene pass; design this only after logging and regression cases are locked.
+  Preconditions completed: `L-001` paid-response logging, `Q-001` real paid-contract regressions, and the 2026-07-07 pre-A-003 coverage gap pass are done. The added coverage lives outside the paid-only corpus and locks both a synthetic `block` primary-decision case and the exact WETH approve ambiguity (`level=safe`, top-level `decision=allow`, `action_evaluation.decision=warn`).
+  Constraint: the next pass may design the response-shape change, but it should still avoid broad product expansion. Start by specifying one primary branch field and its relationship to `level`, `decision`, `recommended_policy.action`, and `action_evaluation.decision`; then update OpenAPI/examples/tests explicitly.
   Done means: response shape, OpenAPI, examples, and tests make the primary branch field explicit.
 
 ### 4. Logging
@@ -126,6 +127,7 @@ Current rule:
   Output: persist the paid response body or a bounded redacted response snapshot for paid `/analyze` rows.
   Why now: current durable analytics records timing, UA, referer, analyzed address, action/spender, score, level, and paid status, but not the full findings or policy output.
   Status: completed on 2026-07-07. Durable SQLite now creates `paid_response_snapshots` beside `request_events` and stores a redacted, byte-bounded copy of the serialized public `/analyze` response only for paid `/analyze` HTTP 200 rows. Snapshot rows are linked to `request_events.id` and `request_fingerprint`; `/stats` still aggregates only from `request_events`.
+  Post-logging smoke: a canonical paid WETH smoke on 2026-07-07 succeeded with response `200`, `score=0`, `level=safe`, `findings=0`. A fresh Fly SQLite pull at `.codex/live_db/2026-07-07-1335/analytics.sqlite3` showed `36` paid `/analyze` rows and `1` `paid_response_snapshots` row. The snapshot row was untruncated (`response_bytes=339`), `decision=allow`, `score=0`, `level=safe`, and did not contain payment signature, payer wallet, or tx-hash markers.
   Privacy limits: the snapshot path does not add source IP, payer wallet, transaction hash, payment signature, or facilitator payload logging. Keys containing payment/signature/payer/wallet/transaction/IP-style terms are redacted, and oversized snapshots are stored as a bounded valid JSON preview with `truncated=1`.
   Query:
   ```powershell
@@ -204,14 +206,14 @@ Current rule:
 Do now:
 
 1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
-2. Design `A-003` decision-primary output clarity using the locked paid-contract regressions.
+2. Design `A-003` decision-primary output clarity using the locked paid-contract regressions, synthetic block coverage, action-aware approve ambiguity coverage, and the first real `paid_response_snapshots` row.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
 
 1. Decide whether `L-002` needs facilitator IDs or transaction hashes, or whether off-chain correlation is enough.
-2. Decide whether to add one post-logging paid smoke so `paid_response_snapshots` has a real production row before A-003 ships.
-3. Prepare a Fable review of the regression fixture pass before changing the public response shape.
+2. Prepare a Fable review of the pre-A-003 coverage pass before changing the public response shape.
+3. Decide whether `L-002` can wait until after A-003 or whether payer-attribution planning should happen first.
 
 Do later:
 
