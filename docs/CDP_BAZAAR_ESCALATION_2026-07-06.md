@@ -123,3 +123,74 @@ https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006
 ```
 
 The canonical endpoint passes CDP validation and has a fresh successful CDP-facilitated x402 settlement.
+
+## 2026-07-07 Recheck
+
+The delayed index did not self-repair overnight.
+
+Commands:
+
+```powershell
+python scripts\check_cdp_discovery.py --max-pages 200
+GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/merchant?payTo=0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891&limit=20
+GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/search?urlSubstring=augurrisk.com&limit=20
+GET https://api.cdp.coinbase.com/platform/v2/x402/discovery/search?urlSubstring=risk-api.life.conway.tech&limit=20
+python scripts\register_x402jobs.py --list --search Augur
+```
+
+Results:
+
+- full CDP scan: `scanned_pages=200`, `scanned_items=20000`, `status=NOT_FOUND`
+- stale related match still present: `https://risk-api.life.conway.tech/analyze`
+- merchant discovery for payTo returned only `https://risk-api.life.conway.tech/analyze`
+- merchant `lastUpdated` stayed `2026-03-02T05:26:45.981Z`
+- CDP search `urlSubstring=augurrisk.com` returned no resources
+- CDP search `urlSubstring=risk-api.life.conway.tech` returned `https://risk-api.life.conway.tech/analyze`
+- x402.jobs is still repaired as `https://x402.jobs/resources/augurrisk-com/augur-2`
+
+Official escalation destinations found on 2026-07-07:
+
+1. CDP support form: `https://support.cdp.coinbase.com/`
+2. CDP/x402 Discord: `https://discord.gg/cdp`
+3. x402 GitHub issues: `https://github.com/x402-foundation/x402/issues`
+
+Practical route: use CDP support first, then post the same message in the CDP Discord x402 support/community channel if no ticket response. GitHub Issues is official for bug reports, but the public repo page currently shows issue creation as restricted, so it is not the primary route unless the user account has permission.
+
+## Copy-Paste Support Message
+
+Subject:
+
+```text
+CDP Bazaar stale resource: Augur still indexed at dead Conway URL after canonical validation and settlement
+```
+
+Body:
+
+```text
+Hi CDP/x402 team,
+
+I operate Augur, an x402-paid Base contract risk API.
+
+CDP Bazaar still indexes Augur under a dead legacy URL:
+https://risk-api.life.conway.tech/analyze
+
+The canonical production URL is:
+https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006
+
+Merchant payTo:
+0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891
+
+Evidence:
+- The canonical endpoint passed CDP /platform/v2/x402/validate on 2026-07-06 with valid=True, statusCode=402, x402Version=2, and Bazaar extension present.
+- A real paid CDP-facilitated x402 call succeeded on 2026-07-06.
+- Blockscout USDC transfer tx:
+  0x38d86ab18f54029a8e453c50a0bb3adcfb37a05dfc165dc32305f666427f218d
+- On 2026-07-07, a 20,000-resource CDP discovery scan still did not find augurrisk.com/analyze and still returned the stale Conway URL as the only Augur-related match.
+- CDP merchant discovery for payTo 0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891 still returns only https://risk-api.life.conway.tech/analyze with lastUpdated=2026-03-02T05:26:45.981Z.
+- CDP search urlSubstring=augurrisk.com returns no resources.
+- CDP search urlSubstring=risk-api.life.conway.tech returns the stale resource.
+
+Could you remove or refresh the stale Conway resource and index the canonical Augur resource at augurrisk.com for the same payTo?
+
+Thanks.
+```

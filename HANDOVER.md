@@ -15,14 +15,14 @@
   - `python -m pytest tests\test_app.py tests\test_logging.py -q` -> `188 passed`
   - `python -m pytest -q` -> `403 passed`
 - Fly token hygiene: app token `codex-deploy-2026-06-04` was still active and was revoked with `flyctl tokens revoke` on 2026-07-06. Remaining active app tokens need a follow-up owner/purpose review before revocation.
-- CDP/Bazaar discovery: `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after the 2026-07-06 validation and paid settlement and did not find `https://augurrisk.com/analyze`; the only Augur-related match remains stale `https://risk-api.life.conway.tech/analyze`. The old Conway health URL timed out from this machine.
+- CDP/Bazaar discovery: still stale after the 2026-07-07 recheck. `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources and did not find `https://augurrisk.com/analyze`; merchant discovery for payTo `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891` still returns only `https://risk-api.life.conway.tech/analyze`; CDP search finds Conway but not `augurrisk.com`. Escalation now requires user action through CDP support or Discord.
 - x402.jobs discovery: repaired on 2026-07-06. `python scripts\register_x402jobs.py --list --search Augur` shows resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, listing `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price.
 - Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
 - Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
-- Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar did not repair immediately: the canonical endpoint passed CDP `/x402/validate`, a real paid WETH settlement succeeded, and Blockscout shows tx `0x38d86ab18f54029a8e453c50a0bb3adcfb37a05dfc165dc32305f666427f218d`, but CDP merchant/search still returns only stale `https://risk-api.life.conway.tech/analyze`. Escalation packet: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
+- Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar remains stale after the 2026-07-07 recheck; the support-ready packet and copy-paste message are in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
 - Next exact tasks:
-  1. Re-check CDP/Bazaar after the 2026-07-06 paid settlement indexing window.
-  2. If CDP still shows only Conway, send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to Coinbase/CDP or x402 support.
+  1. Submit the copy-paste message in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to CDP support at `https://support.cdp.coinbase.com/`.
+  2. If no ticket response, post the same message in the CDP/x402 Discord at `https://discord.gg/cdp`.
   3. Implement bounded full paid-response logging.
   4. Build paid-contract regression fixtures from real paid contracts.
   5. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
@@ -949,7 +949,7 @@
 
 ## Tomorrow Start Here
 1. Start with discovery repair, not product changes:
-   - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource even after the canonical endpoint passed CDP validate and a fresh paid settlement succeeded on 2026-07-06
+   - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource even after the canonical endpoint passed CDP validate, a fresh paid settlement succeeded on 2026-07-06, and CDP was rechecked on 2026-07-07
    - x402.jobs is repaired as `https://x402.jobs/resources/augurrisk-com/augur-2`
    - use `docs/GrowthExecutionPlan.md` and `docs/REGISTRATIONS.md` as the current checklist/source of truth
 2. Confirm live health before any follow-up:

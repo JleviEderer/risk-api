@@ -1,6 +1,6 @@
 # Augur Growth Execution Plan
 
-> Last updated: 2026-07-06
+> Last updated: 2026-07-07
 
 This document is the active operating tracker for product, distribution, and conversion work.
 
@@ -98,8 +98,8 @@ Current rule:
 - [ ] `D-001` Repair Coinbase Bazaar / CDP discovery indexing
   Output: make `https://augurrisk.com/analyze` discoverable in CDP Bazaar search.
   Evidence from 2026-07-06: `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after validation and paid settlement and did not find `augurrisk.com/analyze`; the only Augur-related match was the stale `https://risk-api.life.conway.tech/analyze` resource. The old Conway domain timed out from this machine.
-  Current status: canonical endpoint passed CDP `/x402/validate`, and one fresh paid WETH settlement succeeded on 2026-07-06. CDP merchant/search still return only the stale Conway resource. Escalation packet: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
-  Done means: CDP discovery returns the canonical `augurrisk.com` resource for Augur-related searches or there is a support/escalation packet with the stale-resource evidence.
+  Current status: rechecked on 2026-07-07 and still stale. Full CDP scan still returned `NOT_FOUND`; merchant discovery for payTo still returns only `https://risk-api.life.conway.tech/analyze`; search `urlSubstring=augurrisk.com` returns no resources; search `urlSubstring=risk-api.life.conway.tech` returns the stale resource. Escalation packet and copy-paste support message: `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
+  Done means: CDP discovery returns the canonical `augurrisk.com` resource for Augur-related searches or a CDP support/Discord escalation has been submitted and tracked.
 
 - [x] `D-002` Re-list or repair x402.jobs
   Output: restore an Augur x402.jobs listing pointing at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006`.
@@ -160,8 +160,8 @@ Current rule:
 
 Do now:
 
-1. Re-check CDP/Bazaar after the 2026-07-06 paid settlement has had time to index.
-2. If CDP still returns only Conway after the indexing window, send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to Coinbase/CDP or x402 support.
+1. Submit the copy-paste message in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to CDP support at `https://support.cdp.coinbase.com/`.
+2. If no ticket response, post the same message in the CDP/x402 Discord at `https://discord.gg/cdp`.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:

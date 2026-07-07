@@ -7,14 +7,14 @@ Single source of truth for everywhere Augur (risk-api) is registered and discove
 | Registry | Status | URL / ID | How to Update | Env Vars | Last Verified |
 |----------|--------|----------|---------------|----------|---------------|
 | ERC-8004 | Live | [Agent #19074](https://8004scan.io/agents/base/19074) | `scripts/register_erc8004.py` | wallet key | 2026-03-29 |
-| x402.jobs | Live | [x402.jobs listing](https://x402.jobs/resources/augurrisk-com/augur-2) | `scripts/register_x402jobs.py` | `X402_JOBS_API_KEY` | 2026-07-06 |
+| x402.jobs | Live | [x402.jobs listing](https://x402.jobs/resources/augurrisk-com/augur-2) | `scripts/register_x402jobs.py` | `X402_JOBS_API_KEY` | 2026-07-07 |
 | MoltMart | Live | [moltmart.app](https://moltmart.app) | `scripts/register_moltmart.py` | `MOLTMART_API_KEY`, `MOLTMART_SERVICE_ID` | 2026-03-29 |
 | Work402 | Live (testnet) | [work402.com](https://work402.com) | `scripts/register_work402.py` | `WORK402_DID` | 2026-03-29 |
 | IPFS | Live | `QmfCBvB5wdBCTeT1XUiXyXY3z2TmUm1rUnQsqrW58reL6S` | `scripts/pin_metadata_ipfs.py` | `PINATA_JWT` | 2026-03-29 |
 | 8004scan | Live | [8004scan.io/agents/base/19074](https://8004scan.io/agents/base/19074) | Wallet verification via browser | - | 2026-03-30 |
 | x402scan | Live | [x402scan.com](https://www.x402scan.com) | Register at x402scan.com/resources/register | - | 2026-03-01 |
 | x402 Bazaar | Historical / unverified | ID `6352e8b7-9662-4029-bf60-6becc2ec9457` | POST to `x402-discovery-api.onrender.com/register` | - | 2026-03-08 |
-| Coinbase Bazaar | Escalation ready / stale Conway only | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`augurrisk.com/analyze`) | Auto-indexed via CDP facilitator settlement | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-07-06 |
+| Coinbase Bazaar | User support action pending / stale Conway only | [CDP Bazaar](https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources) (`augurrisk.com/analyze`) | Auto-indexed via CDP facilitator settlement; support escalation required | `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | 2026-07-07 |
 
 ## 2026-03-29 Alignment Checklist
 
@@ -61,7 +61,7 @@ This is the current hygiene-pass discovery snapshot. It supersedes the older Mar
 |---------|---------------|----------|-------|
 | Fly production app | Healthy | `flyctl status --app augurrisk` showed machine `48e64d2fd31728`, `started`, `1` passing check. Live `/health` returned `ok`; live `/stats` returned durable SQLite counts with `paid_requests=35` after the discovery-pass paid smoke. | App health is not the current discovery blocker; exact Fly machine version advances on deploy. |
 | x402.jobs | Repaired | `python scripts/register_x402jobs.py` created/updated resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`; `python scripts/register_x402jobs.py --list --search Augur` shows `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price. | Treat x402.jobs as live again. Monitor because the public site shell can still be hard to inspect with static PowerShell fetches. |
-| Coinbase Bazaar / CDP public discovery | Stale / canonical resource not found | `python scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after validation and paid settlement on 2026-07-06 and did not find `https://augurrisk.com/analyze`; the only Augur-related match was `https://risk-api.life.conway.tech/analyze`. | Send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` if the delayed index does not update. |
+| Coinbase Bazaar / CDP public discovery | Stale / canonical resource not found | `python scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources after validation and paid settlement on 2026-07-06 and did not find `https://augurrisk.com/analyze`; the only Augur-related match was `https://risk-api.life.conway.tech/analyze`. | Superseded by the 2026-07-07 escalation recheck below. |
 | Conway legacy origin | Dead from this machine | `https://risk-api.life.conway.tech/health` timed out on 2026-07-06. | This makes the stale CDP/Bazaar resource actively harmful for discovery. |
 
 ## 2026-07-06 Discovery Repair Pass
@@ -72,6 +72,16 @@ This is the current hygiene-pass discovery snapshot. It supersedes the older Mar
 | CDP settlement | Fresh canonical paid call succeeded | `python scripts/test_x402_payment.py` returned `200`, `score=0`, `level=safe`; Blockscout USDC tx `0x38d86ab18f54029a8e453c50a0bb3adcfb37a05dfc165dc32305f666427f218d` paid `0.1` USDC from `0x79301cf19aaea29fbe40f0f5b78f73e2c3b0a2b8` to `0x13580b9c6a9afbfe4c739e74136c1da174db9891`. | Re-check CDP after indexing delay. |
 | CDP merchant/search | Still stale after validation and settlement | Merchant endpoint for payTo `0x1358...9891` returned only `https://risk-api.life.conway.tech/analyze` with `lastUpdated=2026-03-02T05:26:45.981Z`; search `urlSubstring=augurrisk.com` returned `0`; search `urlSubstring=risk-api.life.conway.tech` returned `1`. | If still stale after the indexing window, send `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` to Coinbase/CDP or x402 support. |
 | x402.jobs | Repaired | Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, slug `augurrisk-com/augur-2`, canonical URL, `max_amount_required=100000`, `call_count=2`, `total_earned_usdc=0.2`. | Use `python scripts/register_x402jobs.py --list --search Augur` for future verification. |
+
+## 2026-07-07 CDP/Bazaar Escalation Recheck
+
+| Surface | Current State | Evidence | Next Step |
+|---------|---------------|----------|-----------|
+| CDP full discovery scan | Still stale | `python scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources and returned `status=NOT_FOUND`; the only Augur-related match remained `https://risk-api.life.conway.tech/analyze`. | Submit support escalation. |
+| CDP merchant discovery | Still stale | Merchant discovery for payTo `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891` returned only `https://risk-api.life.conway.tech/analyze` with `lastUpdated=2026-03-02T05:26:45.981Z`. | Ask CDP to remove or refresh the stale resource. |
+| CDP search | Still stale | `urlSubstring=augurrisk.com` returned no resources; `urlSubstring=risk-api.life.conway.tech` returned the stale Conway resource. | Recheck after support response or on 2026-07-09. |
+| x402.jobs | Still repaired | `python scripts/register_x402jobs.py --list --search Augur` showed `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price. | Continue to treat x402.jobs as live. |
+| Support destination | User action required | Official CDP support path is `https://support.cdp.coinbase.com/`; official CDP/x402 Discord is `https://discord.gg/cdp`; x402 GitHub issues are official but public issue creation currently appears restricted. | User should paste the message from `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`; next recheck date: 2026-07-09. |
 
 ## 2026-03-29 Recheck
 
