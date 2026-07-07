@@ -166,10 +166,20 @@ Current rule:
 
 ### 5. Paid-Contract Regressions
 
-- [ ] `Q-001` Build a golden regression suite from real paid contracts
+- [x] `Q-001` Build a golden regression suite from real paid contracts
   Output: fixtures and expected outcomes for contracts that real paid callers screened.
-  Initial set: Base WETH `0x4200000000000000000000000000000000000006`, Mintpad `0xfb51d2120c27bb56d91221042cb2dd2866a647fe`, RUG PULL `0x3Af31D295C09aCa8AE4524DAA6108F17F9e54F32`, Pudgy Penguin `0x722dF2b5552354950a7b55d8872a4e8f33eD1b07`, and the recurring Beefy/AERO-style paid cases from the July analytics pull.
-  Depends on: `L-001` for future exact-response capture.
+  Status: completed on 2026-07-07 in `tests/fixtures/paid_contract_cases.json` and `tests/test_paid_contract_regressions.py`.
+  Fixture source: durable Fly SQLite pull `.codex/live_db/2026-07-07-1249/analytics.sqlite3`, using real paid `/analyze` rows only. `paid_response_snapshots` existed but had `0` rows at generation time because no paid call had landed after the 2026-07-07 logging deploy, so the fixtures use historical `request_events` address/output metadata plus current public Base bytecode snapshots.
+  Contracts covered:
+  - Base WETH `0x4200000000000000000000000000000000000006` (`22` paid rows): protects the canonical WETH/WWETH-context integration path as `score=0`, `level=safe`, `decision=allow`.
+  - Moo Beefy Aerodrome FUN-USDC `0x73fd88f0c1364f9f81d52dd6bb9fff6429597ccd` (`3` paid rows): protects EIP-1167 proxy resolution into Beefy implementation bytecode and the `warn` outcome for proxy/delegatecall/suspicious selector context.
+  - Aerodrome AERO `0x940181a94a35a4569e4529a3cdfb74e38fd98631` (`3` paid rows): protects hidden-mint signal surfacing as `manual_review`, not `allow`.
+  - Moo Beefy Aero WETH-ZRO `0x8b1f5874e0b5aa3eeb117b82af8d59fcb52d122a` (`2` paid rows): protects the WETH-pair Beefy vault path with the same proxy-resolution outcome.
+  - Mintpad `0xfb51d2120c27bb56d91221042cb2dd2866a647fe` (`2` paid rows): protects non-WETH suspicious-selector warning behavior.
+  - Recover `0x1f9840a85d5af5bf1d1762f925bdaddc4201f984` (`1` paid row): protects a non-WETH clean `allow` baseline.
+  - RUG PULL `0x3af31d295c09aca8ae4524daa6108f17f9e54f32` (`1` paid row): protects the corrected valid address and suspicious-selector warning behavior.
+  - Pudgy Penguin on Base `0x722df2b5552354950a7b55d8872a4e8f33ed1b07` (`1` paid row): protects another non-WETH clean `allow` baseline.
+  Privacy limits: fixtures store paid contract addresses, paid counts/timestamps, public bytecode, and expected analyzer outputs only. They do not store source IP, payer wallet, transaction hash, user agent, referer, payment signature, or facilitator payloads.
   Done means: future detector or policy edits fail tests if they regress real paid use cases without an intentional fixture update.
 
 ### 6. Pricing
@@ -194,14 +204,14 @@ Current rule:
 Do now:
 
 1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
-2. Build `Q-001` paid-contract regression cases using durable analytics plus `paid_response_snapshots`.
+2. Design `A-003` decision-primary output clarity using the locked paid-contract regressions.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
 
-1. Build `Q-001` paid-contract regression cases.
-2. Design `A-003` decision-primary output clarity without widening the product.
-3. Decide whether `L-002` needs facilitator IDs or transaction hashes, or whether off-chain correlation is enough.
+1. Decide whether `L-002` needs facilitator IDs or transaction hashes, or whether off-chain correlation is enough.
+2. Decide whether to add one post-logging paid smoke so `paid_response_snapshots` has a real production row before A-003 ships.
+3. Prepare a Fable review of the regression fixture pass before changing the public response shape.
 
 Do later:
 

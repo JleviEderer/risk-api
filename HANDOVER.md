@@ -18,13 +18,15 @@
 - CDP/Bazaar discovery: still stale after the 2026-07-07 recheck. `scripts/check_cdp_discovery.py --max-pages 200` scanned `20,000` resources and did not find `https://augurrisk.com/analyze`; merchant discovery for payTo `0x13580b9C6A9AfBfE4C739e74136C1dA174dB9891` still returns only `https://risk-api.life.conway.tech/analyze`; CDP search finds Conway but not `augurrisk.com`. Escalation now requires user action through CDP support or Discord.
 - x402.jobs discovery: repaired on 2026-07-06. `python scripts\register_x402jobs.py --list --search Augur` shows resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a`, listing `https://x402.jobs/resources/augurrisk-com/augur-2`, canonical URL, and `$0.10` price.
 - Paid response logging: implemented on 2026-07-07 without changing the public `/analyze` response. Durable SQLite now has a companion `paid_response_snapshots` table keyed to `request_events`; it stores redacted, byte-bounded serialized response snapshots only for paid `/analyze` HTTP 200 rows. It does not add source IP, payer wallet, transaction hash, payment signature, or facilitator payload logging.
+- Paid-contract regression fixtures: implemented on 2026-07-07 in `tests/fixtures/paid_contract_cases.json` plus `tests/test_paid_contract_regressions.py`. Fixture source was the fresh durable Fly SQLite pull `.codex/live_db/2026-07-07-1249/analytics.sqlite3`; `paid_response_snapshots` had `0` rows at generation time, so this historical corpus uses paid `request_events` address/output metadata plus current public Base bytecode snapshots. Covered contracts: Base WETH, Aerodrome AERO, Moo Beefy Aerodrome FUN-USDC, Moo Beefy Aero WETH-ZRO, Mintpad, Recover, RUG PULL, and Pudgy Penguin on Base. Tests patch RPC and deployer reputation so detector/policy/proxy behavior is deterministic and does not store source IP, payer wallet, transaction hash, user agent, referer, payment signature, or facilitator payload.
+- Paid-contract regression validation on 2026-07-07: `python -m pytest tests\test_paid_contract_regressions.py tests\test_logging.py -q` -> `31 passed`; `python auto\bench.py auto\corpus\public_cases.json` -> `19/19` checks passed; `python -m pyright src\ tests\` -> `0 errors`; `python -m pytest -q` -> `418 passed`.
 - Current tracking source: `docs/GrowthExecutionPlan.md` now has the July 2026 checklist covering hygiene, discovery, API-output clarity, logging, paid-contract regressions, pricing, and distribution.
 - Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
 - Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar remains stale after the 2026-07-07 recheck; the support-ready packet and copy-paste message are in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
 - Next exact tasks:
   1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
-  2. Build paid-contract regression fixtures from real paid contracts using `request_events` plus `paid_response_snapshots`.
-  3. Design the decision-primary API-output clarity change after logging/regression coverage is in place.
+  2. Design the decision-primary API-output clarity change now that logging and paid-contract regressions are in place.
+  3. Decide whether to run one post-logging paid smoke so `paid_response_snapshots` has a real production row before A-003 ships.
   4. Decide whether `L-002` needs stored facilitator IDs/tx hashes or whether off-chain Blockscout correlation is enough.
   5. Decide the pricing test by 2026-07-20.
 
@@ -986,6 +988,7 @@ for r in con.execute("""
    - CDP/Bazaar still surfaces the stale `https://risk-api.life.conway.tech/analyze` resource even after the canonical endpoint passed CDP validate, a fresh paid settlement succeeded on 2026-07-06, and CDP was rechecked on 2026-07-07
    - x402.jobs is repaired as `https://x402.jobs/resources/augurrisk-com/augur-2`
    - paid-response snapshots are now in durable SQLite for new paid `/analyze` 200 rows only
+   - paid-contract regressions are now locked in `tests/fixtures/paid_contract_cases.json`; do not rebuild them unless new paid traffic or an intentional detector/policy change justifies a fixture update
    - use `docs/GrowthExecutionPlan.md` and `docs/REGISTRATIONS.md` as the current checklist/source of truth
 2. Confirm live health before any follow-up:
    - health check: `https://augurrisk.com/health`
@@ -994,9 +997,9 @@ for r in con.execute("""
    - live app behavior is already deployed on Fly; the bounded `/stats` fix is committed on `origin/master`
    - if the next `flyctl deploy --remote-only` times out during health polling, check `flyctl status --app augurrisk` and the live public routes before assuming the deploy failed
 3. If the goal is API quality, do not make product response changes before observability:
-   - first implement bounded full paid-response logging
-   - then build regression fixtures from real paid contracts
-   - only then design the decision-primary output clarity change
+   - bounded full paid-response logging is done
+   - regression fixtures from real paid contracts are done
+   - next design the decision-primary output clarity change against those fixtures
 4. If the goal is the current conversion/action-aware plan, do not build broad product surface yet:
    - the `/analyze` onboarding path is done
    - traffic classes in analytics are done
