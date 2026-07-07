@@ -119,6 +119,7 @@ Current rule:
   Why now: real paid callers exist, so response ambiguity is commercial risk.
   Preconditions completed: `L-001` paid-response logging, `Q-001` real paid-contract regressions, and the 2026-07-07 pre-A-003 coverage gap pass are done. The added coverage lives outside the paid-only corpus and locks both a synthetic `block` primary-decision case and the exact WETH approve ambiguity (`level=safe`, top-level `decision=allow`, `action_evaluation.decision=warn`).
   Constraint: the next pass may design the response-shape change, but it should still avoid broad product expansion. Start by specifying one primary branch field and its relationship to `level`, `decision`, `recommended_policy.action`, and `action_evaluation.decision`; then update OpenAPI/examples/tests explicitly.
+  Design spec: `docs/A003_DESIGN_SPEC.md` (2026-07-07, Fable). Proposal: top-level `decision` becomes the effective decision (strictness-max of contract and action policy), additive `contract_decision` field, serializer-layer only, zero paid-fixture edits. Next step: Codex critiques the spec, then implements against its checklist.
   Done means: response shape, OpenAPI, examples, and tests make the primary branch field explicit.
 
 ### 4. Logging
