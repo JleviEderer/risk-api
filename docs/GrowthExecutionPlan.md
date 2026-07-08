@@ -119,8 +119,8 @@ Current rule:
   Why now: real paid callers exist, so response ambiguity is commercial risk.
   Preconditions completed: `L-001` paid-response logging, `Q-001` real paid-contract regressions, and the 2026-07-07 pre-A-003 coverage gap pass are done. The added coverage lives outside the paid-only corpus and locks both a synthetic `block` primary-decision case and the exact WETH approve ambiguity (`level=safe`, top-level `decision=allow`, `action_evaluation.decision=warn`).
   Status: implemented and deployed on 2026-07-08 from `docs/A003_DESIGN_SPEC.md` v2. Top-level `decision` is now the effective max-strictness branch field, `contract_decision` is always emitted as the contract-only policy action, and top-level `recommended_policy.action` is rebuilt to equal `decision`. `action_context` and `action_evaluation` remain unchanged. Public docs/OpenAPI/examples/MCP wrapper surfaces were updated, including the MCP output schema so structured content no longer strips `decision`, `contract_decision`, or `recommended_policy`.
-  Validation: `python -m pytest -q` -> `429 passed`; `python -m pyright src\ tests\` -> `0 errors`; `python auto\loop.py` -> `PASS (59/59 checks passed)`; `python -m py_compile ...` passed; `npm run smoke` in `examples/javascript/augur-mcp` passed without paid credentials; GitHub Typecheck and Fly Deploy passed for implementation commit `51bedaa`. Live checks passed for `/health`, unpaid WETH `/analyze` returning `402`, `payment-required` header presence, OpenAPI `contract_decision` schema/required field, and `/llms-full.txt` `contract_decision`/primary-decision prose. `tests/fixtures/paid_contract_cases.json` and `tests/test_paid_contract_regressions.py` were not edited.
-  Remaining: Fable review, paid WETH approve smoke, paid snapshot row check, and paid MCP smoke when credentials/funds are available.
+  Validation: `python -m pytest -q` -> `429 passed`; `python -m pyright src\ tests\` -> `0 errors`; `python auto\loop.py` -> `PASS (59/59 checks passed)`; `python -m py_compile ...` passed; `npm run smoke` in `examples/javascript/augur-mcp` passed without paid credentials; GitHub Typecheck and Fly Deploy passed for implementation commit `51bedaa`. Live checks passed for `/health`, unpaid WETH `/analyze` returning `402`, `payment-required` header presence, OpenAPI `contract_decision` schema/required field, and `/llms-full.txt` `contract_decision`/primary-decision prose. Fable review approved the implementation with no blocking findings. Paid approve smoke on 2026-07-08 used the configured local payer wallet against WETH approve and returned `200`; Fly SQLite pull `.codex/live_db/2026-07-08-1610/analytics.sqlite3` showed `37` paid `/analyze` 200 rows and `2` paid response snapshots, with the latest snapshot `decision=warn`, `contract_decision=allow`, top-level policy action `warn`, `action_evaluation.decision=warn`, `action=approve`, untruncated `response_bytes=797`, and no payment/private markers. Paid MCP smoke passed and returned structured content containing `decision`, `contract_decision`, and `recommended_policy`. `tests/fixtures/paid_contract_cases.json` and `tests/test_paid_contract_regressions.py` were not edited.
+  Remaining: monitor post-A-003 paid traffic and decide whether future payer attribution (`L-002`) needs facilitator IDs or whether off-chain correlation is enough.
 
 ### 4. Logging
 
@@ -207,7 +207,7 @@ Current rule:
 Do now:
 
 1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
-2. Get Fable review of the A-003 implementation and then complete the paid-smoke checklist when credentials/funds are available.
+2. Monitor the next post-A-003 paid rows and use `paid_response_snapshots` for any caller-quality review.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
