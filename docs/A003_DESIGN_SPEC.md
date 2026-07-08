@@ -2,7 +2,7 @@
 
 > Date: 2026-07-07 (revised 2026-07-08 after Codex design critique)
 > Author: Fable (design); Codex critique 2026-07-08: no blocking objections, non-blocking additions folded into §4, §7, §8, §10
-> Status: IMPLEMENTED — A-003 response-shape implementation completed 2026-07-08; pending live deploy/smoke review.
+> Status: IMPLEMENTED AND DEPLOYED — A-003 response-shape implementation completed 2026-07-08; CI/Fly deploy and live non-paid checks passed; paid smoke checks pending credentials.
 > Scope guard: this spec changes response serialization and documentation only. It does not change pricing, discovery metadata, detector behavior, scoring, or the policy engine.
 
 ## 1. Problem
