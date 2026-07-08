@@ -15,6 +15,13 @@ from risk_api.analysis.policy import (
 )
 from risk_api.analysis.scoring import RiskLevel
 
+_STRICTNESS: dict[PolicyAction, int] = {
+    PolicyAction.ALLOW: 0,
+    PolicyAction.WARN: 1,
+    PolicyAction.MANUAL_REVIEW: 2,
+    PolicyAction.BLOCK: 3,
+}
+
 
 def serialize_analysis_result(
     result: AnalysisResult,
@@ -23,12 +30,22 @@ def serialize_analysis_result(
     action_evaluation: ActionEvaluation | None = None,
 ) -> dict[str, object]:
     """Serialize an analysis result into the public wire shape."""
+    contract_decision = result.decision
+    effective_decision = _effective_decision(contract_decision, action_evaluation)
+    policy_source = _top_level_policy_source(result, action_evaluation)
+    recommended_policy = PolicyResult(
+        action=effective_decision,
+        summary=policy_source.summary,
+        reason_codes=list(policy_source.reason_codes),
+    )
+
     response_data: dict[str, object] = {
         "address": result.address,
         "score": result.score,
         "level": result.level.value,
-        "decision": result.decision.value,
-        "recommended_policy": _serialize_policy(result.recommended_policy),
+        "decision": effective_decision.value,
+        "contract_decision": contract_decision.value,
+        "recommended_policy": _serialize_policy(recommended_policy),
         "bytecode_size": result.bytecode_size,
         "findings": [_serialize_finding(finding) for finding in result.findings],
         "category_scores": result.category_scores,
@@ -53,6 +70,31 @@ def serialize_analysis_result(
         }
 
     return response_data
+
+
+def _effective_decision(
+    contract_decision: PolicyAction,
+    action_evaluation: ActionEvaluation | None,
+) -> PolicyAction:
+    if action_evaluation is None:
+        return contract_decision
+    return max(
+        contract_decision,
+        action_evaluation.decision,
+        key=lambda action: _STRICTNESS[action],
+    )
+
+
+def _top_level_policy_source(
+    result: AnalysisResult,
+    action_evaluation: ActionEvaluation | None,
+) -> PolicyResult:
+    if (
+        action_evaluation is not None
+        and _STRICTNESS[action_evaluation.decision] >= _STRICTNESS[result.decision]
+    ):
+        return action_evaluation.recommended_policy
+    return result.recommended_policy
 
 
 def normalize_analysis_snapshot(snapshot: Mapping[str, Any]) -> dict[str, object]:

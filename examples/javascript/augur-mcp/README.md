@@ -84,6 +84,24 @@ Behavior:
 - calls Augur's paid `/analyze` endpoint
 - handles the x402 payment handshake locally with your wallet
 - returns both text output and structured JSON content
+- preserves the primary `decision` gate, `contract_decision`, and `recommended_policy`
+
+Structured response excerpt:
+
+```json
+{
+  "address": "0x4200000000000000000000000000000000000006",
+  "score": 0,
+  "level": "safe",
+  "decision": "allow",
+  "contract_decision": "allow",
+  "recommended_policy": {
+    "action": "allow",
+    "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
+    "reason_codes": []
+  }
+}
+```
 
 ### `describe_augur_service`
 

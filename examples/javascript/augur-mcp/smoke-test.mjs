@@ -39,6 +39,14 @@ async function main() {
       arguments: { address: DEFAULT_ADDRESS },
     });
     console.log("analyze_base_contract_risk", JSON.stringify(analysis.structuredContent));
+    const content = analysis.structuredContent;
+    if (
+      typeof content?.decision !== "string"
+      || typeof content?.contract_decision !== "string"
+      || typeof content?.recommended_policy?.action !== "string"
+    ) {
+      throw new Error("Paid analysis structuredContent is missing decision fields.");
+    }
   }
 
   await client.close();

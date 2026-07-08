@@ -118,6 +118,7 @@ def test_analyze_request_is_logged(client_logged, app_with_logging):
     assert entry["paid"] is False
     assert entry["score"] == 0
     assert entry["level"] == "safe"
+    assert "action_decision" not in entry
     assert entry["method"] == "GET"
     assert entry["funnel_stage"] == "analyze_success"
     assert "ts" in entry
@@ -469,10 +470,11 @@ def test_paid_analyze_response_snapshot_is_persisted(app_with_analytics_db):
         "risk_api.app.analyze_contract",
         return_value=clean_result,
     ):
-        resp = client.get(f"/analyze?address={addr}")
+        spender = "0x" + "12" * 20
+        resp = client.get(f"/analyze?address={addr}&action=approve&spender={spender}")
 
     assert resp.status_code == 200
-    assert resp.get_json()["decision"] == "allow"
+    assert resp.get_json()["decision"] == "warn"
 
     db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
     with sqlite3.connect(db_path) as conn:
@@ -493,7 +495,10 @@ def test_paid_analyze_response_snapshot_is_persisted(app_with_analytics_db):
     snapshot = json.loads(snapshot_json)
     assert snapshot["address"] == addr
     assert snapshot["score"] == 0
-    assert snapshot["recommended_policy"]["action"] == "allow"
+    assert snapshot["decision"] == "warn"
+    assert snapshot["contract_decision"] == "allow"
+    assert snapshot["recommended_policy"]["action"] == "warn"
+    assert snapshot["action_evaluation"]["decision"] == "warn"
     assert "payment" not in snapshot
 
 

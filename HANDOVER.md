@@ -26,10 +26,11 @@
 - Review follow-up: Fable's July hygiene review found one missing test, one lost napkin lesson, one invalid paid-contract address, and a CI ordering gap. Follow-up patch added the `get_first_tx_timestamp()` empty-result regression test, restored the serializer napkin rule, corrected the paid-contract addresses in `docs/GrowthExecutionPlan.md`, added a 2026-07-20 pricing decision date, and changed Fly Deploy to run only after the Typecheck workflow succeeds.
 - Discovery repair follow-up: x402.jobs was repaired on 2026-07-06. Resource `4964c164-c748-4cd6-a7a5-0ac33e118b6a` now points at `https://augurrisk.com/analyze?address=0x4200000000000000000000000000000000000006` and verifies through `python scripts\register_x402jobs.py --list --search Augur` as `https://x402.jobs/resources/augurrisk-com/augur-2` with `$0.10` price. CDP/Bazaar remains stale after the 2026-07-07 recheck; the support-ready packet and copy-paste message are in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md`.
 - A-003 design spec: written on 2026-07-07 by Fable in `docs/A003_DESIGN_SPEC.md` (commit `800707d`, docs-only, no product behavior change). Proposal: top-level `decision` becomes the effective decision (strictness-max of contract-level and action-level policy, justified by `_approve_decision` monotonicity), additive always-present `contract_decision` field, top-level `recommended_policy` follows `decision`, change lands in `api_contract.serialize_analysis_result` only. Spec includes a 10-item test matrix (adds the missing HTTP-level serialized `block` response test), doc-surface checklist, rollout plan with a paid approve smoke, and a 9-step implementation checklist. Design invariant: zero edits to `tests/fixtures/paid_contract_cases.json` or `tests/test_paid_contract_regressions.py`; the WETH approve test in `tests/test_pre_a003_coverage.py` is the one intentional expectation update.
+- A-003 implementation: completed locally on 2026-07-08 from `docs/A003_DESIGN_SPEC.md` v2. Public `/analyze` serialization now always emits `contract_decision`, makes top-level `decision` the effective max-strictness branch field, and rebuilds top-level `recommended_policy.action` to equal the emitted `decision`. `action_context` and `action_evaluation` remain unchanged. Public first-party docs/OpenAPI/examples and the in-repo MCP wrapper were updated; the MCP output schema now exposes `decision`, `contract_decision`, and `recommended_policy` instead of stripping them from structured output. Validation passed: `python -m pytest -q` -> `429 passed`; `python -m pyright src\ tests\` -> `0 errors`; `python auto\loop.py` -> `PASS (59/59 checks passed)`; targeted `py_compile` passed; `npm run smoke` in `examples/javascript/augur-mcp` passed without paid credentials. `tests/fixtures/paid_contract_cases.json` and `tests/test_paid_contract_regressions.py` were not edited. Remaining: Fable implementation review plus live deploy/smoke checks, including a paid WETH approve smoke and paid snapshot row check.
 - Agreed working split: Fable specs and reviews, Codex critiques the spec and implements. The Codex spec-critique prompt is in the 2026-07-07 session notes; critique should confirm precedence soundness, the zero-fixture-edit claim, doc-surface completeness, and the `contract_decision` naming/unconditional-emission call before implementation starts.
 - Next exact tasks:
-  1. Codex: critique `docs/A003_DESIGN_SPEC.md` (design review only, no implementation).
-  2. Codex: implement A-003 against the spec's section 10 checklist after the critique is resolved; Fable reviews the implementation with live verification.
+  1. Fable: review the A-003 implementation against `docs/A003_DESIGN_SPEC.md` v2, with special attention to serializer invariants, OpenAPI/machine-doc surfaces, MCP structured output, and live-deploy checklist readiness.
+  2. Codex/user: after review, deploy through the existing CI/Fly path and run live `/health`, unpaid `402`, `openapi.json`, `/llms-full.txt`, paid WETH approve smoke, paid snapshot row check, and paid MCP smoke if credentials/funds are available.
   3. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies; the escalation packet in `docs/CDP_BAZAAR_ESCALATION_2026-07-06.md` still needs to be sent by the user.
   4. Decide whether `L-002` needs stored facilitator IDs/tx hashes or whether off-chain Blockscout correlation is enough.
   5. Decide the pricing test by 2026-07-20.
@@ -1004,7 +1005,7 @@ for r in con.execute("""
    - bounded full paid-response logging is done
    - regression fixtures from real paid contracts are done
    - synthetic `block` decision coverage and WETH approve action-level `warn` coverage are done
-   - next design the decision-primary output clarity change against those fixtures and the first real paid response snapshot
+   - A-003 decision-primary output clarity is implemented locally; next review and deploy it, then verify a new paid action-aware snapshot
 4. If the goal is the current conversion/action-aware plan, do not build broad product surface yet:
    - the `/analyze` onboarding path is done
    - traffic classes in analytics are done
@@ -1012,7 +1013,7 @@ for r in con.execute("""
    - the WETH before/after proof page is done
    - dashboard Traffic Quality Classes are done
    - `approve` V1, spender allowlist refinement, and action-aware observability are done
-   - the next response-shape work is decision-primary clarity, not more action expansion
+   - the current response-shape work is A-003 review/deploy verification, not more action expansion
 5. For the next analytics read, use the Fly SQLite store, not just the public aggregate `/stats`:
    - pull `/data/analytics.sqlite3`, `/data/analytics.sqlite3-wal`, and `/data/analytics.sqlite3-shm`
    - compare before/after counts for `malformed_probe`, `real_unpaid_conversion_attempt`, `paid_request`, and action-aware `approve`

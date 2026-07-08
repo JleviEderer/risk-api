@@ -1,6 +1,6 @@
 # Augur Growth Execution Plan
 
-> Last updated: 2026-07-07
+> Last updated: 2026-07-08
 
 This document is the active operating tracker for product, distribution, and conversion work.
 
@@ -114,13 +114,13 @@ Current rule:
 
 ### 3. API-Output Clarity
 
-- [ ] `A-003` Make the machine-branching field unambiguous
+- [x] `A-003` Make the machine-branching field unambiguous
   Output: ensure agents can branch on one primary decision field without being misled by `level=safe` plus action-level `warn`.
   Why now: real paid callers exist, so response ambiguity is commercial risk.
   Preconditions completed: `L-001` paid-response logging, `Q-001` real paid-contract regressions, and the 2026-07-07 pre-A-003 coverage gap pass are done. The added coverage lives outside the paid-only corpus and locks both a synthetic `block` primary-decision case and the exact WETH approve ambiguity (`level=safe`, top-level `decision=allow`, `action_evaluation.decision=warn`).
-  Constraint: the next pass may design the response-shape change, but it should still avoid broad product expansion. Start by specifying one primary branch field and its relationship to `level`, `decision`, `recommended_policy.action`, and `action_evaluation.decision`; then update OpenAPI/examples/tests explicitly.
-  Design spec: `docs/A003_DESIGN_SPEC.md` (2026-07-07, Fable). Proposal: top-level `decision` becomes the effective decision (strictness-max of contract and action policy), additive `contract_decision` field, serializer-layer only, zero paid-fixture edits. Next step: Codex critiques the spec, then implements against its checklist.
-  Done means: response shape, OpenAPI, examples, and tests make the primary branch field explicit.
+  Status: implemented locally on 2026-07-08 from `docs/A003_DESIGN_SPEC.md` v2. Top-level `decision` is now the effective max-strictness branch field, `contract_decision` is always emitted as the contract-only policy action, and top-level `recommended_policy.action` is rebuilt to equal `decision`. `action_context` and `action_evaluation` remain unchanged. Public docs/OpenAPI/examples/MCP wrapper surfaces were updated, including the MCP output schema so structured content no longer strips `decision`, `contract_decision`, or `recommended_policy`.
+  Validation: `python -m pytest -q` -> `429 passed`; `python -m pyright src\ tests\` -> `0 errors`; `python auto\loop.py` -> `PASS (59/59 checks passed)`; `python -m py_compile ...` passed; `npm run smoke` in `examples/javascript/augur-mcp` passed without paid credentials. `tests/fixtures/paid_contract_cases.json` and `tests/test_paid_contract_regressions.py` were not edited.
+  Remaining: Fable review, deploy through CI/Fly after merge/push, live `/health`, unpaid `402`, `openapi.json`, `/llms-full.txt`, paid WETH approve smoke, paid snapshot row check, and paid MCP smoke when credentials are available.
 
 ### 4. Logging
 
@@ -207,13 +207,13 @@ Current rule:
 Do now:
 
 1. Recheck CDP/Bazaar on 2026-07-09 or when CDP support replies.
-2. Design `A-003` decision-primary output clarity using the locked paid-contract regressions, synthetic block coverage, action-aware approve ambiguity coverage, and the first real `paid_response_snapshots` row.
+2. Get Fable review of the A-003 implementation and then complete the live deploy/smoke checklist.
 3. Keep x402.jobs monitored at `https://x402.jobs/resources/augurrisk-com/augur-2`.
 
 Do next:
 
 1. Decide whether `L-002` needs facilitator IDs or transaction hashes, or whether off-chain correlation is enough.
-2. Prepare a Fable review of the pre-A-003 coverage pass before changing the public response shape.
+2. After A-003 live verification, compare new paid action-aware snapshots against the design invariants.
 3. Decide whether `L-002` can wait until after A-003 or whether payer-attribution planning should happen first.
 
 Do later:

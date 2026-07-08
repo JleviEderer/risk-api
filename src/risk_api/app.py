@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import logging
 import re
@@ -14,7 +13,11 @@ from uuid import uuid4
 
 from flask import Flask, Response, current_app, jsonify, redirect, request
 
-from risk_api.api_contract import normalize_analysis_snapshot, serialize_analysis_result
+from risk_api.api_contract import (
+    analysis_result_from_snapshot,
+    normalize_analysis_snapshot,
+    serialize_analysis_result,
+)
 from risk_api.analysis.action_policy import (
     ActionContext,
     ApproveSpenderTrust,
@@ -195,23 +198,20 @@ PROXY_ANALYSIS_EXAMPLE = normalize_analysis_snapshot({
     "proxy_resolution_status": "resolved",
 })
 
-APPROVE_ACTION_ANALYSIS_EXAMPLE = deepcopy(SAFE_ANALYSIS_EXAMPLE)
-APPROVE_ACTION_ANALYSIS_EXAMPLE["action_context"] = {
-    "action": AnalyzeAction.APPROVE.value,
-    "spender": APPROVE_EXAMPLE_SPENDER,
-    "chain": BASE_CHAIN_NAME,
-}
-APPROVE_ACTION_ANALYSIS_EXAMPLE["action_evaluation"] = {
-    "decision": "warn",
-    "recommended_policy": _policy_example(
-        "warn",
-        (
-            "Allow with caution only if this workflow explicitly expects the "
-            "approval. Keep the spender on an allowlist and the approval scope narrow."
-        ),
-        [PolicyReasonCode.ACTION_APPROVE_REQUESTED.value],
+_APPROVE_ACTION_CONTEXT = ActionContext(
+    action=AnalyzeAction.APPROVE,
+    spender=APPROVE_EXAMPLE_SPENDER,
+    chain=BASE_CHAIN_NAME,
+)
+_APPROVE_BASE_RESULT = analysis_result_from_snapshot(SAFE_ANALYSIS_EXAMPLE)
+APPROVE_ACTION_ANALYSIS_EXAMPLE = serialize_analysis_result(
+    _APPROVE_BASE_RESULT,
+    action_context=_APPROVE_ACTION_CONTEXT,
+    action_evaluation=derive_action_evaluation(
+        _APPROVE_BASE_RESULT.recommended_policy,
+        _APPROVE_ACTION_CONTEXT,
     ),
-}
+)
 
 SAFE_ANALYSIS_EXAMPLE_JSON = json.dumps(SAFE_ANALYSIS_EXAMPLE, indent=2)
 PROXY_ANALYSIS_EXAMPLE_JSON = json.dumps(PROXY_ANALYSIS_EXAMPLE, indent=2)
@@ -395,7 +395,7 @@ OPENAPI_SPEC: dict[str, object] = {
             "Screen Base contracts before your agent buys, routes funds, approves, pays, or interacts. "
             "Analyzes Base bytecode patterns (proxy detection, reentrancy, "
             "selfdestruct, honeypot, hidden mint, fee manipulation, "
-            "delegatecall, deployer reputation) and returns a default decision, "
+            "delegatecall, deployer reputation) and returns an effective decision, "
             "policy recommendation, supporting findings, and a composite 0-100 "
             "score. Pay $0.10/call via x402 in USDC on Base. "
             '"safe" means no major bytecode-level risk signals detected in this '
@@ -414,7 +414,7 @@ OPENAPI_SPEC: dict[str, object] = {
                     "Fetches on-chain bytecode for the given Base mainnet "
                     "contract address and runs 8 detectors (proxy, reentrancy, selfdestruct, "
                     "honeypot, hidden mint, fee manipulation, delegatecall, "
-                    "deployer reputation). Returns a default decision, policy recommendation, "
+                    "deployer reputation). Returns an effective decision, policy recommendation, "
                     'supporting findings, and a composite 0-100 score. "safe" is a low-risk bytecode bucket, not a '
                     "security guarantee."
                 ),
@@ -869,13 +869,19 @@ OPENAPI_SPEC: dict[str, object] = {
                     "address": {"type": "string", "description": "The analyzed contract address."},
                     "score": {
                         "type": "integer", "minimum": 0, "maximum": 100,
-                        "description": "Composite risk score from 0 (safest) to 100 (riskiest).",
+                        "description": (
+                            "Composite bytecode risk score from 0 (safest) "
+                            "to 100 (riskiest). Measurement only; branch on "
+                            "decision, not score."
+                        ),
                     },
                     "level": {
                         "type": "string",
                         "enum": ["safe", "low", "medium", "high", "critical"],
                         "description": (
-                            "Risk level derived from score, not an audit or guarantee: "
+                            "Risk level derived from score. Measurement only, "
+                            "not a recommendation; branch on decision, not level. "
+                            "not an audit or guarantee: "
                             "safe (0-15), low (16-35), medium (36-55), "
                             "high (56-75), critical (76-100)."
                         ),
@@ -884,13 +890,27 @@ OPENAPI_SPEC: dict[str, object] = {
                         "type": "string",
                         "enum": ["allow", "warn", "manual_review", "block"],
                         "description": (
-                            "Default first-pass action Augur recommends for agent workflows."
+                            "Primary machine-branching field. Effective "
+                            "first-pass action Augur recommends for agent "
+                            "workflows; always equals recommended_policy.action "
+                            "and is always at least as strict as contract_decision."
+                        ),
+                    },
+                    "contract_decision": {
+                        "type": "string",
+                        "enum": ["allow", "warn", "manual_review", "block"],
+                        "description": (
+                            "Contract-only policy action before optional "
+                            "action-aware escalation. For no-action requests it "
+                            "matches decision."
                         ),
                     },
                     "recommended_policy": {
                         "$ref": "#/components/schemas/PolicyRecommendation",
                         "description": (
-                            "Policy-ready recommendation derived from the score and findings."
+                            "Policy-ready recommendation for the emitted "
+                            "decision. recommended_policy.action always equals "
+                            "the top-level decision."
                         ),
                     },
                     "bytecode_size": {
@@ -933,7 +953,7 @@ OPENAPI_SPEC: dict[str, object] = {
                 },
                 "required": [
                     "address", "score", "level", "decision",
-                    "recommended_policy", "bytecode_size", "findings",
+                    "contract_decision", "recommended_policy", "bytecode_size", "findings",
                     "category_scores",
                 ],
             },
@@ -1862,7 +1882,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 <div class="section">
 <h2>What it does</h2>
 <p class="section-copy">Augur is a deterministic contract admission gate for Base agents and the workflows around them. It gives you a fast first pass before you trust a contract.</p>
-<p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce a default decision, policy recommendation, supporting findings, and a composite 0&ndash;100 score.</p>
+<p>Fetches on-chain bytecode for a Base mainnet contract address and runs 8 deterministic detectors to produce an effective decision, policy recommendation, supporting findings, and a composite 0&ndash;100 score.</p>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">Scores are bytecode heuristics, not a full audit or guarantee. A <code>safe</code> result means no major bytecode-level risk signals were detected in this scan.</p>
 <div class="detectors">
   <div class="detector"><div class="name">Proxy Detection</div><div class="desc">EIP-1967, EIP-1822, OpenZeppelin slots</div></div>
@@ -1897,10 +1917,10 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 
 <div class="section">
 <h2>Action-Aware Example: Approve</h2>
-<p class="section-copy">V1 action-aware policy is intentionally narrow. It currently supports <code>action=approve</code> on Base and adds an action-level recommendation without replacing the base contract decision.</p>
+<p class="section-copy">V1 action-aware policy is intentionally narrow. It currently supports <code>action=approve</code> on Base and makes the top-level <code>decision</code> the effective action-aware gate while preserving the base contract answer as <code>contract_decision</code>.</p>
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&amp;action=approve&amp;spender=0x1111111111111111111111111111111111111111&amp;chain=base" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
-<p style="margin-top:8px">In this path, the contract can stay top-level <code>allow</code> while the action-level result becomes <code>warn</code>. That lets a calling wallet or agent stay more cautious about the approval than about the contract in the abstract.</p>
+<p style="margin-top:8px">In this path, <code>contract_decision</code> can stay <code>allow</code> while the top-level <code>decision</code> becomes <code>warn</code>. That lets a calling wallet or agent branch on one primary field while still seeing the contract-only result.</p>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">Current limit: action-aware V1 is only for <code>approve</code>. If no spender allowlist is configured, live requests log spender trust as <code>unchecked</code> and still return the narrower action-level policy.</p>
 </div>
 
@@ -1909,7 +1929,7 @@ curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006
 <pre>curl -s "__BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006" \\
   -H "PAYMENT-SIGNATURE: &lt;x402-payment-proof&gt;" | jq</pre>
 <p style="margin-top:8px;color:var(--muted);font-size:.82rem">
-Pay with any x402-compatible client. Returns JSON with decision, recommended_policy, findings, score, level, and category_scores for a Base mainnet contract.
+Pay with any x402-compatible client. Returns JSON with decision, contract_decision, recommended_policy, findings, score, level, and category_scores for a Base mainnet contract.
 </p>
 </div>
 
@@ -2166,7 +2186,7 @@ ul{margin:8px 0 0 18px}
 <div class="step"><strong>1. Request analysis</strong><br>Call <code>GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006</code>.</div>
 <div class="step"><strong>2. Receive a 402</strong><br>Augur returns <code>402 Payment Required</code> with a base64-encoded <code>Payment-Required</code> header describing the exact USDC payment on Base.</div>
 <div class="step"><strong>3. Sign and attach payment</strong><br>Your x402 client signs the payment authorization from your wallet and retries the same request with a <code>PAYMENT-SIGNATURE</code> header.</div>
-<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the decision, recommended_policy, supporting findings, score, level, and proxy details if present.</div>
+<div class="step"><strong>4. Receive JSON</strong><br>Augur verifies the payment with the facilitator, settles it, and returns the decision, contract_decision, recommended_policy, supporting findings, score, level, and proxy details if present.</div>
 </div>
 
 <div class="section">
@@ -2466,12 +2486,12 @@ a{{color:#90cdf4}}
 LLMS_TXT = """\
 # Augur
 
-> Deterministic Base contract admission control for agents on Base. Returns a default decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract admission control for agents on Base. Returns an effective decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
 
 ## What It Does
 
 Augur fetches on-chain bytecode for a Base mainnet smart contract (EIP-155:8453) \
-and runs 8 deterministic detectors to produce a default decision, policy recommendation, supporting findings, and a composite score from 0 (safe) to 100 (critical).
+and runs 8 deterministic detectors to produce an effective decision, policy recommendation, supporting findings, and a composite score from 0 (safe) to 100 (critical).
 Use Augur before your agent buys, routes funds, approves, pays, or interacts. \
 Call before pay. Call before approve. Call before interact. Augur is deterministic preflight for Base contract actions.
 A `safe` result means no major bytecode-level risk signals were detected in this scan, not that the contract is audited or guaranteed safe.
@@ -2505,8 +2525,8 @@ Augur also accepts a narrow action-aware context for `approve` on Base:
 GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
 ```
 
-This keeps the top-level contract `decision` intact and adds `action_context` plus `action_evaluation`.
-That means a clean contract can still return top-level `allow` while the approval-specific result returns action-level `warn`.
+The top-level `decision` is the effective gate to branch on. For action-aware requests, `contract_decision` preserves the contract-only result while `action_context` plus `action_evaluation` show the action-specific details.
+That means a clean contract can return `contract_decision: "allow"` while the primary `decision` for an approval returns `warn`.
 
 ## Example Response
 
@@ -2525,7 +2545,7 @@ If no spender allowlist is configured, spender trust is treated as `unchecked`.
 
 ## Risk Levels
 
-- **safe** (0-15): No major bytecode-level risk signals detected in this scan; not a guarantee
+- **safe** (0-15): No major bytecode-level risk signals detected in this scan; measurement only, not a guarantee. Branch on `decision`, not `level`
 - **low** (16-35): Limited bytecode-level concerns detected; review context
 - **medium** (36-55): Notable risks, review before interacting
 - **high** (56-75): Significant risks detected
@@ -2548,7 +2568,7 @@ SKILL_MD = """\
 ---
 name: augur
 version: 1.0.0
-description: Deterministic Base contract admission control for agents. Analyze a contract, get a first-pass decision plus policy recommendation and supporting findings, and pay per call with x402.
+description: Deterministic Base contract admission control for agents. Analyze a contract, get an effective first-pass decision plus policy recommendation and supporting findings, and pay per call with x402.
 homepage: __BASE_URL__
 license: MIT
 tags: [security, smart-contracts, base, bytecode-analysis, x402, agents]
@@ -2570,7 +2590,7 @@ Call before pay. Call before approve. Call before interact. Augur is determinist
 1. Read this file or `__BASE_URL__/openapi.json`
 2. For the first successful paid call, use `GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006`
 3. If you receive `402`, let your x402 client pay `$0.10` USDC on Base and retry with `PAYMENT-SIGNATURE`
-4. Read `decision`, `recommended_policy`, `findings`, `score`, `level`, `category_scores`, and optional `implementation`
+4. Branch on `decision`; read `contract_decision`, `recommended_policy`, `findings`, `score`, `level`, `category_scores`, and optional `implementation`
 
 ## Endpoint
 
@@ -2590,8 +2610,8 @@ Augur also supports a narrow action-aware request shape for approval checks on B
 GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
 ```
 
-Use this when your agent is about to approve a spender and you want a narrower action-level policy without replacing the base contract result.
-The response adds `action_context` and `action_evaluation`.
+Use this when your agent is about to approve a spender and you want the primary `decision` to reflect the stricter action-level gate while preserving the base contract result as `contract_decision`.
+The response adds `contract_decision`, `action_context`, and `action_evaluation`.
 
 ## Output Shape
 
@@ -2607,9 +2627,10 @@ __APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__
 
 The important distinction is:
 
-- top-level `decision` still describes the contract by default
+- top-level `decision` is the primary branch field
+- `contract_decision` preserves the contract-only policy action
 - `action_evaluation.decision` describes the specific `approve` action
-- a clean contract can stay top-level `allow` while the `approve` action returns `warn`
+- a clean contract can stay `contract_decision: "allow"` while the primary `decision` for `approve` returns `warn`
 
 Current limit: action-aware V1 currently supports only `approve` on Base, and `spender` is required for that action.
 
@@ -2657,7 +2678,7 @@ Proxy contracts can include a nested `implementation` analysis so downstream pol
 LLMS_FULL_TXT = """\
 # Augur - Full Documentation
 
-> Deterministic Base contract admission control for agents on Base. Returns a default decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
+> Deterministic Base contract admission control for agents on Base. Returns an effective decision, policy recommendation, supporting findings, and a 0-100 score. Pay $0.10/call via x402 in USDC on Base.
 
 ## Overview
 
@@ -2707,6 +2728,7 @@ If the request is missing `address`, appends another path after the address, or 
   "score": 0,
   "level": "safe",
   "decision": "allow",
+  "contract_decision": "allow",
   "recommended_policy": {
     "action": "allow",
     "summary": "Allow by default for first-pass automation. Continue only if this matches your broader strategy and trust model.",
@@ -2730,7 +2752,7 @@ __PROXY_ANALYSIS_EXAMPLE_JSON__
 GET __BASE_URL__/analyze?address=0x4200000000000000000000000000000000000006&action=approve&spender=0x1111111111111111111111111111111111111111&chain=base
 ```
 
-This keeps the top-level contract decision and adds a second, narrower action-level judgment for the approval itself.
+The top-level `decision` becomes the effective action-aware gate, while `contract_decision` preserves the contract-only policy action and `action_evaluation` shows the approval-specific detail.
 
 ## Example: Action-Aware Approve Response
 
@@ -2740,7 +2762,8 @@ __APPROVE_ACTION_ANALYSIS_EXAMPLE_JSON__
 
 In this example:
 
-- the contract-level `decision` is still `allow`
+- the contract-level `contract_decision` is still `allow`
+- the primary top-level `decision` is `warn`
 - the action-level `action_evaluation.decision` is `warn`
 - the reason code `action_approve_requested` explains why the approval path is more cautious than the contract's default policy
 
@@ -2752,9 +2775,10 @@ Current limit: action-aware V1 supports only `approve` on Base. If no spender al
 |------------------|---------|-------------|
 | address          | string  | The analyzed contract address |
 | score            | integer | Composite risk score, 0-100 |
-| level            | string  | Risk bucket: safe, low, medium, high, critical (`safe` is not a guarantee) |
-| decision         | string  | Default first-pass action: allow, warn, manual_review, or block |
-| recommended_policy | object | Policy recommendation with action, summary, and stable reason_codes |
+| level            | string  | Risk bucket: safe, low, medium, high, critical; measurement only (`safe` is not a guarantee) |
+| decision         | string  | Primary branch field: effective first-pass action, allow, warn, manual_review, or block |
+| contract_decision | string | Contract-only policy action before optional action-aware escalation |
+| recommended_policy | object | Policy recommendation with action equal to `decision`, summary, and stable reason_codes |
 | bytecode_size    | integer | Contract bytecode size in bytes |
 | findings         | array   | List of risk findings from detectors |
 | category_scores  | object  | Risk points by detector category |
@@ -3347,7 +3371,7 @@ def create_app(
                             "bytecode for a contract on Base and runs "
                             "8 detectors (proxy, reentrancy, selfdestruct, honeypot, hidden mint, "
                             "fee manipulation, delegatecall, deployer reputation) to produce a "
-                            "default decision, policy recommendation, supporting findings, and a "
+                            "effective decision, policy recommendation, supporting findings, and a "
                             "composite 0-100 score before a workflow decides whether to proceed."
                         ),
                     },
@@ -3690,18 +3714,19 @@ def create_app(
                 "Bytecode-level admission control for Base mainnet smart contracts. "
                 "8 detectors: delegatecall, hidden mint, fee-on-transfer, "
                 "selfdestruct, reentrancy patterns, honeypot, proxy detection, "
-                "deployer reputation (explorer-backed). Returns a default decision, "
+                "deployer reputation (explorer-backed). Returns an effective decision, "
                 "policy recommendation, supporting findings, and a 0-100 composite score.\n\n"
                 "## Usage\n\n"
                 "First successful paid call:\n"
                 f"GET /analyze?address={SAFE_EXAMPLE_ADDRESS}\n"
                 "PAYMENT-SIGNATURE: <x402-payment-proof>\n"
-                "Expected 200 JSON includes decision=allow, level=safe, score=0.\n\n"
+                "Expected 200 JSON includes decision=allow, contract_decision=allow, level=safe, score=0.\n\n"
                 "GET /analyze?address={base_contract_address}\n"
                 "POST /analyze with JSON body: {\"address\": \"0x...\"}\n\n"
                 "## Output\n\n"
-                "- `decision`: allow, warn, manual_review, or block\n"
-                "- `recommended_policy`: action, summary, and machine-readable reason codes\n"
+                "- `decision`: primary branch field; allow, warn, manual_review, or block\n"
+                "- `contract_decision`: contract-only policy before optional action-aware escalation\n"
+                "- `recommended_policy`: action equal to decision, summary, and machine-readable reason codes\n"
                 "- `score`: 0-100 (safe=0-15, low=16-35, medium=36-55, "
                 "high=56-75, critical=76-100)\n"
                 '- `safe`: no major bytecode-level risk signals detected in this scan, not a guarantee\n'

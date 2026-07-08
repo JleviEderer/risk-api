@@ -15,6 +15,7 @@ _EXAMPLE_OUTPUT = {
     "score": 0,
     "level": "safe",
     "decision": "allow",
+    "contract_decision": "allow",
     "recommended_policy": {
         "action": "allow",
         "summary": (

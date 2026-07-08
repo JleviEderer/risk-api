@@ -8,8 +8,10 @@ from unittest.mock import patch
 
 from risk_api.api_contract import analysis_result_from_snapshot
 from risk_api.app import (
+    APPROVE_ACTION_ANALYSIS_EXAMPLE,
     PROXY_ANALYSIS_EXAMPLE,
     PROXY_EXAMPLE_ADDRESS,
+    SAFE_ANALYSIS_EXAMPLE,
     create_app,
 )
 from risk_api.analysis.engine import clear_analysis_cache
@@ -144,6 +146,7 @@ def test_analyze_success(client):
     assert data["score"] == 0
     assert data["level"] == "safe"
     assert data["decision"] == "allow"
+    assert data["contract_decision"] == "allow"
     assert data["recommended_policy"]["action"] == "allow"
     assert data["recommended_policy"]["reason_codes"] == []
     assert isinstance(data["findings"], list)
@@ -314,6 +317,7 @@ def test_x402_402_response_has_bazaar_extension(client_with_x402):
     assert "score" in example
     assert "level" in example
     assert "decision" in example
+    assert "contract_decision" in example
     assert "recommended_policy" in example
     assert "findings" in example
 
@@ -749,7 +753,9 @@ def test_analyze_get_with_approve_action_returns_action_evaluation(client):
 
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["decision"] == "allow"
+    assert data["decision"] == "warn"
+    assert data["contract_decision"] == "allow"
+    assert data["recommended_policy"]["action"] == "warn"
     assert data["action_context"] == {
         "action": "approve",
         "spender": spender,
@@ -776,7 +782,9 @@ def test_analyze_warn_contract_with_approve_action_escalates_to_manual_review(cl
 
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["decision"] == "warn"
+    assert data["decision"] == "manual_review"
+    assert data["contract_decision"] == "warn"
+    assert data["recommended_policy"]["action"] == "manual_review"
     assert data["action_evaluation"]["decision"] == "manual_review"
     assert "fee_manipulation_signal" in data["action_evaluation"][
         "recommended_policy"
@@ -833,6 +841,9 @@ def test_analyze_allowlisted_approve_action_can_preserve_allow(test_config):
 
     assert resp.status_code == 200
     data = resp.get_json()
+    assert data["decision"] == "allow"
+    assert data["contract_decision"] == "allow"
+    assert data["recommended_policy"]["action"] == "allow"
     assert data["action_evaluation"]["decision"] == "allow"
     assert data["action_evaluation"]["recommended_policy"]["action"] == "allow"
     assert "action_approve_spender_allowlisted" in data["action_evaluation"][
@@ -890,10 +901,60 @@ def test_analyze_non_allowlisted_approve_action_escalates_to_manual_review(test_
 
     assert resp.status_code == 200
     data = resp.get_json()
+    assert data["decision"] == "manual_review"
+    assert data["contract_decision"] == "allow"
+    assert data["recommended_policy"]["action"] == "manual_review"
     assert data["action_evaluation"]["decision"] == "manual_review"
     assert "action_approve_spender_not_allowlisted" in data["action_evaluation"][
         "recommended_policy"
     ]["reason_codes"]
+
+
+def test_analyze_post_with_json_action_body_returns_effective_decision(client):
+    addr = "0x" + "ab" * 20
+    spender = "0x" + "12" * 20
+    clean_result = analysis_result_from_snapshot(
+        {
+            "address": addr,
+            "score": 0,
+            "level": "safe",
+            "decision": "allow",
+            "recommended_policy": {
+                "action": "allow",
+                "summary": "Allow by default.",
+                "reason_codes": [],
+            },
+            "bytecode_size": 4,
+            "findings": [],
+            "category_scores": {},
+        }
+    )
+
+    with patch("risk_api.app.get_code", return_value="0x60006000"), patch(
+        "risk_api.app.analyze_contract",
+        return_value=clean_result,
+    ):
+        resp = client.post(
+            "/analyze",
+            json={
+                "address": addr,
+                "action": "approve",
+                "spender": spender,
+                "chain": "base",
+            },
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["decision"] == "warn"
+    assert data["contract_decision"] == "allow"
+    assert data["recommended_policy"]["action"] == "warn"
+    assert data["action_context"] == {
+        "action": "approve",
+        "spender": spender,
+        "chain": "base",
+    }
+    assert data["action_evaluation"]["decision"] == "warn"
 
 
 def test_analyze_rejects_unsupported_action_before_payment(client_with_x402):
@@ -1937,10 +1998,12 @@ def test_openapi_get_200_has_examples(client):
     )
     assert examples["safe_contract"]["value"]["score"] == 0
     assert examples["safe_contract"]["value"]["level"] == "safe"
+    assert examples["safe_contract"]["value"]["contract_decision"] == "allow"
     assert "proxy_contract" in examples
     assert examples["proxy_contract"]["value"]["score"] == 50
     assert examples["proxy_contract"]["value"]["level"] == "medium"
     assert examples["proxy_contract"]["value"]["decision"] == "manual_review"
+    assert examples["proxy_contract"]["value"]["contract_decision"] == "manual_review"
     assert examples["proxy_contract"]["value"]["implementation"]["category_scores"] == {
         "selfdestruct": 30
     }
@@ -2030,6 +2093,7 @@ def test_openapi_post_200_has_example(client):
     example = data["paths"]["/analyze"]["post"]["responses"]["200"]["content"]["application/json"]["example"]
     assert example["score"] == 0
     assert example["level"] == "safe"
+    assert example["contract_decision"] == "allow"
     request_examples = data["paths"]["/analyze"]["post"]["requestBody"]["content"][
         "application/json"
     ]["examples"]
@@ -2055,16 +2119,21 @@ def test_openapi_get_200_has_approve_action_example(client):
     ]["examples"]
 
     assert examples["approve_action"]["value"]["action_context"]["action"] == "approve"
+    assert examples["approve_action"]["value"]["decision"] == "warn"
+    assert examples["approve_action"]["value"]["contract_decision"] == "allow"
+    assert examples["approve_action"]["value"]["recommended_policy"]["action"] == "warn"
     assert examples["approve_action"]["value"]["action_evaluation"]["decision"] == "warn"
 
 
-def test_openapi_schemas_include_action_evaluation(client):
+def test_openapi_schemas_include_action_evaluation_and_contract_decision(client):
     resp = client.get("/openapi.json")
     data = resp.get_json()
     schemas = data["components"]["schemas"]
 
     assert "ActionContext" in schemas
     assert "ActionEvaluation" in schemas
+    assert "contract_decision" in schemas["AnalysisResult"]["properties"]
+    assert "contract_decision" in schemas["AnalysisResult"]["required"]
     assert "action_context" in schemas["AnalysisResult"]["properties"]
     assert "action_evaluation" in schemas["AnalysisResult"]["properties"]
 
@@ -2078,6 +2147,13 @@ def test_openapi_schemas_have_descriptions(client):
     assert "description" in finding
     assert "description" in finding["properties"]["detector"]
     assert "description" in finding["properties"]["points"]
+    result = schemas["AnalysisResult"]
+    assert "Primary machine-branching field" in result["properties"]["decision"][
+        "description"
+    ]
+    assert "branch on decision, not level" in result["properties"]["level"][
+        "description"
+    ]
     # AnalysisResult level has description with ranges
     level = schemas["AnalysisResult"]["properties"]["level"]
     assert "safe (0-15)" in level["description"]
@@ -2094,6 +2170,28 @@ def test_openapi_schemas_have_descriptions(client):
         "action_approve_spender_not_allowlisted"
         in schemas["PolicyReasonCode"]["enum"]
     )
+
+
+def test_static_analysis_examples_keep_primary_decision_invariants():
+    action_order = {
+        "allow": 0,
+        "warn": 1,
+        "manual_review": 2,
+        "block": 3,
+    }
+
+    for example in (
+        SAFE_ANALYSIS_EXAMPLE,
+        PROXY_ANALYSIS_EXAMPLE,
+        APPROVE_ACTION_ANALYSIS_EXAMPLE,
+    ):
+        assert "contract_decision" in example
+        policy = cast(dict[str, object], example["recommended_policy"])
+        assert example["decision"] == policy["action"]
+        assert (
+            action_order[str(example["decision"])]
+            >= action_order[str(example["contract_decision"])]
+        )
 
 
 # --- FAQPage structured data tests ---
@@ -2140,7 +2238,8 @@ def test_landing_documents_action_aware_approve_example(client):
     text = resp.data.decode()
     assert "Action-Aware Example: Approve" in text
     assert "action=approve" in text
-    assert "action-level result becomes <code>warn</code>" in text
+    assert "<code>contract_decision</code> can stay <code>allow</code>" in text
+    assert "top-level <code>decision</code> becomes <code>warn</code>" in text
 
 
 def test_landing_documents_first_successful_paid_call(client):

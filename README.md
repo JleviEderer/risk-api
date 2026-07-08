@@ -10,7 +10,7 @@
 
 ## What Augur Does
 
-Augur accepts a Base mainnet contract address and returns a default first-pass decision, a machine-readable policy recommendation, supporting findings, and a structured 0-100 bytecode score.
+Augur accepts a Base mainnet contract address and returns an effective first-pass decision, a machine-readable policy recommendation, supporting findings, and a structured 0-100 bytecode score.
 
 The product is designed for agent workflows that need a fast deterministic contract gate before interacting with a contract. It is a deterministic bytecode analysis service, not a full security audit, runtime monitor, or guarantee.
 
@@ -102,6 +102,7 @@ Example response:
   "score": 50,
   "level": "medium",
   "decision": "manual_review",
+  "contract_decision": "manual_review",
   "recommended_policy": {
     "action": "manual_review",
     "summary": "Escalate before interaction. Use a human review step or a heavier tool before the workflow proceeds.",
@@ -170,7 +171,7 @@ Risk levels:
 | 56-75 | high |
 | 76-100 | critical |
 
-`safe` means no major bytecode-level risk signals were detected in that scan. It does not guarantee the contract is safe.
+`safe` means no major bytecode-level risk signals were detected in that scan. It does not guarantee the contract is safe. Branch on `decision`, not `level`.
 
 Default first-pass policy actions:
 

@@ -14,6 +14,24 @@ config();
 const DEFAULT_URL = "https://augurrisk.com";
 const DEFAULT_ADDRESS = "0x4200000000000000000000000000000000000006";
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const POLICY_ACTIONS = ["allow", "warn", "manual_review", "block"];
+
+const policySchema = z.object({
+  action: z.enum(POLICY_ACTIONS),
+  summary: z.string(),
+  reason_codes: z.array(z.string()),
+});
+
+const actionContextSchema = z.object({
+  action: z.string(),
+  spender: z.string(),
+  chain: z.string(),
+});
+
+const actionEvaluationSchema = z.object({
+  decision: z.enum(POLICY_ACTIONS),
+  recommended_policy: policySchema,
+});
 
 function normalizeBaseUrl(url) {
   return url.replace(/\/$/, "");
@@ -79,6 +97,8 @@ async function callAugur(paidFetch, baseUrl, address) {
     typeof data?.address !== "string"
     || typeof data?.score !== "number"
     || typeof data?.level !== "string"
+    || typeof data?.decision !== "string"
+    || typeof data?.contract_decision !== "string"
   ) {
     const error = new Error("Augur returned an unexpected success payload.");
     error.name = "AugurResponseShapeError";
@@ -105,7 +125,7 @@ export async function main() {
     {
       title: "Analyze Base Contract Risk",
       description:
-        "Pay Augur via x402 and return a bytecode-level risk score for a Base mainnet contract.",
+        "Pay Augur via x402 and return the primary decision gate plus bytecode risk context for a Base mainnet contract.",
       inputSchema: {
         address: z
           .string()
@@ -116,10 +136,15 @@ export async function main() {
         address: z.string(),
         score: z.number(),
         level: z.string(),
+        decision: z.enum(POLICY_ACTIONS),
+        contract_decision: z.enum(POLICY_ACTIONS),
+        recommended_policy: policySchema,
         bytecode_size: z.number().optional(),
         findings: z.array(z.unknown()).optional(),
         category_scores: z.record(z.number()).optional(),
         implementation: z.unknown().optional(),
+        action_context: actionContextSchema.optional(),
+        action_evaluation: actionEvaluationSchema.optional(),
       },
     },
     async ({ address }) => {
@@ -133,7 +158,7 @@ export async function main() {
         const analysis = await callAugur(paidFetch, baseUrl, address);
         const findingsSummary = summarizeFindings(analysis.findings);
         const text = [
-          `Augur risk score for ${analysis.address}: ${analysis.score}/100 (${analysis.level}).`,
+          `Augur decision for ${analysis.address}: ${analysis.decision} (${analysis.score}/100, ${analysis.level}).`,
           findingsSummary,
         ].join("\n");
 
