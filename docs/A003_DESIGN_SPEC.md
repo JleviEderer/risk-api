@@ -1,8 +1,8 @@
 # A-003 Design Spec: Decision-Primary Response Output
 
-> Date: 2026-07-07
-> Author: Fable (design), pending Codex critique before implementation
-> Status: DRAFT — design only. No product API behavior changes in this pass.
+> Date: 2026-07-07 (revised 2026-07-08 after Codex design critique)
+> Author: Fable (design); Codex critique 2026-07-08: no blocking objections, non-blocking additions folded into §4, §7, §8, §10
+> Status: DRAFT v2 — design only. No product API behavior changes in this pass.
 > Scope guard: this spec changes response serialization and documentation only. It does not change pricing, discovery metadata, detector behavior, scoring, or the policy engine.
 
 ## 1. Problem
@@ -75,10 +75,23 @@ strictness: allow < warn < manual_review < block
 ```
 
 - Top-level `decision` = `effective(...)`.
-- Top-level `recommended_policy` = `action_evaluation.recommended_policy` when an action is requested **and** `action_evaluation.decision >= contract action` (always true today); otherwise (defensive branch, unreachable today) keep the contract-level policy object.
 - `contract_decision` = contract-level policy action, always.
 - Invariant to enforce in tests: `decision == recommended_policy.action` in **every** response shape.
 - Invariant to enforce in tests: `strictness(decision) >= strictness(contract_decision)`.
+
+**Emitted-policy construction rule (Codex critique guard).** The serializer must never blind-copy a policy object into the top-level `recommended_policy`. Today `derive_action_evaluation()` sets `ActionEvaluation.decision` and `ActionEvaluation.recommended_policy.action` from the same `action_decision` variable (`action_policy.py:49-65`), so they cannot diverge — but a future or manually-constructed `ActionEvaluation` could carry `decision != recommended_policy.action`, and a blind copy would recreate the exact ambiguity A-003 removes, one level down. Therefore the top-level policy is **rebuilt, not copied**:
+
+```
+source_policy = action_evaluation.recommended_policy
+                    if action raised-or-equal strictness else contract policy
+emitted recommended_policy = {
+    "action":       effective_decision.value,   # forced, by construction
+    "summary":      source_policy.summary,
+    "reason_codes": source_policy.reason_codes,
+}
+```
+
+This guarantees `decision == recommended_policy.action` **by construction**, not by convention. A unit test (matrix 5e) feeds an artificially inconsistent `ActionEvaluation` and asserts the emitted invariant still holds.
 
 ## 5. Backward Compatibility
 
@@ -157,7 +170,7 @@ Per `AGENTS.md`, discovery/response wording is duplicated state. Required update
 3. **`SAFE_ANALYSIS_EXAMPLE` / `PROXY_ANALYSIS_EXAMPLE`:** regenerate via `normalize_analysis_snapshot` (they will pick up `contract_decision` automatically once the serializer emits it).
 4. **Generated machine docs (`/llms.txt`, `/llms-full.txt`, `/skill.md`, homepage, `/how-payment-works`):** example JSON flows in via the `__*_EXAMPLE_JSON__` replacements automatically, but **prose must be edited** — `app.py` ~line 2508 ("This keeps the top-level contract `decision` intact...") and ~line 2594 become false and must be rewritten to describe effective-decision semantics. Grep `app.py` for `decision` prose near the machine-doc template strings.
 5. **`README.md`:** example response (~line 104) gains `contract_decision`; the one-line product description already says "decision" — verify wording.
-6. **`examples/javascript/augur-mcp/index.mjs` + its README:** verify the MCP wrapper passes the response through untouched (expected); update its README example JSON if it embeds one.
+6. **`examples/javascript/augur-mcp/index.mjs` + its README (found during critique — pre-existing gap, fix in this pass):** the MCP tool's Zod `outputSchema` (index.mjs ~115-123) currently exposes only `address, score, level, bytecode_size, findings, category_scores, implementation` — **it omits `decision` and `recommended_policy` entirely**, so MCP callers cannot see the gate field at all. This contradicts the decision-primary positioning independent of A-003. Required: add `decision` (required), `contract_decision` (required), `recommended_policy` (object: `action`, `summary`, `reason_codes`), and optional `action_context`/`action_evaluation` to `outputSchema`; update the tool `description` to name `decision` as the branch field; update the wrapper's text summary output if it surfaces level/score without decision; update the MCP README's example JSON; re-run `smoke-test.mjs` against the deployed API. Zod object schemas strip unknown keys by default, so today's wrapper silently *drops* the decision fields from structured output — verify the new schema round-trips them.
 7. **Proof report pages (`proof_reports.py` / `REPORT_PAGES`):** snapshots round-trip through `normalize_analysis_snapshot`, so serialized output gains `contract_decision` automatically; `auto/loop.py` serializer-drift checks must stay green.
 8. **NOT updated:** registration scripts / IPFS metadata / ERC-8004 URI — no discovery metadata text changes in this pass. External registry copy unchanged (positioning did not change).
 
@@ -169,12 +182,15 @@ Per `AGENTS.md`, discovery/response wording is duplicated state. Required update
 | 2 | Synthetic critical `block` policy branch | `test_pre_a003_coverage.py::test_synthetic_critical_block_case...` | **Zero edits, stays green** (policy layer untouched). |
 | 3 | WETH approve ambiguity | `test_pre_a003_coverage.py::test_weth_approve_keeps_contract_allow_but_action_warn` | **Intentionally updated** to Case B: top-level `decision=warn`, `contract_decision=allow`, `recommended_policy.action=warn` with `action_approve_requested`, `action_evaluation` unchanged. Rename to reflect new semantics. |
 | 4 | **NEW** HTTP-level serialized block response | `test_pre_a003_coverage.py` (or `test_app.py`) | Mock `analyze_contract` → block-decision result; assert JSON `decision="block"`, `contract_decision="block"`, `recommended_policy.action="block"`. Closes the gap found in the pre-A-003 review (only set-membership HTTP assertions existed). |
-| 5 | **NEW** serializer precedence unit tests | new/`test_api_contract.py` | (a) no action → `decision == contract_decision`; (b) action raises allow→warn; (c) contract `manual_review` + action passthrough; (d) defensive: artificial `ActionEvaluation` with decision *weaker* than contract → top-level `decision` stays at contract strictness (max rule). |
+| 5 | **NEW** serializer precedence unit tests | new/`test_api_contract.py` | (a) no action → `decision == contract_decision`; (b) action raises allow→warn; (c) contract `manual_review` + action passthrough; (d) defensive: artificial `ActionEvaluation` with decision *weaker* than contract → top-level `decision` stays at contract strictness (max rule); (e) **guard (Codex critique):** artificial `ActionEvaluation` with `decision != recommended_policy.action` → emitted top-level `recommended_policy.action` still equals emitted `decision` (rebuild rule, §4). |
 | 6 | **NEW** invariants across all examples | `test_app.py` | For SAFE, PROXY, APPROVE examples and live-route responses: `decision == recommended_policy.action`; `strictness(decision) >= strictness(contract_decision)`; `contract_decision` present. |
 | 7 | OpenAPI examples match mocked route output | existing `test_openapi_*` tests | Updated expectations include `contract_decision`; approve example asserts Case B shape. |
 | 8 | Proof-report serializer round-trip | existing `test_app.py` + `auto/loop.py` | Stays green; report snapshots gain `contract_decision` via the shared serializer only. |
-| 9 | Analytics observability fields | `test_logging.py` | `action_decision` / `action_spender_trust` request-log extraction (reads `action_evaluation`, `app.py:~3158`) unchanged and green. |
+| 9 | Analytics observability fields | `test_logging.py` | **Explicit regression (Codex critique):** the after-request hook extracts `action_decision` from `data["action_evaluation"]["decision"]` (`app.py:~3158`) — unchanged by design since `action_evaluation` is kept verbatim. Test: action-aware 200 through the full app → log entry carries `action_decision` equal to the new top-level `decision` (they coincide under monotonicity); no-action 200 → no `action_decision` key. |
 | 10 | Paid snapshot body | `test_logging.py` | Snapshot body for a paid action-aware 200 includes `contract_decision`; privacy marker test stays green. |
+| 11 | **NEW (Codex critique)** POST-body action request | `test_app.py` or `test_pre_a003_coverage.py` | `POST /analyze` with JSON body `{address, action, spender, chain}` (the `_extract_analyze_request_fields` merge path) returns the same Case B shape as the GET query form: `decision=warn`, `contract_decision=allow`, invariants hold. Guards against the GET-only assumption in serialization tests. |
+| 12 | **NEW (Codex critique)** proxy + action combined | `test_pre_a003_coverage.py` | Proxy contract (reuse a Beefy EIP-1167 fixture bytecode: contract-level `warn` with proxy/delegatecall codes) + `action=approve` with unchecked spender → contract `warn` escalates to action `manual_review`; assert `decision=manual_review`, `contract_decision=warn`, `implementation` object present and unchanged, merged reason codes contain both `upgradeable_proxy`-family and `action_*` codes. Covers the interaction of the two response-enriching layers (proxy resolution + action evaluation) in one response. |
+| 13 | **NEW** MCP wrapper smoke | `examples/javascript/augur-mcp/smoke-test.mjs` (manual, post-deploy) | Structured output includes `decision`, `contract_decision`, `recommended_policy` after the §7.6 outputSchema fix; confirms Zod no longer strips the gate fields. |
 
 Validation gate for the implementation pass: full `pytest` green, `pyright` 0 errors (CI), `auto/loop.py` all checks green, then live smoke (below).
 
@@ -200,14 +216,14 @@ Validation gate for the implementation pass: full `pytest` green, `pyright` 0 er
 
 Ordered; each step keeps the suite green except step 4's intentional update.
 
-1. `src/risk_api/api_contract.py`: add `_STRICTNESS` ordering + `effective_decision()` helper; emit `contract_decision` always; when `action_evaluation` present, set top-level `decision`/`recommended_policy` per §4 max rule.
-2. `tests/`: add matrix items 4-6 (new tests) — write them first against the new serializer behavior.
+1. `src/risk_api/api_contract.py`: add `_STRICTNESS` ordering + `effective_decision()` helper; emit `contract_decision` always; when `action_evaluation` present, set top-level `decision` per §4 max rule and **rebuild** top-level `recommended_policy` per the §4 emitted-policy construction rule (never blind-copy the action policy object).
+2. `tests/`: add matrix items 4-6 and 11-12 (new tests) — write them first against the new serializer behavior. Include 5e (inconsistent-`ActionEvaluation` guard), the POST-body action shape (11), and proxy+action combined (12).
 3. Run matrix items 1-2 untouched — confirm zero edits needed (design invariant).
-4. Update matrix item 3 (WETH approve test) to Case B expectations; rename test.
+4. Update matrix item 3 (WETH approve test) to Case B expectations; rename test. Add/confirm matrix item 9's explicit `action_decision` extraction regression in `test_logging.py`.
 5. `src/risk_api/app.py`: OpenAPI schema properties + descriptions (§7.1); rebuild `APPROVE_ACTION_ANALYSIS_EXAMPLE` through the serializer (§7.2); machine-doc prose (§7.4).
-6. `README.md` + `examples/javascript/augur-mcp/` verification (§7.5-7.6).
+6. `README.md` (§7.5) and `examples/javascript/augur-mcp/` (§7.6): update the MCP `outputSchema` to expose `decision`, `contract_decision`, and `recommended_policy` (currently omitted entirely — Zod strips them), update tool description + wrapper README example.
 7. Full validation: `pytest -q`, `auto/loop.py`, `py_compile`; CI typecheck.
-8. Deploy; run §9 post-deploy verification including the paid approve smoke; confirm snapshot row.
+8. Deploy; run §9 post-deploy verification including the paid approve smoke; confirm snapshot row; run the MCP `smoke-test.mjs` (matrix 13) against the live API.
 9. Update `HANDOVER.md`, `.codex/napkin.md`, `docs/GrowthExecutionPlan.md` (A-003 → done with evidence), and this spec's Status line → IMPLEMENTED.
 
 ## 11. Evidence Base
