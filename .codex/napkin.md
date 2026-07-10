@@ -78,6 +78,10 @@
 10. **[2026-04-06] Ship new action-aware messaging on first-party docs before registry churn**
    Do instead: when product positioning stays the same but you need to make a new action-aware capability legible, update the homepage plus `skill.md` / `llms.txt` / `llms-full.txt` first with one exact request and response example; only rerun registry and marketplace updates if the core public positioning actually changes.
 
+## Pricing
+1. **[2026-07-10] Treat Augur price changes as an enforced x402 test, not copy edits**
+   Do instead: when testing `$0.02`, change the actual production x402 `PRICE` secret so the 402 challenge asks for `20000` USDC base units, then update public copy, machine docs, registration scripts, x402.jobs, smoke-test assumptions, and tracking docs in the same pass; verify live unpaid 402 requirements before any paid smoke.
+
 ## Research Hygiene
 1. **[2026-03-10] Keep raw LLM research out of tracked docs**
    Do instead: store transcript dumps under `.codex/research.local/`; keep only synthesis memos and filled summary artifacts in `docs/`.
