@@ -21,6 +21,10 @@
 | 2026-02-24 | self | Tried to DELETE x402.jobs resource by slug with `x-api-key` header | x402.jobs DELETE only works by UUID: `DELETE /api/v1/resources/{uuid}` with `x-api-key`. Slug-based DELETE returns "Missing authorization header". |
 | 2026-02-24 | self | Re-POSTed same resource URL to x402.jobs expecting upsert | x402.jobs POST creates a NEW resource with different slug (appends `-base`). Not idempotent — delete old resource first by UUID. |
 | 2026-02-24 | self | Used `monkeypatch.delenv()` to isolate config tests from `.env` | `load_dotenv()` re-reads `.env` on every `load_config()` call, overriding monkeypatch. Must mock `load_dotenv` itself: `monkeypatch.setattr("risk_api.config.load_dotenv", lambda **kwargs: None)` |
+| 2026-07-06 | self | Embedded PowerShell with `$vars` inside a bash-quoted string for a background check — `$left` got mangled to nothing and the script printed a false "CLEAN" verdict | Never verify via output of a broken-escaping pipeline. Run PowerShell via the PowerShell tool directly; re-run any check whose command errored before trusting its conclusion |
+| 2026-07-06 | review | Codex fabricated 3 of 4 paid-contract addresses in a planning doc (plausible-looking hex, one 41 chars) | Verify every address-like value against ground truth (Base RPC `eth_getCode`, analytics DB) before it lands in docs/fixtures. Length-check is the cheapest first filter |
+| 2026-07-06 | review | A "Fix pyright type narrowing" commit hid a real behavior change (uncaught IndexError on empty Blockscout result became `return None`) with no test | Read "mechanical" commits line by line; any semantic change under a cosmetic label needs its own test and its own commit-message honesty |
+| 2026-07-08 | self | Crude `grep snapshot` on public `/stats` flagged "leakage" that was just the `/reports/base-bluechip-bytecode-snapshot` URL in referers | Inspect the actual match context before reporting a privacy leak; count specific key names (`snapshot_json`, `paid_response`), not generic words |
 
 ## User Preferences
 - Prefers new private GitHub repos for new projects (not monorepo)
@@ -36,6 +40,11 @@
 - Check facilitator `/supported` endpoint to see what scheme+network combos work
 - **Fake x402 gate for tests**: Patch `risk_api.app._setup_x402_middleware` with a lightweight `before_request` hook that returns 402 + proper `Payment-Required` headers (including Bazaar extensions). Avoids all x402 SDK imports. See `tests/conftest.py` for implementation.
 - **`python -m pytest` instead of `pytest`** — pytest is installed but not on PATH in MINGW. `python -m pytest` always works.
+- **Spec → critique → implement → review split (proven on A-003, July 2026)**: Fable writes the design spec and reviews with external ground-truth verification (live endpoints, Base RPC, analytics DB pulls, CI logs); Codex critiques the spec then implements. Catches fabricated data, hidden behavior changes, and CI gaps that inside-the-repo review misses. Default for response-contract changes.
+- **"Zero fixture edits" as a design invariant**: putting response-shape changes in the serializer layer only (`api_contract.py`) means engine-level regression fixtures (`paid_contract_cases.json`) need no edits — and "did the fixtures change?" becomes a one-line review check (`git show --name-only`).
+- **Invariants by construction, not convention**: rebuild the emitted policy object with `action=effective_decision` instead of copying, so `decision == recommended_policy.action` cannot diverge even from inconsistent inputs. Cheaper than policing every producer.
+- **Verify fixture provenance against the source DB**: fixture addresses/counts == exact query result from the pulled `analytics.sqlite3`, and fixture bytecode == live `eth_getCode`. Two commands, kills the fabrication risk class entirely.
+- **Review commits scope-first**: `git show --stat`/`--name-only` against the claimed scope before reading diffs — "docs-only pass" touching `src/` is an instant flag.
 
 ## Patterns That Don't Work
 - Trusting Context7 MCP docs for x402 SDK — they describe APIs that don't exist in v2.2.0
@@ -58,10 +67,10 @@
 - x402.org facilitator supports: `eip155:84532` (v2 exact), `base-sepolia` (v1 exact)
 - Coinbase mainnet facilitator: `https://api.cdp.coinbase.com/platform/v2/x402` — **requires CDP API key auth, returns 401 without it**
 - **Dexter facilitator** (`https://x402.dexter.cash`): free, no auth, 20K settlements/day, Base mainnet — **DOWN 2026-02-23 (522 timeout)**
-- **OpenFacilitator** (`https://pay.openfacilitator.io`): free, no auth, supports eip155:8453 v2 exact — **current production facilitator**
+- **OpenFacilitator** (`https://pay.openfacilitator.io`): ~~current production facilitator~~ **BROKEN for Base USDC** (gas limit 100k < 109k needed, silent reverts). Production is **CDP** (`https://api.cdp.coinbase.com/platform/v2/x402`, Ed25519 JWT auth via `cdp_auth.py`); Mogami (`https://v2.facilitator.mogami.tech`) is the free fallback
 - x402 402 response: body is `{}`, payment details are in `Payment-Required` header (base64 JSON)
 - USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` — EIP-1967 proxy, impl `0x2ce6...d779` (23KB), scores 63/high (proxy+delegatecall+impl_delegatecall+impl_hidden_mint)
-- WETH on Base: `0x4200000000000000000000000000000000000006` — scores 3/safe (deployer_reputation finding: precompile address has no Basescan deployer record)
+- WETH on Base: `0x4200000000000000000000000000000000000006` — scores 0/safe/allow since the 2026-03-29 false-positive fix (was 3/safe). With `action=approve` + unchecked spender: top-level `decision=warn`, `contract_decision=allow` (post-A-003)
 - `ExactEvmServerScheme` has a pyright type error (parameter name mismatch) — SDK bug, use `type: ignore[arg-type]`
 - Conway sandbox pip has broken distro module — patch `encoding="ascii"` to `"utf-8"` in `pip/_vendor/distro/distro.py`
 - Conway sandbox system python setuptools is read-only/corrupted — always use venv
@@ -105,9 +114,11 @@
 - **OASF domains field = top-level slug** — `technology` not `technology/blockchain`. Slash format rejected.
 
 ## Deploy Notes
-- **Auto-deploy is live** — pushing to `master` triggers `.github/workflows/fly-deploy.yml` → `flyctl deploy --remote-only`. `FLY_API_TOKEN` secret set 2026-03-07. No need to run `fly deploy` locally.
+- **Auto-deploy is live and gated** — pushing to `master` triggers Typecheck; `.github/workflows/fly-deploy.yml` runs via `workflow_run` **only if Typecheck succeeds** (gating added 2026-07-06 after a failing-typecheck push deployed anyway). No need to run `fly deploy` locally. Note: docs-only pushes still deploy (identical product image, harmless).
 - **`fly deploy` exit code 1 ≠ broken app** — if one machine was already stopped before the deploy, Fly leaves it stopped and exits 1 ("non-started state"). Check `augurrisk.com/health` and `fly status` to confirm the live machine updated correctly.
 
 ## Graduation Queue
 - **Context7 x402 distrust** — stable enough to graduate to CLAUDE.md: "Never trust Context7 for x402 SDK docs. Always verify imports against installed package."
 - **Context7 doesn't have x402.jobs docs** — use direct scraping for x402.jobs API reference
+- **Verify address-like values against ground truth before they land in docs/fixtures** (length check, then `eth_getCode`/analytics DB) — proven twice in July 2026 (fabricated planning-doc addresses; corrected fixture corpus). Candidate for project CLAUDE.md.
+- **`python -m pytest` not `pytest`** on this machine (MINGW PATH) — stable since Feb, used every session. Candidate for project CLAUDE.md Commands section.
