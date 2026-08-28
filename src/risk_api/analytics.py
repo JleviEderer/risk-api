@@ -8,6 +8,7 @@ import os
 import sqlite3
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,9 @@ TRAFFIC_CLASS_KEYS = (
     "paid_request",
     "other_traffic",
 )
+
+SQLITE_STATS_RECENT_EVENT_LIMIT = 20_000
+SQLITE_STATS_HOURLY_DAYS = 7
 
 MACHINE_DISCOVERY_STAGES = {
     "skill_doc_fetch",
@@ -223,20 +227,45 @@ def _sqlite_traffic_class_expression() -> tuple[str, list[str]]:
     return expression, params
 
 
-def _top_sqlite_items(
-    conn: sqlite3.Connection, column: str, key_name: str
+def _top_recent_sqlite_items(
+    conn: sqlite3.Connection,
+    column: str,
+    key_name: str,
+    *,
+    event_limit: int = SQLITE_STATS_RECENT_EVENT_LIMIT,
 ) -> list[dict[str, Any]]:
     rows = conn.execute(
         f"""
         SELECT {column}, COUNT(*) AS count
-        FROM request_events
+        FROM (
+            SELECT {column}
+            FROM request_events
+            ORDER BY id DESC
+            LIMIT ?
+        )
         WHERE {column} IS NOT NULL AND {column} != ''
         GROUP BY {column}
         ORDER BY count DESC
         LIMIT 10
-        """
+        """,
+        (event_limit,),
     ).fetchall()
     return [{key_name: str(item), "count": int(count)} for item, count in rows]
+
+
+def _sqlite_hourly_cutoff(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute("SELECT MAX(ts) FROM request_events").fetchone()
+    max_ts = row[0] if row else None
+    if not isinstance(max_ts, str) or not max_ts:
+        return None
+    try:
+        latest = datetime.fromisoformat(max_ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if latest.tzinfo is None:
+        latest = latest.replace(tzinfo=timezone.utc)
+    cutoff = latest.astimezone(timezone.utc) - timedelta(days=SQLITE_STATS_HOURLY_DAYS)
+    return cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def build_sqlite_stats_payload(
@@ -258,19 +287,28 @@ def build_sqlite_stats_payload(
 
     with _connect_sqlite(db_path) as conn:
         _ensure_sqlite_schema(conn)
-        total_row = conn.execute(
-            """
-            SELECT
-                COUNT(*) AS total,
-                COALESCE(SUM(paid), 0) AS paid,
-                COALESCE(ROUND(AVG(duration_ms)), 0) AS avg_duration_ms
-            FROM request_events
-            """
-        ).fetchone()
+        payload["aggregation_window"] = {
+            "hourly_days": SQLITE_STATS_HOURLY_DAYS,
+            "recent_event_limit": SQLITE_STATS_RECENT_EVENT_LIMIT,
+        }
+        total_row = conn.execute("SELECT COUNT(*) FROM request_events").fetchone()
         if total_row is not None:
             payload["total_requests"] = int(total_row[0] or 0)
-            payload["paid_requests"] = int(total_row[1] or 0)
-            payload["avg_duration_ms"] = int(total_row[2] or 0)
+
+        avg_duration_row = conn.execute(
+            """
+            SELECT COALESCE(ROUND(AVG(duration_ms)), 0)
+            FROM (
+                SELECT duration_ms
+                FROM request_events
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            """,
+            (SQLITE_STATS_RECENT_EVENT_LIMIT,),
+        ).fetchone()
+        if avg_duration_row is not None:
+            payload["avg_duration_ms"] = int(avg_duration_row[0] or 0)
 
         stage_counts = {
             str(stage): int(count)
@@ -306,6 +344,18 @@ def build_sqlite_stats_payload(
         payload["funnel"] = funnel
 
         traffic_classes = {key: 0 for key in TRAFFIC_CLASS_KEYS}
+        traffic_placeholders = _sql_placeholders(TRAFFIC_CLASS_KEYS)
+        for traffic_class, count in conn.execute(
+            f"""
+            SELECT traffic_class, COUNT(*) AS count
+            FROM request_events
+            WHERE traffic_class IN ({traffic_placeholders})
+            GROUP BY traffic_class
+            """,
+            TRAFFIC_CLASS_KEYS,
+        ):
+            traffic_classes[str(traffic_class)] = int(count)
+
         traffic_expr, traffic_params = _sqlite_traffic_class_expression()
         for traffic_class, count in conn.execute(
             f"""
@@ -313,19 +363,29 @@ def build_sqlite_stats_payload(
             FROM (
                 SELECT {traffic_expr} AS traffic_class_value
                 FROM request_events
+                WHERE traffic_class IS NULL OR traffic_class = ''
             )
             GROUP BY traffic_class_value
             """,
             traffic_params,
         ):
             if traffic_class in traffic_classes:
-                traffic_classes[str(traffic_class)] = int(count)
+                traffic_classes[str(traffic_class)] += int(count)
         payload["traffic_classes"] = traffic_classes
+        payload["paid_requests"] = traffic_classes["paid_request"]
 
-        payload["top_paths"] = _top_sqlite_items(conn, "path", "path")
-        payload["top_hosts"] = _top_sqlite_items(conn, "host", "host")
-        payload["top_referers"] = _top_sqlite_items(conn, "referer", "referer")
+        payload["top_paths"] = _top_recent_sqlite_items(conn, "path", "path")
+        payload["top_hosts"] = _top_recent_sqlite_items(conn, "host", "host")
+        payload["top_referers"] = _top_recent_sqlite_items(
+            conn, "referer", "referer"
+        )
 
+        hourly_cutoff = _sqlite_hourly_cutoff(conn)
+        hourly_where = "ts IS NOT NULL AND length(ts) >= 13"
+        hourly_params: list[str] = [*intent_page_stages, *machine_doc_stages]
+        if hourly_cutoff is not None:
+            hourly_where = "ts >= ?"
+            hourly_params.append(hourly_cutoff)
         hourly_rows = conn.execute(
             """
             SELECT
@@ -345,14 +405,15 @@ def build_sqlite_stats_payload(
                 COALESCE(SUM(CASE WHEN funnel_stage = 'no_bytecode' THEN 1 ELSE 0 END), 0) AS no_bytecode_requests,
                 COALESCE(SUM(CASE WHEN funnel_stage = 'paid_request' THEN 1 ELSE 0 END), 0) AS paid_requests
             FROM request_events
-            WHERE ts IS NOT NULL AND length(ts) >= 13
+            WHERE {hourly_where}
             GROUP BY hour_prefix
             ORDER BY hour_prefix ASC
             """.format(
                 intent_stages=_sql_placeholders(intent_page_stages),
                 machine_stages=_sql_placeholders(machine_doc_stages),
+                hourly_where=hourly_where,
             ),
-            [*intent_page_stages, *machine_doc_stages],
+            hourly_params,
         ).fetchall()
         payload["hourly"] = [
             {

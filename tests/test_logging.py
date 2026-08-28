@@ -734,6 +734,44 @@ def test_sqlite_stats_classifies_rows_without_stored_traffic_class(
     assert data["recent"][0]["traffic_class"] == "known_health_check"
 
 
+def test_sqlite_stats_hourly_window_keeps_totals_but_bounds_chart(
+    client_analytics, app_with_analytics_db
+):
+    db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
+    for ts, request_id in (
+        ("2026-08-01T12:00:00Z", "req-old-hourly-test"),
+        ("2026-08-20T12:00:00Z", "req-recent-hourly-test"),
+    ):
+        assert append_sqlite_entry(
+            db_path,
+            {
+                "ts": ts,
+                "path": "/",
+                "status": 200,
+                "paid": False,
+                "duration_ms": 12,
+                "user_agent": "pytest-agent",
+                "method": "GET",
+                "host": "augurrisk.com",
+                "referer": "",
+                "request_id": request_id,
+                "funnel_stage": "landing_view",
+            },
+        ) is True
+
+    data = client_analytics.get("/stats").get_json()
+
+    assert data["total_requests"] == 2
+    assert data["funnel"]["landing_views"] == 2
+    assert data["aggregation_window"] == {
+        "hourly_days": 7,
+        "recent_event_limit": 20_000,
+    }
+    assert [bucket["hour"] for bucket in data["hourly"]] == [
+        "2026-08-20T12:00:00Z"
+    ]
+
+
 def test_sqlite_analytics_ignores_duplicate_entries(app_with_analytics_db):
     db_path = app_with_analytics_db.config["ANALYTICS_DB_PATH"]
     entry = {

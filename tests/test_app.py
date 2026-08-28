@@ -1068,6 +1068,8 @@ def test_dashboard_returns_html(client):
     assert b"Traffic Quality Classes" in resp.data
     assert b"real_unpaid_conversion_attempt" in resp.data
     assert b"malformed_probe" in resp.data
+    assert "Dashboard data unavailable — retrying".encode() in resp.data
+    assert b"AbortController" in resp.data
 
 
 def test_dashboard_not_behind_paywall(client_with_x402):

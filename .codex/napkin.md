@@ -94,7 +94,7 @@
 
 ## Validation
 1. **[2026-06-04] Keep public `/stats` bounded over durable SQLite**
-   Do instead: aggregate dashboard totals with SQLite queries and read `raw_json` only for recent rows; store `traffic_class` as a column and keep SQL fallback classification for older rows so a grown `/data/analytics.sqlite3` cannot make `/stats` time out and break `/dashboard`; do not bulk-backfill old analytics rows inside a public request on the 512 MB Fly VM.
+   Do instead: keep exact all-time totals, funnel stages, and traffic classes on indexed SQLite queries; bound display-only aggregates to the latest 20,000 events and the hourly chart to 7 days, and read `raw_json` only for the 20 recent rows so `/stats` cannot occupy the single Gunicorn worker long enough to break `/dashboard`; never bulk-backfill old analytics rows inside a public request on the 512 MB Fly VM.
 2. **[2026-04-09] Separate evaluator traffic from real demand in Fly analytics**
    Do instead: use `/dashboard` Traffic Quality Classes plus the request `traffic_class` field and `/stats.traffic_classes` first; treat `/.well-known/x402`, `/.well-known/agent-card.json`, `openapi.json`, `llms*.txt`, health checks, and repeated Base WETH `402` or paid probes as machine-evaluator traffic unless a real integration trail proves otherwise; judge traction from repeated non-smoke paid calls and successful first-call conversion, not raw high-intent counts.
 3. **[2026-04-06] Observe narrow action-aware behavior before widening the API**

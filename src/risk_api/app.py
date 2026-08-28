@@ -1655,7 +1655,13 @@ function renderTrafficChart(data){
   });
 }
 function refresh(){
-  fetch('/stats').then(function(r){return r.json()}).then(function(d){
+  var controller=window.AbortController?new AbortController():null;
+  var timeout=controller?setTimeout(function(){controller.abort()},20000):null;
+  fetch('/stats',controller?{signal:controller.signal}:{}).then(function(r){
+    if(!r.ok){throw new Error('stats '+r.status)}
+    return r.json();
+  }).then(function(d){
+    if(timeout){clearTimeout(timeout)}
     var funnel=d.funnel||{};
     var total=d.total_requests||0;
     var paid=funnel.paid_requests||d.paid_requests||0;
@@ -1668,6 +1674,7 @@ function refresh(){
     var backend=d.storage_backend||'unknown';
     var durable=!!d.storage_durable;
     var backendLabel=durable?('Persistent '+backend):('Ephemeral '+backend);
+    var recentLimit=(d.aggregation_window||{}).recent_event_limit||0;
 
     setMetric('total',fmtNumber(total),durable?'Current durable event count visible to this app.':'Current instance log size. Use trends, not absolute lifetime counts.');
     setMetric('valuable',fmtNumber(valuable),pct(valuable,total)+' of tracked traffic is closer to commercial value.');
@@ -1676,7 +1683,7 @@ function refresh(){
     setMetric('landing',fmtNumber(landing),pct(landing,total)+' of tracked traffic is homepage awareness.');
     setMetric('intent',fmtNumber(intent),'Honeypot / proxy / deployer = '+intentBreakdown);
     setMetric('attempts',fmtNumber(attempts),attempts?('Paid conversion so far: '+pct(paid,attempts)):'No unpaid 402 attempts logged yet.');
-    setMetric('avgdur',d.avg_duration_ms?d.avg_duration_ms+'ms':'-','Lower is better, but quality of traffic matters more than speed here.');
+    setMetric('avgdur',d.avg_duration_ms?d.avg_duration_ms+'ms':'-',recentLimit?('Average over the latest '+fmtNumber(recentLimit)+' requests.'):('Lower is better, but quality of traffic matters more than speed here.'));
 
     document.getElementById('value-share').textContent=pct(valuable,total);
     document.getElementById('paid-conv').textContent=attempts?pct(paid,attempts):'0%';
@@ -1713,7 +1720,11 @@ function refresh(){
         +'<td class="mono" title="'+(e.request_id||'')+'">'+requestShort(e.request_id||'')+'</td>';
       tbody.appendChild(tr);
     });
-  }).catch(function(){});
+  }).catch(function(){
+    if(timeout){clearTimeout(timeout)}
+    document.getElementById('updated').textContent='Dashboard data unavailable — retrying';
+    document.getElementById('analytics-source').textContent='The app is up, but /stats did not respond. Automatic retry runs every 30 seconds.';
+  });
 }
 loadChart().then(refresh);
 setInterval(refresh,30000);

@@ -1,5 +1,12 @@
 # Handover
 
+## August 27, 2026 Dashboard Recovery
+
+- Live `/stats` was again exceeding the 30-second single-worker timeout, which also made `/dashboard` hang while the worker was occupied. `/health` could still return `200`, so health alone did not expose the failure.
+- The durable stats path now keeps exact all-time totals, funnel stages, and traffic classes on indexed queries while bounding expensive display-only aggregates: average duration and top lists use the latest 20,000 events, and the hourly chart uses the latest 7 days relative to the newest stored event.
+- The dashboard now aborts a stalled `/stats` fetch after 20 seconds and shows a visible retry message instead of silently remaining blank.
+- Validation: `python -m pytest -q` -> `430 passed`; `python -m pyright src\ tests\` -> `0 errors`; targeted `py_compile` passed. Against the 277 MB July 8 production snapshot (`347,283` events), the repaired local `/stats` route returned `200` in about `5.5s`, with `169` hourly buckets and `20` recent rows; `/dashboard` returned `200` in about `0.5s`.
+
 ## July 6, 2026 Hygiene Snapshot
 
 - Repo root: `C:\Users\justi\dev\risk-api`
