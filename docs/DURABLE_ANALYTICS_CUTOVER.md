@@ -7,6 +7,8 @@ Use this when moving `/stats` and `/dashboard` off ephemeral per-machine JSONL l
 - Repo support exists:
   - `ANALYTICS_DB_PATH` enables SQLite event persistence
   - `/stats` prefers SQLite when that env var is set
+  - when `ANALYTICS_DB_PATH` and `REQUEST_LOG_PATH` are both set, SQLite is the
+    only active writer; JSONL remains a fallback for environments without SQLite
   - `/stats` should aggregate through bounded SQLite queries and read `raw_json` only for the recent-request table
   - `traffic_class` is persisted as a SQLite column, with SQL fallback classification for older rows where the column is empty
   - do not bulk-backfill historical analytics rows inside the public `/stats` request on the current 512 MB Fly VM
@@ -67,6 +69,14 @@ python scripts/backfill_analytics_db.py --from-log /path/to/requests.jsonl --to-
 Notes:
 - The SQLite store deduplicates identical entries by content fingerprint.
 - Re-running the backfill should skip entries that were already imported.
+
+## JSONL Rollback
+
+- To use JSONL as the only analytics backend, configure `REQUEST_LOG_PATH` and
+  leave `ANALYTICS_DB_PATH` unset; `/stats` and request logging then use JSONL.
+- To temporarily restore the old dual-write behavior while SQLite remains
+  configured, revert the SQLite-primary logging change and redeploy. Do not
+  remove or rewrite the SQLite volume as part of that rollback.
 
 ## Post-Cutover Checks
 

@@ -3079,20 +3079,25 @@ def _setup_x402_middleware(app: Flask, config: Config) -> bool:
 
 
 def _configure_request_log_file(app: Flask) -> None:
-    """Attach a file handler to the request logger if REQUEST_LOG_PATH is set."""
+    """Attach the JSONL fallback only when durable SQLite is not configured."""
     import os
 
     log_path = os.environ.get("REQUEST_LOG_PATH", "")
-    if not log_path:
-        return
-
-    app.config["REQUEST_LOG_PATH"] = log_path
-    os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
-
     for handler in list(request_logger.handlers):
         if getattr(handler, "_risk_api_request_log", False):
             request_logger.removeHandler(handler)
             handler.close()
+
+    if not log_path:
+        return
+    if os.environ.get("ANALYTICS_DB_PATH", ""):
+        logger.info(
+            "Request JSONL fallback disabled while durable SQLite is configured"
+        )
+        return
+
+    app.config["REQUEST_LOG_PATH"] = log_path
+    os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
 
     handler = logging.FileHandler(log_path, encoding="utf-8")
     handler._risk_api_request_log = True  # type: ignore[attr-defined]

@@ -383,6 +383,28 @@ def test_stats_returns_501_without_log_path(test_config, monkeypatch):
     assert resp.status_code == 501
 
 
+def test_sqlite_analytics_disables_jsonl_dual_write(
+    test_config, monkeypatch, tmp_path
+):
+    db_path = tmp_path / "analytics.sqlite3"
+    log_path = tmp_path / "requests.jsonl"
+    log_path.write_text("existing fallback data\n", encoding="utf-8")
+    monkeypatch.setenv("ANALYTICS_DB_PATH", str(db_path))
+    monkeypatch.setenv("REQUEST_LOG_PATH", str(log_path))
+
+    app = create_app(config=test_config, enable_x402=False)
+    app.config["TESTING"] = True
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    assert app.config["ANALYTICS_DB_PATH"] == str(db_path)
+    assert "REQUEST_LOG_PATH" not in app.config
+    assert log_path.read_text(encoding="utf-8") == "existing fallback data\n"
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM request_events").fetchone()[0]
+    assert count == 1
+
+
 @responses.activate
 def test_stats_includes_hourly_and_avg_duration(client_logged, app_with_logging):
     """Stats response includes avg_duration_ms and hourly buckets."""
